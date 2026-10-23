@@ -1,6 +1,6 @@
 import React, { forwardRef, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
-import { BottomSheetModal, BottomSheetView, BottomSheetScrollView } from '@gorhom/bottom-sheet';
+import { BottomSheetModal, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { SharedValue } from 'react-native-reanimated';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState, AppDispatch } from '@/store/store';
@@ -109,8 +109,12 @@ const RouteBottomSheetModal = forwardRef<BottomSheetModal, Props>(
                 snapPoints={['16%', '45%', '100%']}
                 enableOverDrag={false}
                 enablePanDownToClose={false}
+                // Fixed snap points only; the content height must not add its own.
+                enableDynamicSizing={false}
             >
-                <BottomSheetView style={{ flex: 1, paddingTop: 8 }}>
+                {/* One scroll controller for the whole sheet: dragging up expands it before the list scrolls, and pulling down at the top lowers it. The header block is sticky so it stays visible. */}
+                <BottomSheetScrollView stickyHeaderIndices={[0]} contentContainerStyle={{ paddingBottom: 24 }}>
+                    <View style={{ backgroundColor: theme.surfaceColor, paddingTop: 8 }}>
                     {selectedPlace && (
                         <RouteSheetHeader
                             name={selectedPlace.name}
@@ -119,30 +123,8 @@ const RouteBottomSheetModal = forwardRef<BottomSheetModal, Props>(
                         />
                     )}
                     {selectedPlace && <RouteOptionPills />}
-                    {error ? (
-                        <View style={{ padding: 24, alignItems: 'center', gap: 8 }}>
-                            <CircleAlert size={28} color="#ef4444" />
-                            <Text style={{ color: '#ef4444', fontSize: 15, textAlign: 'center' }}>{routeErrorMessage(error)}</Text>
-                        </View>
-                    ) : journeys.length === 0 ? (
-                        loading ? (
-                            <View style={{ padding: 24, alignItems: 'center', gap: 10 }}>
-                                <ActivityIndicator color={ACCENT} />
-                                <Text style={{ color: theme.color, opacity: 0.5, fontSize: 14 }}>Calculating route…</Text>
-                            </View>
-                        ) : (
-                            <View style={{ padding: 24, alignItems: 'center', gap: 8 }}>
-                                <Bus size={28} color={theme.color} style={{ opacity: 0.4 }} />
-                                <Text style={{ color: theme.color, fontSize: 15, fontWeight: '600' }}>No transit route found</Text>
-                                <Text style={{ color: theme.color, opacity: 0.5, fontSize: 13, textAlign: 'center' }}>
-                                    Try a different departure time or a faster walking speed.
-                                </Text>
-                            </View>
-                        )
-                    ) : (
-                        <>
-                            {/* Sort control, only worth showing when there's more than one option */}
-                            {journeys.length > 1 && (
+                        {/* Sort control, only worth showing when there's more than one option */}
+                        {!error && journeys.length > 1 && (
                                 <View
                                     accessibilityRole="tablist"
                                     style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 24, paddingBottom: 12 }}
@@ -177,9 +159,31 @@ const RouteBottomSheetModal = forwardRef<BottomSheetModal, Props>(
                                         );
                                     })}
                                 </View>
-                            )}
+                        )}
+                    </View>
 
-                            <BottomSheetScrollView contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 24, gap: 12 }}>
+                    {error ? (
+                        <View style={{ padding: 24, alignItems: 'center', gap: 8 }}>
+                            <CircleAlert size={28} color="#ef4444" />
+                            <Text style={{ color: '#ef4444', fontSize: 15, textAlign: 'center' }}>{routeErrorMessage(error)}</Text>
+                        </View>
+                    ) : journeys.length === 0 ? (
+                        loading ? (
+                            <View style={{ padding: 24, alignItems: 'center', gap: 10 }}>
+                                <ActivityIndicator color={ACCENT} />
+                                <Text style={{ color: theme.color, opacity: 0.5, fontSize: 14 }}>Calculating route…</Text>
+                            </View>
+                        ) : (
+                            <View style={{ padding: 24, alignItems: 'center', gap: 8 }}>
+                                <Bus size={28} color={theme.color} style={{ opacity: 0.4 }} />
+                                <Text style={{ color: theme.color, fontSize: 15, fontWeight: '600' }}>No transit route found</Text>
+                                <Text style={{ color: theme.color, opacity: 0.5, fontSize: 13, textAlign: 'center' }}>
+                                    Try a different departure time or a faster walking speed.
+                                </Text>
+                            </View>
+                        )
+                    ) : (
+                        <View style={{ paddingHorizontal: 24, gap: 12 }}>
                                 {sorted.map(({ journey, originalIndex }) => {
                                     const isSelected = originalIndex === selectedJourneyIndex;
                                     return (
@@ -284,10 +288,9 @@ const RouteBottomSheetModal = forwardRef<BottomSheetModal, Props>(
                                         </Pressable>
                                     );
                                 })}
-                            </BottomSheetScrollView>
-                        </>
+                        </View>
                     )}
-                </BottomSheetView>
+                </BottomSheetScrollView>
             </BottomSheetModal>
         );
     }
