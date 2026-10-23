@@ -1,6 +1,6 @@
 import React, { RefObject } from 'react';
 import { TouchableOpacity } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { LocateFixed } from 'lucide-react-native';
 import Animated, { clamp, SharedValue, useDerivedValue } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { useDispatch } from 'react-redux';
@@ -41,7 +41,7 @@ export default function LocationButton({ mapRef, animatedPosition }: {
                     goToUserLocation();
                 }}
             >
-                <Ionicons name="locate" size={24} color={ACCENT} />
+                <LocateFixed size={24} color={ACCENT} />
             </TouchableOpacity>
         </Animated.View>
     );

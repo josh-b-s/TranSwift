@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Alert, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { CircleCheck, CirclePlus, CircleX, Footprints, type LucideIcon, Moon, Pencil, RotateCcw, Smartphone, Sun, Trash2 } from 'lucide-react-native';
 import { nanoid } from '@reduxjs/toolkit';
 import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch, RootState } from '@/store/store';
@@ -14,10 +14,10 @@ import {
     type ThemeMode,
 } from '@/store/preferences.slice';
 
-const THEME_OPTIONS: { mode: ThemeMode; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
-    { mode: 'system', label: 'System', icon: 'phone-portrait-outline' },
-    { mode: 'light', label: 'Light', icon: 'sunny-outline' },
-    { mode: 'dark', label: 'Dark', icon: 'moon-outline' },
+const THEME_OPTIONS: { mode: ThemeMode; label: string; icon: LucideIcon }[] = [
+    { mode: 'system', label: 'System', icon: Smartphone },
+    { mode: 'light', label: 'Light', icon: Sun },
+    { mode: 'dark', label: 'Dark', icon: Moon },
 ];
 
 function SectionLabel({ text, theme }: { text: string; theme: ReturnType<typeof useThemeStyle> }) {
@@ -115,7 +115,7 @@ export default function Preferences() {
                                 backgroundColor: active ? '#2563eb' : 'transparent',
                             }}
                         >
-                            <Ionicons name={opt.icon} size={18} color={active ? '#fff' : theme.color} />
+                            <opt.icon size={18} color={active ? '#fff' : theme.color} />
                             <Text style={{ color: active ? '#fff' : theme.color, fontSize: 12, fontWeight: '600' }}>
                                 {opt.label}
                             </Text>
@@ -150,7 +150,7 @@ export default function Preferences() {
                                 alignItems: 'center', justifyContent: 'center',
                             }}
                         >
-                            <Ionicons name="walk-outline" size={18} color="#2563eb" />
+                            <Footprints size={18} color="#2563eb" />
                         </View>
 
                         {isEditing ? (
@@ -182,10 +182,10 @@ export default function Preferences() {
                                     </View>
                                 </View>
                                 <Pressable onPress={saveEditing} hitSlop={8} style={{ padding: 4 }}>
-                                    <Ionicons name="checkmark-circle" size={24} color="#22c55e" />
+                                    <CircleCheck size={24} color="#22c55e" />
                                 </Pressable>
                                 <Pressable onPress={cancelEditing} hitSlop={8} style={{ padding: 4 }}>
-                                    <Ionicons name="close-circle" size={24} color={theme.color} style={{ opacity: 0.4 }} />
+                                    <CircleX size={24} color={theme.color} style={{ opacity: 0.4 }} />
                                 </Pressable>
                             </>
                         ) : (
@@ -201,14 +201,14 @@ export default function Preferences() {
                                     hitSlop={8}
                                     style={{ padding: 4 }}
                                 >
-                                    <Ionicons name="pencil-outline" size={18} color={theme.color} style={{ opacity: 0.6 }} />
+                                    <Pencil size={18} color={theme.color} style={{ opacity: 0.6 }} />
                                 </Pressable>
                                 <Pressable
                                     onPress={() => handleRemoveSpeed(option.id)}
                                     hitSlop={8}
                                     style={{ padding: 4, opacity: walkingSpeeds.length <= 1 ? 0.3 : 1 }}
                                 >
-                                    <Ionicons name="trash-outline" size={18} color="#ef4444" />
+                                    <Trash2 size={18} color="#ef4444" />
                                 </Pressable>
                             </>
                         )}
@@ -230,7 +230,7 @@ export default function Preferences() {
                     borderColor: theme.color + '55',
                 }}
             >
-                <Ionicons name="add-circle-outline" size={18} color={theme.color} />
+                <CirclePlus size={18} color={theme.color} />
                 <Text style={{ color: theme.color, fontSize: 14, fontWeight: '600' }}>Add speed</Text>
             </Pressable>
 
@@ -247,7 +247,7 @@ export default function Preferences() {
                     backgroundColor: theme.backgroundColor,
                 }}
             >
-                <Ionicons name="refresh-outline" size={18} color="#ef4444" />
+                <RotateCcw size={18} color="#ef4444" />
                 <Text style={{ color: '#ef4444', fontSize: 14, fontWeight: '600' }}>Reset settings to default</Text>
             </Pressable>
         </ScrollView>

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Modal, Pressable, Text, TouchableOpacity, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { ChevronDown, ChevronUp } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { SHADOW, useThemeStyle } from '@/constants/themes';
 
@@ -201,7 +201,7 @@ function Stepper({ label, unit, onIncrement, onDecrement, color }: {
                 accessibilityRole="button"
                 accessibilityLabel={`Increase ${unit}`}
             >
-                <Ionicons name="chevron-up" size={20} color={color} />
+                <ChevronUp size={20} color={color} />
             </TouchableOpacity>
             <Text style={{ color, fontSize: 32, fontWeight: '700', minWidth: 56, textAlign: 'center' }}>
                 {label}
@@ -212,7 +212,7 @@ function Stepper({ label, unit, onIncrement, onDecrement, color }: {
                 accessibilityRole="button"
                 accessibilityLabel={`Decrease ${unit}`}
             >
-                <Ionicons name="chevron-down" size={20} color={color} />
+                <ChevronDown size={20} color={color} />
             </TouchableOpacity>
         </View>
     );

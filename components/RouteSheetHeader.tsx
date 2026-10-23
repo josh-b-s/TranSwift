@@ -1,6 +1,6 @@
 import React from 'react';
 import { Pressable, Text, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { MapPin, X } from 'lucide-react-native';
 import { ACCENT, useThemeStyle } from '@/constants/themes';
 
 type Props = {
@@ -21,7 +21,7 @@ export default function RouteSheetHeader({ name, address, onClose }: Props) {
                     alignItems: 'center', justifyContent: 'center',
                 }}
             >
-                <Ionicons name="location-sharp" size={18} color={ACCENT} />
+                <MapPin size={18} color={ACCENT} />
             </View>
             <View style={{ flex: 1 }}>
                 <Text numberOfLines={1} style={{ color: theme.color, fontSize: 17, fontWeight: '700' }}>{name}</Text>
@@ -42,7 +42,7 @@ export default function RouteSheetHeader({ name, address, onClose }: Props) {
                     alignItems: 'center', justifyContent: 'center',
                 }}
             >
-                <Ionicons name="close" size={18} color={theme.color} />
+                <X size={18} color={theme.color} />
             </Pressable>
         </View>
     );

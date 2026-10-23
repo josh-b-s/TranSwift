@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Bus, CircleCheck, CirclePlus, CircleX, Pencil, Trash2 } from 'lucide-react-native';
 import { useThemeStyle } from '@/constants/themes';
 import { pickGtfsZip, importZipAsNewDatabase } from '@/services/gtfs/import/gtfsDbImport';
 import {
@@ -218,7 +218,7 @@ export default function GtfsData() {
                             {isSwitching || isDeleting ? (
                                 <ActivityIndicator size="small" color="#2563eb" />
                             ) : (
-                                <Ionicons name="bus-outline" size={20} color="#2563eb" />
+                                <Bus size={20} color="#2563eb" />
                             )}
                         </Pressable>
 
@@ -236,10 +236,10 @@ export default function GtfsData() {
                                     }}
                                 />
                                 <Pressable onPress={handleSaveRename} hitSlop={8} style={{ padding: 4 }}>
-                                    <Ionicons name="checkmark-circle" size={24} color="#22c55e" />
+                                    <CircleCheck size={24} color="#22c55e" />
                                 </Pressable>
                                 <Pressable onPress={cancelRename} hitSlop={8} style={{ padding: 4 }}>
-                                    <Ionicons name="close-circle" size={24} color={theme.color} style={{ opacity: 0.4 }} />
+                                    <CircleX size={24} color={theme.color} style={{ opacity: 0.4 }} />
                                 </Pressable>
                             </>
                         ) : (
@@ -254,14 +254,14 @@ export default function GtfsData() {
                                         Imported {new Date(db.importedAt).toLocaleDateString()}
                                     </Text>
                                 </Pressable>
-                                {isActive && <Ionicons name="checkmark-circle" size={20} color="#2563eb" />}
+                                {isActive && <CircleCheck size={20} color="#2563eb" />}
                                 <Pressable
                                     onPress={() => startRename(db)}
                                     disabled={busy}
                                     hitSlop={8}
                                     style={{ padding: 4 }}
                                 >
-                                    <Ionicons name="pencil-outline" size={18} color={theme.color} style={{ opacity: 0.6 }} />
+                                    <Pencil size={18} color={theme.color} style={{ opacity: 0.6 }} />
                                 </Pressable>
                                 <Pressable
                                     onPress={() => handleDelete(db)}
@@ -269,7 +269,7 @@ export default function GtfsData() {
                                     hitSlop={8}
                                     style={{ padding: 4 }}
                                 >
-                                    <Ionicons name="trash-outline" size={18} color="#ef4444" />
+                                    <Trash2 size={18} color="#ef4444" />
                                 </Pressable>
                             </>
                         )}
@@ -293,7 +293,7 @@ export default function GtfsData() {
                     opacity: busy ? 0.5 : 1,
                 }}
             >
-                <Ionicons name="add-circle-outline" size={20} color={theme.color} />
+                <CirclePlus size={20} color={theme.color} />
                 <Text style={{ color: theme.color, fontSize: 15, fontWeight: '600' }}>Add zip</Text>
             </Pressable>
 

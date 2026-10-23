@@ -1,19 +1,18 @@
-import { Ionicons } from '@expo/vector-icons';
+import { Bus, CableCar, Navigation, Ship, TrainFront, TramFront } from 'lucide-react-native';
+import type { LucideIcon } from 'lucide-react-native';
 import type { RouteCategory } from '@/services/gtfs/config/routeTypeUtil';
 
-type IconName = keyof typeof Ionicons.glyphMap;
-
-const MODE_ICONS: Record<RouteCategory, IconName> = {
-    tram: 'train-outline',
-    metro: 'subway-outline',
-    rail: 'subway-outline',
-    bus: 'bus-outline',
-    coach: 'bus-outline',
-    ferry: 'boat-outline',
-    cable: 'navigate-outline',
-    aerial: 'navigate-outline',
-    funicular: 'navigate-outline',
-    other: 'navigate-outline',
+const MODE_ICONS: Record<RouteCategory, LucideIcon> = {
+    tram: TramFront,
+    metro: TrainFront,
+    rail: TrainFront,
+    bus: Bus,
+    coach: Bus,
+    ferry: Ship,
+    cable: CableCar,
+    aerial: CableCar,
+    funicular: CableCar,
+    other: Navigation,
 };
 
-export const modeIcon = (category: RouteCategory): IconName => MODE_ICONS[category];
+export const modeIcon = (category: RouteCategory): LucideIcon => MODE_ICONS[category];

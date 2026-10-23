@@ -1,11 +1,11 @@
 import React from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Bus, ChevronRight, type LucideIcon, SlidersHorizontal } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useThemeStyle } from '@/constants/themes';
 
 type MenuItem = {
-    icon: keyof typeof Ionicons.glyphMap;
+    icon: LucideIcon;
     title: string;
     subtitle: string;
     route: '/settings/preferences' | '/settings/gtfs';
@@ -13,13 +13,13 @@ type MenuItem = {
 
 const ITEMS: MenuItem[] = [
     {
-        icon: 'options-outline',
+        icon: SlidersHorizontal,
         title: 'Preferences',
         subtitle: 'Theme, default walking speed, units',
         route: '/settings/preferences',
     },
     {
-        icon: 'bus-outline',
+        icon: Bus,
         title: 'GTFS Data',
         subtitle: 'Manage transit regions and feeds',
         route: '/settings/gtfs',
@@ -52,13 +52,13 @@ export default function SettingsMenu() {
                             alignItems: 'center', justifyContent: 'center',
                         }}
                     >
-                        <Ionicons name={item.icon} size={20} color="#2563eb" />
+                        <item.icon size={20} color="#2563eb" />
                     </View>
                     <View style={{ flex: 1 }}>
                         <Text style={{ color: theme.color, fontSize: 16, fontWeight: '600' }}>{item.title}</Text>
                         <Text style={{ color: theme.color, opacity: 0.5, fontSize: 13, marginTop: 2 }}>{item.subtitle}</Text>
                     </View>
-                    <Ionicons name="chevron-forward" size={18} color={theme.color + '66'} />
+                    <ChevronRight size={18} color={theme.color + '66'} />
                 </Pressable>
             ))}
         </ScrollView>

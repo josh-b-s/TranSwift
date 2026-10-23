@@ -9,7 +9,7 @@ import { modeIcon } from '@/constants/modeIcons';
 import RouteSheetHeader from '@/components/RouteSheetHeader';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
-import { Ionicons } from '@expo/vector-icons';
+import { ArrowLeftRight, Bus, ChevronRight, CircleAlert, Footprints, type LucideIcon, Zap } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { clearRoute, selectJourney } from '@/store/route.slice';
 import { selectPlace, setQuery } from '@/store/search.slice';
@@ -21,10 +21,10 @@ type Props = {
 
 type SortKey = 'arrival' | 'walking' | 'transfers';
 
-const SORT_OPTIONS: { key: SortKey; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
-    { key: 'arrival',   label: 'Fastest',          icon: 'flash-outline' },
-    { key: 'walking',   label: 'Least walking',    icon: 'walk-outline' },
-    { key: 'transfers', label: 'Fewest transfers', icon: 'swap-horizontal-outline' },
+const SORT_OPTIONS: { key: SortKey; label: string; icon: LucideIcon }[] = [
+    { key: 'arrival',   label: 'Fastest',          icon: Zap },
+    { key: 'walking',   label: 'Least walking',    icon: Footprints },
+    { key: 'transfers', label: 'Fewest transfers', icon: ArrowLeftRight },
 ];
 
 // Journey times come out of the router as raw GTFS "HH:MM:SS" strings
@@ -118,7 +118,7 @@ const RouteBottomSheetModal = forwardRef<BottomSheetModal, Props>(
                     )}
                     {error ? (
                         <View style={{ padding: 24, alignItems: 'center', gap: 8 }}>
-                            <Ionicons name="alert-circle-outline" size={28} color="#ef4444" />
+                            <CircleAlert size={28} color="#ef4444" />
                             <Text style={{ color: '#ef4444', fontSize: 15, textAlign: 'center' }}>{error}</Text>
                         </View>
                     ) : journeys.length === 0 ? (
@@ -129,7 +129,7 @@ const RouteBottomSheetModal = forwardRef<BottomSheetModal, Props>(
                             </View>
                         ) : (
                             <View style={{ padding: 24, alignItems: 'center', gap: 8 }}>
-                                <Ionicons name="bus-outline" size={28} color={theme.color} style={{ opacity: 0.4 }} />
+                                <Bus size={28} color={theme.color} style={{ opacity: 0.4 }} />
                                 <Text style={{ color: theme.color, fontSize: 15, fontWeight: '600' }}>No transit route found</Text>
                                 <Text style={{ color: theme.color, opacity: 0.5, fontSize: 13, textAlign: 'center' }}>
                                     Try a different departure time or a faster walking speed.
@@ -166,7 +166,7 @@ const RouteBottomSheetModal = forwardRef<BottomSheetModal, Props>(
                                                     backgroundColor: active ? ACCENT : theme.backgroundColor,
                                                 }}
                                             >
-                                                <Ionicons name={opt.icon} size={14} color={active ? '#fff' : theme.color} />
+                                                <opt.icon size={14} color={active ? '#fff' : theme.color} />
                                                 <Text style={{ color: active ? '#fff' : theme.color, fontSize: 13, fontWeight: '600' }}>
                                                     {opt.label}
                                                 </Text>
@@ -212,10 +212,11 @@ const RouteBottomSheetModal = forwardRef<BottomSheetModal, Props>(
                                             <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
                                                 {journey.legs.map((leg, i) => {
                                                     const { category, label } = classifyRouteType(leg.routeType);
+                                                    const ModeIcon = modeIcon(category);
                                                     return (
                                                         <React.Fragment key={i}>
                                                             {i > 0 && (
-                                                                <Ionicons name="chevron-forward" size={12} color={theme.color} style={{ opacity: 0.35 }} />
+                                                                <ChevronRight size={12} color={theme.color} style={{ opacity: 0.35 }} />
                                                             )}
                                                             <View
                                                                 style={{
@@ -228,7 +229,7 @@ const RouteBottomSheetModal = forwardRef<BottomSheetModal, Props>(
                                                                     backgroundColor: leg.routeColor ?? ACCENT,
                                                                 }}
                                                             >
-                                                                <Ionicons name={modeIcon(category)} size={14} color={leg.routeTextColor ?? '#fff'} />
+                                                                <ModeIcon size={14} color={leg.routeTextColor ?? '#fff'} />
                                                                 <Text style={{ color: leg.routeTextColor ?? '#fff', fontSize: 13, fontWeight: '700' }}>
                                                                     {label} {leg.routeName}
                                                                 </Text>

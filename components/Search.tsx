@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {ActivityIndicator, Alert, FlatList, Keyboard, Text, TextInput, TouchableOpacity, View} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { CircleX, Clock, Footprints, MapPin, Repeat, Search as SearchIcon } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch, RootState } from '@/store/store';
@@ -79,7 +79,7 @@ export default function Search() {
         <View className="absolute left-4 right-4 z-[9999]" style={{ top: TOP_SAFE(useSafeAreaInsets()) }}>
             <View className="flex-row items-center rounded-full px-3 py-2"
                   style={[{ backgroundColor: theme.backgroundColor }, SHADOW]}>
-                <Ionicons name="search" size={20} color={theme.color} style={{ opacity: 0.5, marginHorizontal: 8 }} />
+                <SearchIcon size={20} color={theme.color} style={{ opacity: 0.5, marginHorizontal: 8 }} />
                 <TextInput
                     value={query}
                     onChangeText={(t) => dispatch(setQuery(t))}
@@ -96,7 +96,7 @@ export default function Search() {
                                       accessibilityLabel="Clear search"
                                       hitSlop={8}
                                       className="p-1.5 ml-1">
-                        <Ionicons name="close-circle" size={22} color={theme.color} style={{ opacity: 0.4 }} />
+                        <CircleX size={22} color={theme.color} style={{ opacity: 0.4 }} />
                     </TouchableOpacity>
                 )}
             </View>
@@ -112,7 +112,7 @@ export default function Search() {
                         accessibilityLabel="Set departure time"
                         onPress={() => setShowTimeModal(true)}
                     >
-                        <Ionicons name="time-outline" size={16} color={theme.color} />
+                        <Clock size={16} color={theme.color} />
                         <Text style={{ color: theme.color, marginLeft: 6, fontSize: 13, fontWeight: '600' }}>
                             {departureTime
                                 ? new Date(departureTime).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
@@ -126,7 +126,7 @@ export default function Search() {
                                 hitSlop={8}
                                 style={{ marginLeft: 6 }}
                             >
-                                <Ionicons name="close-circle" size={14} color={theme.color} style={{ opacity: 0.5 }} />
+                                <CircleX size={14} color={theme.color} style={{ opacity: 0.5 }} />
                             </TouchableOpacity>
                         )}
                     </TouchableOpacity>
@@ -138,14 +138,14 @@ export default function Search() {
                         accessibilityLabel={`Walking speed: ${speedLabel}. Tap to cycle.`}
                         onPress={cycleWalkingSpeed}
                     >
-                        <Ionicons name="walk-outline" size={16} color={theme.color} />
+                        <Footprints size={16} color={theme.color} />
                         <Text style={{ color: theme.color, marginLeft: 6, fontSize: 13, fontWeight: '600' }}>
                             {speedLabel}
                         </Text>
                         {/* Hints that this is a cycling control, not a static
                             label — otherwise there's nothing to suggest it's
                             tappable at all. */}
-                        <Ionicons name="sync-outline" size={11} color={theme.color} style={{ opacity: 0.45, marginLeft: 5 }} />
+                        <Repeat size={11} color={theme.color} style={{ opacity: 0.45, marginLeft: 5 }} />
                     </TouchableOpacity>
                 </View>
             )}
@@ -175,7 +175,7 @@ export default function Search() {
                                     className="items-center justify-center rounded-full mr-3"
                                     style={{ width: 36, height: 36, backgroundColor: ACCENT + '1f' }}
                                 >
-                                    <Ionicons name="location-sharp" size={18} color={ACCENT} />
+                                    <MapPin size={18} color={ACCENT} />
                                 </View>
                                 <View className="flex-1">
                                     <Text className="text-base font-semibold" numberOfLines={1} style={{ color: theme.color }}>{item.name}</Text>

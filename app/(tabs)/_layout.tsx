@@ -1,6 +1,6 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { Map as MapIcon, Settings as SettingsIcon } from 'lucide-react-native';
 import { useThemeStyle } from '@/constants/themes';
 
 export default function TabsLayout() {
@@ -25,14 +25,14 @@ export default function TabsLayout() {
                 name="index"
                 options={{
                     title: 'Map',
-                    tabBarIcon: ({ color, size }) => <Ionicons name="map" size={size} color={color} />,
+                    tabBarIcon: ({ color, size }) => <MapIcon size={size} color={color} />,
                 }}
             />
             <Tabs.Screen
                 name="settings"
                 options={{
                     title: 'Settings',
-                    tabBarIcon: ({ color, size }) => <Ionicons name="settings-sharp" size={size} color={color} />,
+                    tabBarIcon: ({ color, size }) => <SettingsIcon size={size} color={color} />,
                 }}
             />
         </Tabs>
