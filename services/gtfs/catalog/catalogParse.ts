@@ -1,3 +1,4 @@
+import type { Coverage } from './coverage';
 import { parseCsv } from './csvParse';
 
 export type CatalogFeed = {
@@ -10,6 +11,8 @@ export type CatalogFeed = {
     /** Mobility Database mirror of the latest zip. Unlike the producer URL it never needs a key. */
     zipUrl: string;
     licenseUrl: string;
+    /** Null when the catalog has no usable box for this feed. */
+    box: Coverage | null;
 };
 
 // Header names as documented for feeds_v2.csv. Not yet checked against a live
@@ -27,7 +30,20 @@ const COLUMN = {
     licenseUrl: 'urls.license',
 } as const;
 
+// Optional: if these names are wrong, location suggestions go quiet but browsing still works.
+const BOX_COLUMNS = [
+    'location.bounding_box.minimum_latitude',
+    'location.bounding_box.maximum_latitude',
+    'location.bounding_box.minimum_longitude',
+    'location.bounding_box.maximum_longitude',
+];
+
 type Column = keyof typeof COLUMN;
+
+function boxOf(row: string[], index: Map<string, number>): Coverage | null {
+    const [minLat, maxLat, minLon, maxLon] = BOX_COLUMNS.map((c) => parseFloat(row[index.get(c) ?? -1] ?? ''));
+    return [minLat, maxLat, minLon, maxLon].some(Number.isNaN) ? null : { minLat, maxLat, minLon, maxLon };
+}
 
 /** Active GTFS schedule feeds from the catalog CSV, sorted by country then provider. */
 export function parseCatalog(text: string): CatalogFeed[] {
@@ -55,6 +71,7 @@ export function parseCatalog(text: string): CatalogFeed[] {
             municipality: cell('municipality'),
             zipUrl: cell('zipUrl'),
             licenseUrl: cell('licenseUrl'),
+            box: boxOf(row, index),
         });
     }
 

@@ -1,6 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, FlatList, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useThemeStyle } from '@/constants/themes';
 import ImportProgressCard from '@/components/ImportProgressCard';
 import { countriesOf, filterFeeds } from '@/services/gtfs/catalog/catalogFilter';
@@ -23,6 +23,8 @@ const ACCENT = '#2563eb';
 export default function BrowseFeeds() {
     const theme = useThemeStyle();
     const router = useRouter();
+    const { feedId, replaceId } = useLocalSearchParams<{ feedId?: string; replaceId?: string }>();
+    const openedFeed = useRef(false);
     const [catalog, setCatalog] = useState<CatalogResult | null>(null);
     const [loadError, setLoadError] = useState('');
     const [refreshing, setRefreshing] = useState(false);
@@ -43,6 +45,15 @@ export default function BrowseFeeds() {
     useEffect(() => {
         load(false);
     }, [load]);
+
+    // Arriving from a location suggestion: go straight to that feed's confirm dialog.
+    useEffect(() => {
+        if (!catalog || !feedId || openedFeed.current) return;
+        openedFeed.current = true;
+        const feed = catalog.feeds.find((f) => f.id === feedId);
+        if (feed) handlePick(feed);
+        else setError('That feed is no longer in the catalog.');
+    }, [catalog, feedId]);
 
     async function handleRefresh() {
         setRefreshing(true);
@@ -67,7 +78,7 @@ export default function BrowseFeeds() {
         }
 
         Alert.alert(
-            `Download ${feed.provider}?`,
+            `${replaceId ? 'Replace with the latest' : 'Download'} ${feed.provider}?`,
             [
                 `Size: ${size ? formatMegabytes(size) : 'unknown'}`,
                 `Licence: ${feed.licenseUrl || 'not listed'}`,
@@ -75,7 +86,7 @@ export default function BrowseFeeds() {
             ].join('\n'),
             [
                 { text: 'Cancel', style: 'cancel' },
-                { text: 'Download', onPress: () => runImport(feed) },
+                { text: replaceId ? 'Replace' : 'Download', onPress: () => runImport(feed) },
             ],
         );
     }
@@ -88,11 +99,16 @@ export default function BrowseFeeds() {
                 feed,
                 (written, total) => setBusy({ label: feed.provider, progress: downloadProgress(written, total) }),
                 (p) => setBusy({ label: feed.provider, progress: track(p) }),
+                replaceId,
             );
             router.back();
         } catch (err) {
-            if (err instanceof DuplicateFeedError) Alert.alert('Already imported', err.message);
-            else setError(`Import failed: ${String(err)}`);
+            if (err instanceof DuplicateFeedError) {
+                if (replaceId) Alert.alert('Already up to date', "The provider hasn't published a newer version yet.");
+                else Alert.alert('Already imported', err.message);
+            } else {
+                setError(`Import failed: ${String(err)}`);
+            }
         } finally {
             setBusy(null);
         }

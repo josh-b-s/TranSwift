@@ -55,5 +55,9 @@ export async function loadCatalog(force = false): Promise<CatalogResult> {
     }
 
     const text = await FileSystem.readAsStringAsync(CACHE_PATH);
-    return { feeds: parseCatalog(text), fetchedAt: cache.fetchedAt, stale };
+    const feeds = parseCatalog(text);
+    if (feeds.length > 0 && feeds.every((f) => !f.box)) {
+        console.warn('[feedCatalog] no bounding boxes parsed; check BOX_COLUMNS in catalogParse.ts');
+    }
+    return { feeds, fetchedAt: cache.fetchedAt, stale };
 }

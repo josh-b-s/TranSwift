@@ -10,6 +10,7 @@
 
 import * as FileSystem from 'expo-file-system/legacy';
 import * as DocumentPicker from 'expo-document-picker';
+import { computeFeedStats } from './gtfsFeedStats';
 import { importGtfsZipToPath, type ImportProgressEvent } from './rustGtfsImporter';
 import {
     DuplicateFeedError,
@@ -17,6 +18,7 @@ import {
     nameFromZipFileName,
     type FeedSource,
     registerDatabase,
+    saveFeedStats,
     type GtfsDatabaseEntry,
 } from './gtfsDbRegistry';
 
@@ -74,5 +76,9 @@ export async function importZipAsNewDatabase(
     await importGtfsZipToPath(zip.uri, dbPath, onProgress);
 
     const name = source?.label ?? nameFromZipFileName(zip.name ?? 'Imported feed');
-    return registerDatabase(name, fileName, md5, source);
+    const entry = await registerDatabase(name, fileName, md5, source);
+    // registerDatabase made this the active database, which computeFeedStats reads.
+    const stats = await computeFeedStats();
+    await saveFeedStats(entry.id, stats);
+    return { ...entry, stats };
 }

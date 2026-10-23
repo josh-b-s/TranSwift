@@ -17,9 +17,12 @@
 import * as FileSystem from 'expo-file-system/legacy';
 import { setActiveDbPath, clearActiveDbPath } from '@/services/db/sqliteDb';
 import { invalidateNativeRouter } from '../router/gtfsRouterNative';
+import { computeFeedStats, type FeedStats } from './gtfsFeedStats';
 
 /** Where a feed was downloaded from, kept for licence credit and later update checks. */
 export type FeedSource = {
+    /** Mobility Database feed id, used to find the feed again in the catalog. */
+    id: string;
     label: string;
     url: string;
     license?: string;
@@ -37,6 +40,8 @@ export type GtfsDatabaseEntry = {
     zipHash?: string;
     /** Set for feeds imported from the catalog; absent for zips picked from the device. */
     source?: FeedSource;
+    /** Computed once after import. Absent on entries imported before it existed. */
+    stats?: FeedStats;
 };
 
 type RegistryFile = {
@@ -195,6 +200,7 @@ export async function setActiveDatabase(id: string): Promise<void> {
 
     reg.activeId = id;
     await writeRegistry(reg);
+    await ensureActiveStats();
 }
 
 /**
@@ -283,4 +289,20 @@ export async function deleteDatabase(id: string): Promise<void> {
     if (entry) {
         await FileSystem.deleteAsync(dbPathFor(entry), { idempotent: true }).catch(() => {});
     }
+}
+
+export async function saveFeedStats(id: string, stats: FeedStats): Promise<void> {
+    const reg = await readRegistry();
+    const entry = reg.databases.find(d => d.id === id);
+    if (!entry) throw new Error(`Unknown GTFS database id: ${id}`);
+    entry.stats = stats;
+    await writeRegistry(reg);
+}
+
+/** Fills in stats for the active database if it was imported before they were tracked. */
+export async function ensureActiveStats(): Promise<void> {
+    const reg = await readRegistry();
+    const entry = reg.databases.find(d => d.id === reg.activeId);
+    if (!entry || entry.stats) return;
+    await saveFeedStats(entry.id, await computeFeedStats());
 }
