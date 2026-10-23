@@ -15,8 +15,8 @@ const PIN_SIZE = 40;
 const ORIGIN_COLOR = '#16a34a';
 const DESTINATION_COLOR = '#ef4444';
 
-// Leaves room on the right for the locate button, which sits in the bottom corner.
-const CONFIRM_RIGHT_MARGIN = 84;
+// Leaves room for the speedometer and locate buttons in the bottom corners.
+const CONFIRM_SIDE_MARGIN = 84;
 
 /** The map moves under a fixed centre pin; Confirm takes whatever is under it. */
 export default function MapPickOverlay({ mapRef }: { mapRef: RefObject<MapView | null> }) {
@@ -92,7 +92,7 @@ export default function MapPickOverlay({ mapRef }: { mapRef: RefObject<MapView |
                 accessibilityRole="button"
                 style={[
                     {
-                        position: 'absolute', left: 16, right: CONFIRM_RIGHT_MARGIN, bottom: 20,
+                        position: 'absolute', left: CONFIRM_SIDE_MARGIN, right: CONFIRM_SIDE_MARGIN, bottom: 20,
                         paddingVertical: 16, borderRadius: 20, alignItems: 'center',
                         backgroundColor: ACCENT,
                     },

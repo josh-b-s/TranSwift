@@ -1,7 +1,7 @@
 import React, { RefObject } from 'react';
 import { TouchableOpacity } from 'react-native';
 import { LocateFixed } from 'lucide-react-native';
-import Animated, { clamp, SharedValue, useDerivedValue } from 'react-native-reanimated';
+import Animated, { SharedValue } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { useDispatch } from 'react-redux';
 import { AppDispatch } from '@/store/store';
@@ -9,9 +9,8 @@ import { setUserLocation } from '@/store/location.slice';
 import MapView, { LatLng } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { ACCENT, SHADOW, useThemeStyle } from '@/constants/themes';
-import { useWindowDimensions } from 'react-native';
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import {useGoToUserLocation} from "@/hooks/goToUserLocation";
+import {useSheetFollowTop} from "@/hooks/sheetFollowTop";
 
 export default function LocationButton({ mapRef, animatedPosition }: {
     mapRef: RefObject<MapView | null>;
@@ -19,13 +18,7 @@ export default function LocationButton({ mapRef, animatedPosition }: {
 }) {
     const dispatch = useDispatch<AppDispatch>();
     const theme = useThemeStyle();
-    const { height } = useWindowDimensions();
-    const tabBarHeight = useBottomTabBarHeight();
-
-    // Same clamp() as the "don't go above half the screen" cap on the way
-    // up — just mirrored on the way down, so the button can't sink lower
-    // than just above the navbar.
-    const clampedTop = useDerivedValue(() => clamp(animatedPosition.value, height / 2, height - tabBarHeight));
+    const clampedTop = useSheetFollowTop(animatedPosition);
 
     const goToUserLocation = useGoToUserLocation(mapRef);
 

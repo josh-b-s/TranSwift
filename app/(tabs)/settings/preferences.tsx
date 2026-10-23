@@ -5,19 +5,28 @@ import { nanoid } from '@reduxjs/toolkit';
 import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch, RootState } from '@/store/store';
 import { useThemeStyle } from '@/constants/themes';
+import { SPEED_UNITS } from '@/constants/speedUnits';
+import SegmentedControl from '@/components/SegmentedControl';
 import {
     addWalkingSpeed,
     removeWalkingSpeed,
     resetPreferences,
+    setSpeedUnit,
     setThemeMode,
     updateWalkingSpeed,
+    type SpeedUnit,
     type ThemeMode,
 } from '@/store/preferences.slice';
 
-const THEME_OPTIONS: { mode: ThemeMode; label: string; icon: LucideIcon }[] = [
-    { mode: 'system', label: 'System', icon: Smartphone },
-    { mode: 'light', label: 'Light', icon: Sun },
-    { mode: 'dark', label: 'Dark', icon: Moon },
+const THEME_OPTIONS: { value: ThemeMode; label: string; icon: LucideIcon }[] = [
+    { value: 'system', label: 'System', icon: Smartphone },
+    { value: 'light', label: 'Light', icon: Sun },
+    { value: 'dark', label: 'Dark', icon: Moon },
+];
+
+const SPEED_UNIT_OPTIONS: { value: SpeedUnit; label: string }[] = [
+    { value: 'kmh', label: SPEED_UNITS.kmh.label },
+    { value: 'mph', label: SPEED_UNITS.mph.label },
 ];
 
 function SectionLabel({ text, theme }: { text: string; theme: ReturnType<typeof useThemeStyle> }) {
@@ -33,6 +42,7 @@ export default function Preferences() {
     const dispatch = useDispatch<AppDispatch>();
     const themeMode = useSelector((s: RootState) => s.preferences.themeMode);
     const walkingSpeeds = useSelector((s: RootState) => s.preferences.walkingSpeeds);
+    const speedUnit = useSelector((s: RootState) => s.preferences.speedUnit);
 
     // Inline-edit state for the walking speed list — editingId names which
     // row is currently showing text inputs instead of static text; the two
@@ -85,7 +95,7 @@ export default function Preferences() {
     function handleReset() {
         Alert.alert(
             'Reset to defaults?',
-            'Theme and walking speeds will be reset to their default values.',
+            'Theme, speedometer unit and walking speeds will be reset to their default values.',
             [
                 { text: 'Cancel', style: 'cancel' },
                 { text: 'Reset', style: 'destructive', onPress: () => { setEditingId(null); dispatch(resetPreferences()); } },
@@ -96,33 +106,18 @@ export default function Preferences() {
     return (
         <ScrollView style={{ flex: 1, backgroundColor: theme.surfaceColor }} contentContainerStyle={{ padding: 16, gap: 8 }}>
             <SectionLabel text="Theme" theme={theme} />
-            <View
-                className="flex-row rounded-2xl overflow-hidden"
-                style={{ backgroundColor: theme.backgroundColor }}
-            >
-                {THEME_OPTIONS.map((opt) => {
-                    const active = opt.mode === themeMode;
-                    return (
-                        <Pressable
-                            key={opt.mode}
-                            onPress={() => dispatch(setThemeMode(opt.mode))}
-                            style={{
-                                flex: 1,
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                paddingVertical: 14,
-                                gap: 4,
-                                backgroundColor: active ? '#2563eb' : 'transparent',
-                            }}
-                        >
-                            <opt.icon size={18} color={active ? '#fff' : theme.color} />
-                            <Text style={{ color: active ? '#fff' : theme.color, fontSize: 12, fontWeight: '600' }}>
-                                {opt.label}
-                            </Text>
-                        </Pressable>
-                    );
-                })}
-            </View>
+            <SegmentedControl
+                options={THEME_OPTIONS}
+                value={themeMode}
+                onChange={(mode) => dispatch(setThemeMode(mode))}
+            />
+
+            <SectionLabel text="Speedometer unit" theme={theme} />
+            <SegmentedControl
+                options={SPEED_UNIT_OPTIONS}
+                value={speedUnit}
+                onChange={(unit) => dispatch(setSpeedUnit(unit))}
+            />
 
             <SectionLabel text="Walking speeds" theme={theme} />
             <Text style={{ color: theme.color, opacity: 0.5, fontSize: 12, marginBottom: 4 }}>

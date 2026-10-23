@@ -13,6 +13,8 @@ import * as FileSystem from 'expo-file-system/legacy';
 
 export type ThemeMode = 'system' | 'light' | 'dark';
 
+export type SpeedUnit = 'kmh' | 'mph';
+
 export type WalkingSpeedOption = {
     id: string;
     label: string;
@@ -23,9 +25,11 @@ export type WalkingSpeedOption = {
 export type StoredPreferences = {
     themeMode: ThemeMode;
     walkingSpeeds: WalkingSpeedOption[];
+    speedUnit: SpeedUnit;
 };
 
 export const DEFAULT_THEME_MODE: ThemeMode = 'system';
+export const DEFAULT_SPEED_UNIT: SpeedUnit = 'kmh';
 
 // Same three tiers Search.tsx's WALK_SPEED_CYCLE used to hardcode.
 export const DEFAULT_WALKING_SPEEDS: WalkingSpeedOption[] = [
@@ -43,10 +47,11 @@ export async function loadStoredPreferences(): Promise<StoredPreferences> {
         return {
             themeMode: parsed.themeMode ?? DEFAULT_THEME_MODE,
             walkingSpeeds: parsed.walkingSpeeds?.length ? parsed.walkingSpeeds : DEFAULT_WALKING_SPEEDS,
+            speedUnit: parsed.speedUnit ?? DEFAULT_SPEED_UNIT,
         };
     } catch {
         // No file yet (fresh install) — defaults, not an error.
-        return { themeMode: DEFAULT_THEME_MODE, walkingSpeeds: DEFAULT_WALKING_SPEEDS };
+        return { themeMode: DEFAULT_THEME_MODE, walkingSpeeds: DEFAULT_WALKING_SPEEDS, speedUnit: DEFAULT_SPEED_UNIT };
     }
 }
 

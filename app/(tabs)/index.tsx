@@ -12,6 +12,7 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
 import Search from '@/components/Search';
 import LocationButton from '@/components/LocationButton';
+import Speedometer from '@/components/Speedometer';
 import RouteBottomSheetModal from '@/components/RouteBottomSheetModal';
 import MapPickOverlay from '@/components/MapPickOverlay';
 import DebugMapOverlay from '@/components/DebugMapOverlay';
@@ -200,6 +201,7 @@ export default function Index() {
             )}
 
             <MapPickOverlay mapRef={mapRef} />
+            <Speedometer animatedPosition={bottomSheetPosition} />
             <LocationButton mapRef={mapRef} animatedPosition={bottomSheetPosition} />
             {/*<DebugControls />*/}
             <RouteBottomSheetModal ref={modalRef} animatedPosition={bottomSheetPosition} />

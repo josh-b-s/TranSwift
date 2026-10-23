@@ -1,19 +1,22 @@
 import { createAsyncThunk, createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { colorScheme as nativewindColorScheme } from 'nativewind';
 import {
+    DEFAULT_SPEED_UNIT,
     DEFAULT_THEME_MODE,
     DEFAULT_WALKING_SPEEDS,
     loadStoredPreferences,
     saveStoredPreferences,
+    type SpeedUnit,
     type ThemeMode,
     type WalkingSpeedOption,
 } from '@/services/preferences/preferencesStore';
 
-export type { ThemeMode, WalkingSpeedOption };
+export type { SpeedUnit, ThemeMode, WalkingSpeedOption };
 
 type State = {
     themeMode: ThemeMode;
     walkingSpeeds: WalkingSpeedOption[];
+    speedUnit: SpeedUnit;
     /** True once loadPreferences() has resolved — screens can use this to
      *  avoid flashing default values before the real ones load. */
     loaded: boolean;
@@ -22,6 +25,7 @@ type State = {
 const initialState: State = {
     themeMode: DEFAULT_THEME_MODE,
     walkingSpeeds: DEFAULT_WALKING_SPEEDS,
+    speedUnit: DEFAULT_SPEED_UNIT,
     loaded: false,
 };
 
@@ -30,7 +34,7 @@ const initialState: State = {
 // preferences write failing shouldn't block the UI update that triggered it,
 // only log so it's visible in dev.
 function persist(state: State) {
-    saveStoredPreferences({ themeMode: state.themeMode, walkingSpeeds: state.walkingSpeeds }).catch(err => {
+    saveStoredPreferences({ themeMode: state.themeMode, walkingSpeeds: state.walkingSpeeds, speedUnit: state.speedUnit }).catch(err => {
         console.warn('[preferences] failed to persist:', err);
     });
 }
@@ -48,6 +52,10 @@ const slice = createSlice({
         setThemeMode(state, action: PayloadAction<ThemeMode>) {
             state.themeMode = action.payload;
             nativewindColorScheme.set(action.payload);
+            persist(state);
+        },
+        setSpeedUnit(state, action: PayloadAction<SpeedUnit>) {
+            state.speedUnit = action.payload;
             persist(state);
         },
         addWalkingSpeed(state, action: PayloadAction<WalkingSpeedOption>) {
@@ -70,6 +78,7 @@ const slice = createSlice({
         resetPreferences(state) {
             state.themeMode = DEFAULT_THEME_MODE;
             state.walkingSpeeds = DEFAULT_WALKING_SPEEDS.map(o => ({ ...o }));
+            state.speedUnit = DEFAULT_SPEED_UNIT;
             nativewindColorScheme.set(DEFAULT_THEME_MODE);
             persist(state);
         },
@@ -78,6 +87,7 @@ const slice = createSlice({
         builder.addCase(loadPreferences.fulfilled, (state, action) => {
             state.themeMode = action.payload.themeMode;
             state.walkingSpeeds = action.payload.walkingSpeeds;
+            state.speedUnit = action.payload.speedUnit;
             state.loaded = true;
             nativewindColorScheme.set(action.payload.themeMode);
         });
@@ -86,6 +96,7 @@ const slice = createSlice({
 
 export const {
     setThemeMode,
+    setSpeedUnit,
     addWalkingSpeed,
     updateWalkingSpeed,
     removeWalkingSpeed,
