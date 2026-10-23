@@ -1,5 +1,5 @@
 import React from 'react';
-import { Text, View } from 'react-native';
+import { Alert, Pressable, Text, View } from 'react-native';
 import { useThemeStyle } from '@/constants/themes';
 import ProgressBar from '@/components/ProgressBar';
 import { formatEta, type ImportProgress } from '@/services/gtfs/import/importProgress';
@@ -7,9 +7,18 @@ import { formatEta, type ImportProgress } from '@/services/gtfs/import/importPro
 type Props = {
     fileName: string;
     progress: ImportProgress;
+    /** Shows a cancel button while the progress is cancellable. */
+    onCancel?: () => void;
 };
 
-export default function ImportProgressCard({ fileName, progress }: Props) {
+function confirmCancel(onCancel: () => void) {
+    Alert.alert('Cancel this import?', 'Progress so far will be discarded.', [
+        { text: 'Keep going', style: 'cancel' },
+        { text: 'Cancel import', style: 'destructive', onPress: onCancel },
+    ]);
+}
+
+export default function ImportProgressCard({ fileName, progress, onCancel }: Props) {
     const theme = useThemeStyle();
     const eta = formatEta(progress.etaSeconds);
 
@@ -33,6 +42,12 @@ export default function ImportProgressCard({ fileName, progress }: Props) {
                 )}
                 {!!eta && <Text style={{ color: theme.color, opacity: 0.5, fontSize: 12 }}>{eta}</Text>}
             </View>
+
+            {onCancel && progress.cancellable && (
+                <Pressable onPress={() => confirmCancel(onCancel)} hitSlop={8} style={{ alignSelf: 'flex-start' }}>
+                    <Text style={{ color: '#ef4444', fontSize: 14, fontWeight: '600' }}>Cancel</Text>
+                </Pressable>
+            )}
         </View>
     );
 }

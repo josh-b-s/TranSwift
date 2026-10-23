@@ -7,6 +7,8 @@ export type ImportProgress = {
     detail?: string;
     /** Null until there is enough elapsed time to extrapolate from. */
     etaSeconds: number | null;
+    /** True while the work can still be stopped. */
+    cancellable?: boolean;
 };
 
 // The Rust importer reports no overall percentage, only per-table counts, so
@@ -121,7 +123,8 @@ export function createProgressTracker(): (e: ImportProgressEvent) => ImportProgr
             ? (elapsed * (1 - best)) / best
             : null;
 
-        return { fraction: best, label, detail, etaSeconds };
+        // Once the agencies are saved only quick finishing steps remain, so cancelling no longer helps.
+        return { fraction: best, label, detail, etaSeconds, cancellable: best < PHASE.agenciesEnd };
     };
 }
 
@@ -150,5 +153,6 @@ export function downloadProgress(written: number, total: number): ImportProgress
             ? `${formatMegabytes(written)} of ${formatMegabytes(total)}`
             : `${formatMegabytes(written)} so far`,
         etaSeconds: null,
+        cancellable: true,
     };
 }

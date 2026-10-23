@@ -1,4 +1,5 @@
 import * as FileSystem from 'expo-file-system/legacy';
+import { CancelledError } from './cancelledError';
 
 const DOWNLOAD_DIR = `${FileSystem.cacheDirectory}gtfs-download/`;
 
@@ -15,16 +16,31 @@ export async function downloadZip(
     url: string,
     fileName: string,
     onProgress: (written: number, total: number) => void,
+    signal?: AbortSignal,
 ): Promise<{ uri: string; name: string }> {
     await FileSystem.makeDirectoryAsync(DOWNLOAD_DIR, { intermediates: true });
+    const target = `${DOWNLOAD_DIR}${fileName}`;
     const task = FileSystem.createDownloadResumable(
         url,
-        `${DOWNLOAD_DIR}${fileName}`,
+        target,
         {},
         ({ totalBytesWritten, totalBytesExpectedToWrite }) =>
             onProgress(totalBytesWritten, Math.max(totalBytesExpectedToWrite, 0)),
     );
-    const res = await task.downloadAsync();
+    // pauseAsync stops the native transfer; the partial file is deleted below.
+    signal?.addEventListener('abort', () => task.pauseAsync().catch(() => {}), { once: true });
+    if (signal?.aborted) throw new CancelledError();
+
+    let res: Awaited<ReturnType<typeof task.downloadAsync>>;
+    try {
+        res = await task.downloadAsync();
+    } catch (err) {
+        if (!signal?.aborted) throw err;
+    }
+    if (signal?.aborted) {
+        await FileSystem.deleteAsync(target, { idempotent: true });
+        throw new CancelledError();
+    }
     if (!res || res.status !== 200) throw new Error(`Download failed (HTTP ${res?.status ?? 'none'})`);
     return { uri: res.uri, name: fileName };
 }

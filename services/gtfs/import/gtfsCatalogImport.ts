@@ -15,15 +15,16 @@ export async function importCatalogFeed(
     onDownload: (written: number, total: number) => void,
     onImport: (p: ImportProgressEvent) => void,
     replaceId?: string,
+    signal?: AbortSignal,
 ): Promise<GtfsDatabaseEntry> {
-    const zip = await downloadZip(feed.zipUrl, `${feed.id}.zip`, onDownload);
+    const zip = await downloadZip(feed.zipUrl, `${feed.id}.zip`, onDownload, signal);
     try {
         const entry = await importZipAsNewDatabase(zip, onImport, {
             id: feed.id,
             label: feed.name ? `${feed.provider} (${feed.name})` : feed.provider,
             url: feed.zipUrl,
             license: feed.licenseUrl || undefined,
-        });
+        }, signal);
 
         const old = replaceId ? (await listDatabases()).find((d) => d.id === replaceId) : undefined;
         if (old) {

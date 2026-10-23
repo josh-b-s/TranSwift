@@ -10,6 +10,7 @@
 
 import * as FileSystem from 'expo-file-system/legacy';
 import * as DocumentPicker from 'expo-document-picker';
+import { CancelledError } from './cancelledError';
 import { computeFeedStats } from './gtfsFeedStats';
 import { importGtfsZipToPath, type ImportProgressEvent } from './rustGtfsImporter';
 import {
@@ -58,6 +59,7 @@ export async function importZipAsNewDatabase(
     zip: { uri: string; name?: string },
     onProgress?: (p: ImportProgressEvent) => void,
     source?: FeedSource,
+    signal?: AbortSignal,
 ): Promise<GtfsDatabaseEntry> {
     // { md5: true } asks expo-file-system to compute the hash natively
     // rather than reading the whole (potentially 100+MB) zip into JS memory
@@ -73,7 +75,19 @@ export async function importZipAsNewDatabase(
     const fileName = `gtfs-${Date.now()}.db`;
     const dbPath = `${SQLITE_DIR}${fileName}`;
 
-    await importGtfsZipToPath(zip.uri, dbPath, onProgress);
+    try {
+        await importGtfsZipToPath(zip.uri, dbPath, onProgress, signal);
+    } catch (err) {
+        if (err instanceof CancelledError) {
+            // The aborted import leaves a half-built db (and maybe WAL files) behind.
+            await Promise.all(
+                ['', '-wal', '-shm', '-journal'].map((ext) =>
+                    FileSystem.deleteAsync(`${dbPath}${ext}`, { idempotent: true }),
+                ),
+            );
+        }
+        throw err;
+    }
 
     const name = source?.label ?? nameFromZipFileName(zip.name ?? 'Imported feed');
     const entry = await registerDatabase(name, fileName, md5, source);

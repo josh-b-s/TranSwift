@@ -163,15 +163,25 @@ fn compute_and_insert_pattern_stats(
 
         patterns_done += 1;
         if patterns_done % 500 == 0 {
-            progress.on_progress(format!("agency {agency_id} · pattern_hops/headway"), patterns_done, pattern_groups.len() as u64);
+            progress.on_progress(format!("agency {agency_id} · pattern_hops/headway"), patterns_done, pattern_groups.len() as u64)?;
         }
     }
-    progress.on_progress(format!("agency {agency_id} · pattern_hops/headway"), patterns_done, pattern_groups.len() as u64);
+    progress.on_progress(format!("agency {agency_id} · pattern_hops/headway"), patterns_done, pattern_groups.len() as u64)?;
     Ok(())
 }
 
 pub trait ImportProgress {
-    fn on_progress(&self, table: String, inserted: u64, total: u64);
+    /// An Err aborts the import; the caller uses this to cancel.
+    fn on_progress(&self, table: String, inserted: u64, total: u64) -> rusqlite::Result<()>;
+}
+
+/// Error an ImportProgress returns to stop the import.
+pub fn cancelled_error() -> rusqlite::Error {
+    rusqlite::Error::SqliteFailure(rusqlite::ffi::Error::new(rusqlite::ffi::SQLITE_INTERRUPT), None)
+}
+
+pub fn is_cancelled(err: &rusqlite::Error) -> bool {
+    matches!(err, rusqlite::Error::SqliteFailure(e, _) if e.extended_code == rusqlite::ffi::SQLITE_INTERRUPT)
 }
 
 fn pack_coord(v: &str) -> Option<i64> {
@@ -252,7 +262,7 @@ fn process_agency(
             ins_rtree.execute(params![pk, lat, lat, lon, lon])?;
             count += 1;
         }
-        progress.on_progress(format!("agency {agency_id} · stops"), count, count);
+        progress.on_progress(format!("agency {agency_id} · stops"), count, count)?;
     }
 
     // ── routes / calendar / calendar_dates (low volume, INSERT OR IGNORE) ─
@@ -276,7 +286,7 @@ fn process_agency(
             ])?;
             count += 1;
         }
-        progress.on_progress(format!("agency {agency_id} · routes"), count, count);
+        progress.on_progress(format!("agency {agency_id} · routes"), count, count)?;
     }
     {
         let mut ins = conn.prepare(
@@ -294,7 +304,7 @@ fn process_agency(
             ])?;
             count += 1;
         }
-        progress.on_progress(format!("agency {agency_id} · calendar"), count, count);
+        progress.on_progress(format!("agency {agency_id} · calendar"), count, count)?;
     }
     {
         let mut ins = conn.prepare(
@@ -309,7 +319,7 @@ fn process_agency(
             ])?;
             count += 1;
         }
-        progress.on_progress(format!("agency {agency_id} · calendar_dates"), count, count);
+        progress.on_progress(format!("agency {agency_id} · calendar_dates"), count, count)?;
     }
 
     // ── trips.txt -> in-memory trip metadata ──────────────────────────
@@ -425,7 +435,7 @@ fn process_agency(
             ins.execute(params![meta.pk, trip_id, agency_id, pattern_pk, meta.service_id])?;
             count += 1;
         }
-        progress.on_progress(format!("agency {agency_id} · trips"), count, count);
+        progress.on_progress(format!("agency {agency_id} · trips"), count, count)?;
     }
 
     // ── stop_times (insert) — the big one, ~11.8M rows across the feed ──
@@ -482,10 +492,10 @@ fn process_agency(
             let prev_count = count;
             count += chunk.len() as u64;
             if count / 200_000 != prev_count / 200_000 {
-                progress.on_progress(format!("agency {agency_id} · stop_times"), count, 0);
+                progress.on_progress(format!("agency {agency_id} · stop_times"), count, 0)?;
             }
         }
-        progress.on_progress(format!("agency {agency_id} · stop_times"), count, count);
+        progress.on_progress(format!("agency {agency_id} · stop_times"), count, count)?;
     }
 
     // ── patterns + pattern_stops ───────────────────────────────────────
@@ -503,7 +513,7 @@ fn process_agency(
                 ins_ps.execute(params![g.pk, s.stop_pk, s.stop_sequence])?;
             }
         }
-        progress.on_progress(format!("agency {agency_id} · patterns"), pattern_groups.len() as u64, pattern_groups.len() as u64);
+        progress.on_progress(format!("agency {agency_id} · patterns"), pattern_groups.len() as u64, pattern_groups.len() as u64)?;
     }
 
     // ── pattern_hops + pattern_headway (frequency-graph precompute) ─────
@@ -548,10 +558,10 @@ fn process_agency(
                     let seq: i64 = seq_i.and_then(|i| rec.get(i)).and_then(|v| v.parse().ok()).unwrap_or(0);
                     ins_shape.execute(params![shape_pk, lat, lon, seq])?;
                     stored += 1;
-                    if stored % 200_000 == 0 { progress.on_progress(format!("agency {agency_id} · shapes"), stored, 0); }
+                    if stored % 200_000 == 0 { progress.on_progress(format!("agency {agency_id} · shapes"), stored, 0)?; }
                 }
             }
-            progress.on_progress(format!("agency {agency_id} · shapes"), stored, stored);
+            progress.on_progress(format!("agency {agency_id} · shapes"), stored, stored)?;
         }
     }
 
@@ -569,16 +579,16 @@ pub fn import_gtfs(zip_path: &str, db_path: &str, progress: &dyn ImportProgress)
     // "db path ready" and "starting table: agency 1" in the JS-side logs —
     // report them explicitly so future timing issues are visible without
     // guessing which phase they're in.
-    progress.on_progress("reading zip".to_string(), 0, 0);
+    progress.on_progress("reading zip".to_string(), 0, 0)?;
     let zip_bytes = std::fs::read(zip_path).map_err(|e| {
         rusqlite::Error::InvalidParameterName(format!("failed to read zip: {e}"))
     })?;
     progress.on_progress(
         format!("read zip ({} bytes, {:.1}s)", zip_bytes.len(), t0.elapsed().as_secs_f64()),
         0, 0,
-    );
+    )?;
 
-    progress.on_progress("scanning zip for GTFS feeds".to_string(), 0, 0);
+    progress.on_progress("scanning zip for GTFS feeds".to_string(), 0, 0)?;
     let sources = find_all_gtfs_sources(&zip_bytes);
     if sources.is_empty() {
         return Err(rusqlite::Error::InvalidParameterName(
@@ -588,7 +598,7 @@ pub fn import_gtfs(zip_path: &str, db_path: &str, progress: &dyn ImportProgress)
     progress.on_progress(
         format!("found {} feed(s) ({:.1}s)", sources.len(), t0.elapsed().as_secs_f64()),
         0, 0,
-    );
+    )?;
 
     let mut conn = Connection::open(db_path)?;
     conn.pragma_update(None, "journal_mode", "WAL")?;
@@ -604,29 +614,29 @@ pub fn import_gtfs(zip_path: &str, db_path: &str, progress: &dyn ImportProgress)
     let tx = conn.transaction()?;
     let mut pk_offsets = PkOffsets { stop: 1, trip: 1, pattern: 1, shape: 1 };
     for (i, source) in sources.iter().enumerate() {
-        progress.on_progress(format!("agency {}/{} ({})", i + 1, sources.len(), source.describe()), 0, 0);
+        progress.on_progress(format!("agency {}/{} ({})", i + 1, sources.len(), source.describe()), 0, 0)?;
         pk_offsets = process_agency(&tx, (i + 1) as i64, source, pk_offsets, progress)?;
     }
     progress.on_progress(
         format!("all agencies imported ({:.1}s)", t0.elapsed().as_secs_f64()),
         0, 0,
-    );
+    )?;
     tx.commit()?;
 
-    progress.on_progress("building indexes".to_string(), 0, 0);
+    progress.on_progress("building indexes".to_string(), 0, 0)?;
     conn.execute_batch(GTFS_INDEXES_SQL)?;
     progress.on_progress(
         format!("indexes built ({:.1}s)", t0.elapsed().as_secs_f64()),
         0, 0,
-    );
+    )?;
 
-    progress.on_progress("checkpointing WAL".to_string(), 0, 0);
+    progress.on_progress("checkpointing WAL".to_string(), 0, 0)?;
     conn.pragma_update(None, "wal_checkpoint", "TRUNCATE")?;
     conn.execute_batch("PRAGMA journal_mode = DELETE;")?;
     progress.on_progress(
         format!("WAL checkpointed ({:.1}s)", t0.elapsed().as_secs_f64()),
         0, 0,
-    );
+    )?;
 
     // VACUUM rewrites the db file compactly, reclaiming free pages left
     // behind by the bulk inserts above — this is what the desktop
@@ -634,12 +644,12 @@ pub fn import_gtfs(zip_path: &str, db_path: &str, progress: &dyn ImportProgress)
     // and why its output was ~550MB vs. this importer's ~606MB on the same
     // feed. Must run outside any transaction (VACUUM can't run inside one),
     // which is already the case here since `tx` was committed above.
-    progress.on_progress("vacuuming".to_string(), 0, 0);
+    progress.on_progress("vacuuming".to_string(), 0, 0)?;
     conn.execute_batch("VACUUM;")?;
     progress.on_progress(
         format!("vacuum done ({:.1}s total)", t0.elapsed().as_secs_f64()),
         0, 0,
-    );
+    )?;
 
     Ok(())
 }

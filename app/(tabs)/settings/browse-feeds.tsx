@@ -8,6 +8,7 @@ import type { CatalogFeed } from '@/services/gtfs/catalog/catalogParse';
 import { loadCatalog, type CatalogResult } from '@/services/gtfs/catalog/feedCatalog';
 import { importCatalogFeed } from '@/services/gtfs/import/gtfsCatalogImport';
 import { DuplicateFeedError } from '@/services/gtfs/import/gtfsDbRegistry';
+import { CancelledError } from '@/services/gtfs/import/cancelledError';
 import { fetchZipSize } from '@/services/gtfs/import/gtfsDownload';
 import {
     createProgressTracker,
@@ -25,6 +26,7 @@ export default function BrowseFeeds() {
     const router = useRouter();
     const { feedId, replaceId } = useLocalSearchParams<{ feedId?: string; replaceId?: string }>();
     const openedFeed = useRef(false);
+    const abortRef = useRef<AbortController | null>(null);
     const [catalog, setCatalog] = useState<CatalogResult | null>(null);
     const [loadError, setLoadError] = useState('');
     const [refreshing, setRefreshing] = useState(false);
@@ -94,15 +96,19 @@ export default function BrowseFeeds() {
     async function runImport(feed: CatalogFeed) {
         const track = createProgressTracker();
         setBusy({ label: feed.provider, progress: downloadProgress(0, 0) });
+        const abort = new AbortController();
+        abortRef.current = abort;
         try {
             await importCatalogFeed(
                 feed,
                 (written, total) => setBusy({ label: feed.provider, progress: downloadProgress(written, total) }),
                 (p) => setBusy({ label: feed.provider, progress: track(p) }),
                 replaceId,
+                abort.signal,
             );
             router.back();
         } catch (err) {
+            if (err instanceof CancelledError) return;
             if (err instanceof DuplicateFeedError) {
                 if (replaceId) Alert.alert('Already up to date', "The provider hasn't published a newer version yet.");
                 else Alert.alert('Already imported', err.message);
@@ -110,6 +116,7 @@ export default function BrowseFeeds() {
                 setError(`Import failed: ${String(err)}`);
             }
         } finally {
+            abortRef.current = null;
             setBusy(null);
         }
     }
@@ -183,7 +190,13 @@ export default function BrowseFeeds() {
                     Couldn't refresh the list. Showing the copy from {new Date(catalog.fetchedAt).toLocaleDateString()}.
                 </Text>
             )}
-            {busy && <ImportProgressCard fileName={busy.label} progress={busy.progress} />}
+            {busy && (
+                <ImportProgressCard
+                    fileName={busy.label}
+                    progress={busy.progress}
+                    onCancel={() => abortRef.current?.abort()}
+                />
+            )}
             {!!error && <Text style={{ color: '#ef4444', fontSize: 12 }}>{error}</Text>}
         </View>
     );

@@ -1,10 +1,11 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Bus, CircleCheck, CirclePlus, CircleX, Globe, Pencil, Trash2 } from 'lucide-react-native';
 import { useThemeStyle } from '@/constants/themes';
 import ImportProgressCard from '@/components/ImportProgressCard';
 import { createProgressTracker, type ImportProgress } from '@/services/gtfs/import/importProgress';
+import { CancelledError } from '@/services/gtfs/import/cancelledError';
 import { pickGtfsZip, importZipAsNewDatabase } from '@/services/gtfs/import/gtfsDbImport';
 import {
     deleteDatabase,
@@ -40,6 +41,7 @@ export default function GtfsData() {
     const [activeId, setActiveId] = useState<string | null>(null);
     const [loaded, setLoaded] = useState(false);
     const [importState, setImportState] = useState<ImportState>({ busy: false });
+    const abortRef = useRef<AbortController | null>(null);
     const [switchingId, setSwitchingId] = useState<string | null>(null);
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [error, setError] = useState('');
@@ -77,11 +79,17 @@ export default function GtfsData() {
                 progress: { fraction: 0, label: 'Checking file', etaSeconds: null },
             });
             const track = createProgressTracker();
-            await importZipAsNewDatabase(zip, (p) => {
-                setImportState({ busy: true, fileName, progress: track(p) });
-            });
+            const abort = new AbortController();
+            abortRef.current = abort;
+            await importZipAsNewDatabase(
+                zip,
+                (p) => setImportState({ busy: true, fileName, progress: track(p) }),
+                undefined,
+                abort.signal,
+            );
             await refresh();
         } catch (err) {
+            if (err instanceof CancelledError) return;
             if (err instanceof DuplicateFeedError) {
                 const existing = err.existing;
                 Alert.alert('Already imported', err.message, [
@@ -105,6 +113,7 @@ export default function GtfsData() {
                 setError(`Import failed: ${String(err)}`);
             }
         } finally {
+            abortRef.current = null;
             setImportState({ busy: false });
         }
     }
@@ -327,7 +336,13 @@ export default function GtfsData() {
             </Pressable>
 
             {importState.busy && (
-                <ImportProgressCard fileName={importState.fileName} progress={importState.progress} />
+                (
+                <ImportProgressCard
+                    fileName={importState.fileName}
+                    progress={importState.progress}
+                    onCancel={() => abortRef.current?.abort()}
+                />
+            )
             )}
 
             {!!error && (

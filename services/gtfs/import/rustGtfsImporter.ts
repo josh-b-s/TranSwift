@@ -14,7 +14,8 @@
  * instead; ubrn's FfiConverterObjectWithCallbacks wraps it for the FFI call.
  */
 
-import {importGtfs, type ProgressCallback} from '@mapapp/gtfs-importer';
+import {cancelImport, importGtfs, type ProgressCallback} from '@mapapp/gtfs-importer';
+import {CancelledError} from './cancelledError';
 
 export type ImportProgressEvent = { table: string; inserted: number; total: number };
 
@@ -35,6 +36,7 @@ export async function importGtfsZipToPath(
     zipPath: string,
     dbPath: string,
     onProgress?: (p: ImportProgressEvent) => void,
+    signal?: AbortSignal,
 ): Promise<void> {
     const t0 = Date.now();
     const elapsed = () => `${((Date.now() - t0) / 1000).toFixed(1)}s`;
@@ -79,6 +81,10 @@ export async function importGtfsZipToPath(
         },
     };
 
+    // The importer stops at its next progress report, so this isn't instant.
+    signal?.addEventListener('abort', cancelImport, {once: true});
+    if (signal?.aborted) throw new CancelledError();
+
     try {
         await importGtfs(
             stripFileScheme(zipPath),
@@ -92,6 +98,7 @@ export async function importGtfsZipToPath(
         }
         console.log(`[rustGtfsImporter] import complete in ${elapsed()}`);
     } catch (err) {
+        if (signal?.aborted) throw new CancelledError();
         console.error(`[rustGtfsImporter] import failed after ${elapsed()}:`, err);
         throw err;
     }
