@@ -27,13 +27,16 @@ export default function Layout() {
     return (
         <GestureHandlerRootView style={{ flex: 1 }}>
             <SafeAreaProvider>
-                <BottomSheetModalProvider>
-                    <Provider store={store}>
+                {/* Provider wraps the modal provider because sheet content renders in
+                    the modal provider's portal host, which has to sit inside the
+                    store's context for hooks like useDispatch to work there. */}
+                <Provider store={store}>
+                    <BottomSheetModalProvider>
                         <Stack screenOptions={{ headerShown: false }}>
                             <Stack.Screen name="(tabs)" />
                         </Stack>
-                    </Provider>
-                </BottomSheetModalProvider>
+                    </BottomSheetModalProvider>
+                </Provider>
             </SafeAreaProvider>
         </GestureHandlerRootView>
     );

@@ -1,8 +1,11 @@
 import { createAsyncThunk, createSlice, PayloadAction } from '@reduxjs/toolkit';
 import type { LatLng, SearchPlace } from '@/services/places/places';
 import { searchPlaces as searchPlacesService } from '@/services/places/places';
+import { CURRENT_LOCATION } from '@/services/places/endpoints';
 
 export type { SearchPlace };
+
+export type RouteField = 'origin' | 'destination';
 
 export const searchPlaces = createAsyncThunk<
     SearchPlace[],
@@ -22,7 +25,12 @@ export const searchPlaces = createAsyncThunk<
 type State = {
     query: string;
     results: SearchPlace[];
+    /** The destination. */
     selected: SearchPlace | null;
+    /** Where the route starts. CURRENT_LOCATION means the live device position. */
+    origin: SearchPlace;
+    /** Set while the user is choosing that endpoint by moving the map. */
+    pickingField: RouteField | null;
     loading: boolean;
     error?: string | null;
     showResults: boolean;
@@ -42,6 +50,8 @@ const initialState: State = {
     query: '',
     results: [],
     selected: null,
+    origin: CURRENT_LOCATION,
+    pickingField: null,
     loading: false,
     error: null,
     showResults: false,
@@ -59,6 +69,22 @@ const slice = createSlice({
         selectPlace(state, action: PayloadAction<SearchPlace | null>) {
             state.selected = action.payload;
             state.showResults = false;
+        },
+        setOrigin(state, action: PayloadAction<SearchPlace>) {
+            state.origin = action.payload;
+            state.showResults = false;
+        },
+        /** No-op until a destination exists, since there's nothing to swap with. */
+        swapEndpoints(state) {
+            if (!state.selected) return;
+            [state.origin, state.selected] = [state.selected, state.origin];
+        },
+        startPicking(state, action: PayloadAction<RouteField>) {
+            state.pickingField = action.payload;
+            state.showResults = false;
+        },
+        stopPicking(state) {
+            state.pickingField = null;
         },
         clearResults(state) {
             state.results = [];
@@ -88,5 +114,8 @@ const slice = createSlice({
     },
 });
 
-export const { setQuery, selectPlace, clearResults, setDepartureTime, setWalkingSpeed } = slice.actions;
+export const {
+    setQuery, selectPlace, setOrigin, swapEndpoints, startPicking, stopPicking,
+    clearResults, setDepartureTime, setWalkingSpeed,
+} = slice.actions;
 export default slice.reducer;
