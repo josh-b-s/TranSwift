@@ -2,6 +2,7 @@ mod source;
 mod csv_util;
 mod schema;
 mod import;
+mod background;
 
 use std::sync::Arc;
 use crate::import::ImportProgress;
@@ -30,15 +31,24 @@ impl ImportProgress for ProgressAdapter {
     }
 }
 
+// Async so the import runs off the JS thread; otherwise the UI can't redraw
+// (progress bar included) until the whole import returns.
 #[uniffi::export]
-pub fn import_gtfs(
+pub async fn import_gtfs(
     zip_path: String,
     db_path: String,
     progress: Arc<dyn ProgressCallback>,
 ) -> Result<(), ImportError> {
-    let adapter = ProgressAdapter(progress);
-    import::import_gtfs(&zip_path, &db_path, &adapter)
-        .map_err(|e| ImportError::Db(e.to_string()))
+    background::run_on_thread(move || {
+        let adapter = ProgressAdapter(progress);
+        // A panic would leave the future pending forever, so turn it into an error.
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            import::import_gtfs(&zip_path, &db_path, &adapter)
+                .map_err(|e| ImportError::Db(e.to_string()))
+        }))
+        .unwrap_or_else(|_| Err(ImportError::Db("import panicked".to_string())))
+    })
+    .await
 }
 
 uniffi::setup_scaffolding!();

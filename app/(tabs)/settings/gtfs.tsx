@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { Bus, CircleCheck, CirclePlus, CircleX, Pencil, Trash2 } from 'lucide-react-native';
 import { useThemeStyle } from '@/constants/themes';
+import ImportProgressCard from '@/components/ImportProgressCard';
+import { createProgressTracker, type ImportProgress } from '@/services/gtfs/import/importProgress';
 import { pickGtfsZip, importZipAsNewDatabase } from '@/services/gtfs/import/gtfsDbImport';
 import {
     deleteDatabase,
@@ -14,10 +16,10 @@ import {
     type GtfsDatabaseEntry,
 } from '@/services/gtfs/import/gtfsDbRegistry';
 
-type ImportState = { busy: false } | { busy: true; status: string };
+type ImportState = { busy: false } | { busy: true; fileName: string; progress: ImportProgress };
 
 /**
- * GTFS feed management — a list of imported databases (one per zip the user
+ * GTFS feed management: a list of imported databases (one per zip the user
  * has added) with the active one checked, plus an "Add zip" action that
  * picks a file, imports it via the native Rust importer, and adds it to the
  * list. Only one database can be active/selected at a time for now.
@@ -25,7 +27,7 @@ type ImportState = { busy: false } | { busy: true; status: string };
  * Each row can also be renamed (pencil, inline text field) or deleted
  * (trash, with confirmation). Import-time name collisions are silently
  * disambiguated file-system style ("Melbourne", "Melbourne (1)", ...) by
- * gtfsDbRegistry.ts's registerDatabase() — renaming, in contrast, rejects
+ * gtfsDbRegistry.ts's registerDatabase(). Renaming, in contrast, rejects
  * an exact collision outright (see handleSaveRename below) so the user
  * gets a chance to pick a different name rather than have one picked for
  * them mid-edit.
@@ -40,7 +42,7 @@ export default function GtfsData() {
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [error, setError] = useState('');
 
-    // Inline rename state — editingId names which row currently shows a
+    // Inline rename state: editingId names which row currently shows a
     // TextInput instead of static text, mirroring preferences.tsx's
     // walking-speed edit pattern.
     const [editingId, setEditingId] = useState<string | null>(null);
@@ -61,13 +63,17 @@ export default function GtfsData() {
         setError('');
         try {
             const zip = await pickGtfsZip();
-            if (!zip) return; // user cancelled the picker — not an error
+            if (!zip) return; // user cancelled the picker, not an error
 
-            setImportState({ busy: true, status: `Checking ${zip.name}…` });
-            const t0 = Date.now();
+            const fileName = zip.name ?? 'GTFS zip';
+            setImportState({
+                busy: true,
+                fileName,
+                progress: { fraction: 0, label: 'Checking file', etaSeconds: null },
+            });
+            const track = createProgressTracker();
             await importZipAsNewDatabase(zip, (p) => {
-                const secs = ((Date.now() - t0) / 1000).toFixed(1);
-                setImportState({ busy: true, status: `${p.table}: ${p.inserted}/${p.total} (${secs}s)` });
+                setImportState({ busy: true, fileName, progress: track(p) });
             });
             await refresh();
         } catch (err) {
@@ -175,12 +181,12 @@ export default function GtfsData() {
     return (
         <ScrollView style={{ flex: 1, backgroundColor: theme.surfaceColor }} contentContainerStyle={{ padding: 16, gap: 12 }}>
             <Text style={{ color: theme.color, opacity: 0.5, fontSize: 13 }}>
-                Each imported feed becomes its own database — pick which one the app should route against.
+                Each imported feed becomes its own database. Pick which one the app should route against.
             </Text>
 
             {loaded && databases.length === 0 && !importState.busy && (
                 <Text style={{ color: theme.color, opacity: 0.5, fontSize: 13, fontStyle: 'italic' }}>
-                    No feeds imported yet — add one below.
+                    No feeds imported yet. Add one below.
                 </Text>
             )}
 
@@ -298,10 +304,7 @@ export default function GtfsData() {
             </Pressable>
 
             {importState.busy && (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 4 }}>
-                    <ActivityIndicator size="small" color={theme.color} />
-                    <Text style={{ color: theme.color, fontSize: 13, flex: 1 }}>{importState.status}</Text>
-                </View>
+                <ImportProgressCard fileName={importState.fileName} progress={importState.progress} />
             )}
 
             {!!error && (
