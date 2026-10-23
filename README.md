@@ -4,6 +4,35 @@ A GTFS journey planner where per-rider walking speed actually changes the
 route. No transit API exposes that as an input, so this rolls its own
 RAPTOR instead of wrapping one.
 
+<!--
+GIF placeholders, drop screen recordings here once captured.
+Suggested shots: (1) searching a trip and getting results, (2) the walking-speed
+setting changing the returned route, (3) the debug map overlay showing the
+BFS corridor / candidate paths.
+
+![Search and route results](docs/gifs/search-demo.gif)
+![Walking speed changes the route](docs/gifs/walking-speed-demo.gif)
+![Debug corridor overlay](docs/gifs/debug-overlay-demo.gif)
+-->
+
+## At a glance
+
+- **What it is:** a mobile trip planner (React Native / Expo) that runs a
+  full custom transit-routing engine on-device, offline, against raw GTFS
+  data. No third-party directions API involved.
+- **Why it's interesting:** the routing pipeline (below) is a from-scratch
+  implementation of a published algorithm (RAPTOR) plus several original
+  pre-processing stages, built to fix real performance failures (OOM,
+  multi-second queries) rather than designed on paper first.
+- **Stack:** React Native + Expo Router, TypeScript, Redux Toolkit,
+  NativeWind (Tailwind for RN), `react-native-maps`, on-device SQLite
+  (`op-sqlite`) for the preprocessed GTFS store, and two custom **Rust**
+  native modules (GTFS import and the RAPTOR router itself), bridged into RN
+  via `uniffi-bindgen-react-native`.
+- **My role:** designed and built the routing pipeline end to end
+  (preprocessing, graph construction, search, scoring, RAPTOR, Rust/RN
+  bridge) as well as the app UI.
+
 ## Why
 
 Started as a PTV-meets-Strava idea: your own walking pace, not a fixed
@@ -93,3 +122,16 @@ runs: the balanced bidirectional seed BFS, the edge corridor expansion, and
 sizing the time window off the Nth-fastest seed candidate. That combination
 isn't a named algorithm. It's the part that got shaped by hitting real OOM
 and latency walls, not designed on paper first.
+
+## Running it
+
+```bash
+npm install
+npm run android   # or: npm run ios / npm run web
+```
+
+The Rust native modules (`modules/gtfs-importer`, `modules/gtfs-router-rust`)
+build via `uniffi-bindgen-react-native`, see their `npm run build:*` scripts
+in `package.json`. GTFS data can be preprocessed either with
+`npm run preprocess-gtfs` or from within the app itself, via the GTFS
+settings screen (`app/(tabs)/settings/gtfs.tsx`).
