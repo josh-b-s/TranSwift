@@ -8,7 +8,7 @@ import { AppDispatch } from '@/store/store';
 import { setUserLocation } from '@/store/location.slice';
 import MapView, { LatLng } from 'react-native-maps';
 import * as Location from 'expo-location';
-import { SHADOW, useThemeStyle } from '@/constants/themes';
+import { ACCENT, SHADOW, useThemeStyle } from '@/constants/themes';
 import { useWindowDimensions } from 'react-native';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import {useGoToUserLocation} from "@/hooks/goToUserLocation";
@@ -32,7 +32,7 @@ export default function LocationButton({ mapRef, animatedPosition }: {
     return (
         <Animated.View style={{ top: clampedTop }}>
             <TouchableOpacity
-                className="absolute bottom-5 right-5 w-16 h-16 rounded-full items-center justify-center"
+                className="absolute bottom-5 right-4 w-14 h-14 rounded-full items-center justify-center"
                 style={[{ backgroundColor: theme.backgroundColor }, SHADOW]}
                 accessibilityRole="button"
                 accessibilityLabel="Center map on my location"
@@ -41,7 +41,7 @@ export default function LocationButton({ mapRef, animatedPosition }: {
                     goToUserLocation();
                 }}
             >
-                <Ionicons name="locate" size={28} color={theme.color} />
+                <Ionicons name="locate" size={24} color={ACCENT} />
             </TouchableOpacity>
         </Animated.View>
     );

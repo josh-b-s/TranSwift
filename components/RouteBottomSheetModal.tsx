@@ -4,12 +4,15 @@ import { BottomSheetModal, BottomSheetView, BottomSheetScrollView } from '@gorho
 import { SharedValue } from 'react-native-reanimated';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState, AppDispatch } from '@/store/store';
-import { SHADOW, TOP_SAFE, useThemeStyle } from '@/constants/themes';
+import { ACCENT, SHADOW, TOP_SAFE, useThemeStyle } from '@/constants/themes';
+import { modeIcon } from '@/constants/modeIcons';
+import RouteSheetHeader from '@/components/RouteSheetHeader';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { selectJourney } from '@/store/route.slice';
+import { clearRoute, selectJourney } from '@/store/route.slice';
+import { selectPlace, setQuery } from '@/store/search.slice';
 import {classifyRouteType} from "@/services/gtfs/config/routeTypeUtil";
 
 type Props = {
@@ -48,13 +51,25 @@ function formatDuration(mins: number): string {
     return m === 0 ? `${h}h` : `${h}h ${m}m`;
 }
 
+function formatWalking(meters: number): string {
+    if (meters < 1000) return `${Math.round(meters)} m walk`;
+    return `${(meters / 1000).toFixed(1)} km walk`;
+}
+
 const RouteBottomSheetModal = forwardRef<BottomSheetModal, Props>(
     ({ animatedPosition }, ref) => {
         const theme = useThemeStyle();
         const dispatch = useDispatch<AppDispatch>();
-        const { journeys = [], selectedJourneyIndex, error } = useSelector((s: RootState) => s.route);
+        const { journeys = [], selectedJourneyIndex, error, loading } = useSelector((s: RootState) => s.route);
+        const selectedPlace = useSelector((s: RootState) => s.search.selected);
         const [sortKey, setSortKey] = useState<SortKey>('arrival');
         const tabBarHeight = useBottomTabBarHeight();
+
+        const closeRoute = () => {
+            dispatch(selectPlace(null));
+            dispatch(clearRoute());
+            dispatch(setQuery(''));
+        };
 
         // Sort for DISPLAY only — selection is always by original journeys[]
         // index so the map/state stays in sync regardless of sort order.
@@ -77,35 +92,53 @@ const RouteBottomSheetModal = forwardRef<BottomSheetModal, Props>(
                 animatedPosition={animatedPosition}
                 backgroundStyle={{
                     backgroundColor: theme.surfaceColor,
-                    borderTopLeftRadius: 40,
-                    borderTopRightRadius: 40,
+                    borderTopLeftRadius: 28,
+                    borderTopRightRadius: 28,
                 }}
-                handleIndicatorStyle={{ backgroundColor: theme.color }}
-                style={[SHADOW, { borderTopLeftRadius: 40, borderTopRightRadius: 40 }]}
+                handleIndicatorStyle={{ backgroundColor: theme.color + '55', width: 40 }}
+                style={[SHADOW, { borderTopLeftRadius: 28, borderTopRightRadius: 28 }]}
                 topInset={TOP_SAFE(useSafeAreaInsets())}
                 // Reserves the navbar's height at the bottom of the sheet's
                 // own container, so even at the 100% snap point the sheet
                 // stops short of it and the navbar stays on top/visible
                 // instead of getting covered.
                 bottomInset={tabBarHeight}
-                snapPoints={['10%', '40%', '100%']}
+                index={1}
+                snapPoints={['16%', '45%', '100%']}
                 enableOverDrag={false}
                 enablePanDownToClose={false}
             >
-                <BottomSheetView style={{ flex: 1, paddingTop: 16 }}>
+                <BottomSheetView style={{ flex: 1, paddingTop: 8 }}>
+                    {selectedPlace && (
+                        <RouteSheetHeader
+                            name={selectedPlace.name}
+                            address={selectedPlace.address}
+                            onClose={closeRoute}
+                        />
+                    )}
                     {error ? (
                         <View style={{ padding: 24, alignItems: 'center', gap: 8 }}>
                             <Ionicons name="alert-circle-outline" size={28} color="#ef4444" />
                             <Text style={{ color: '#ef4444', fontSize: 15, textAlign: 'center' }}>{error}</Text>
                         </View>
                     ) : journeys.length === 0 ? (
-                        <View style={{ padding: 24, alignItems: 'center', gap: 10 }}>
-                            <ActivityIndicator color={theme.color} />
-                            <Text style={{ color: theme.color, opacity: 0.5, fontSize: 14 }}>Calculating route…</Text>
-                        </View>
+                        loading ? (
+                            <View style={{ padding: 24, alignItems: 'center', gap: 10 }}>
+                                <ActivityIndicator color={ACCENT} />
+                                <Text style={{ color: theme.color, opacity: 0.5, fontSize: 14 }}>Calculating route…</Text>
+                            </View>
+                        ) : (
+                            <View style={{ padding: 24, alignItems: 'center', gap: 8 }}>
+                                <Ionicons name="bus-outline" size={28} color={theme.color} style={{ opacity: 0.4 }} />
+                                <Text style={{ color: theme.color, fontSize: 15, fontWeight: '600' }}>No transit route found</Text>
+                                <Text style={{ color: theme.color, opacity: 0.5, fontSize: 13, textAlign: 'center' }}>
+                                    Try a different departure time or a faster walking speed.
+                                </Text>
+                            </View>
+                        )
                     ) : (
                         <>
-                            {/* Sort control — only worth showing when there's more than one option */}
+                            {/* Sort control, only worth showing when there's more than one option */}
                             {journeys.length > 1 && (
                                 <View
                                     accessibilityRole="tablist"
@@ -128,11 +161,9 @@ const RouteBottomSheetModal = forwardRef<BottomSheetModal, Props>(
                                                     alignItems: 'center',
                                                     gap: 5,
                                                     paddingHorizontal: 12,
-                                                    paddingVertical: 6,
+                                                    paddingVertical: 7,
                                                     borderRadius: 999,
-                                                    backgroundColor: active ? '#2563eb' : theme.backgroundColor,
-                                                    borderWidth: 1,
-                                                    borderColor: active ? '#2563eb' : theme.color + '33',
+                                                    backgroundColor: active ? ACCENT : theme.backgroundColor,
                                                 }}
                                             >
                                                 <Ionicons name={opt.icon} size={14} color={active ? '#fff' : theme.color} />
@@ -161,64 +192,71 @@ const RouteBottomSheetModal = forwardRef<BottomSheetModal, Props>(
                                             style={{
                                                 borderRadius: 20,
                                                 borderWidth: 2,
-                                                borderColor: isSelected ? '#2563eb' : theme.color + '22',
-                                                backgroundColor: isSelected ? '#2563eb11' : theme.backgroundColor,
+                                                borderColor: isSelected ? ACCENT : 'transparent',
+                                                backgroundColor: theme.backgroundColor,
                                                 padding: 16,
-                                                gap: 8,
+                                                gap: 10,
                                             }}
                                         >
-                                            {/* Summary row: times + duration */}
+                                            {/* Duration leads: it's what riders compare first */}
                                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                                                <Text style={{ color: theme.color, fontSize: 22, fontWeight: '700' }}>
-                                                    {formatClock(journey.departureTime)} → {formatClock(journey.arrivalTime)}
-                                                </Text>
-                                                <Text style={{ color: theme.color, opacity: 0.6, fontSize: 14 }}>
+                                                <Text style={{ color: theme.color, fontSize: 24, fontWeight: '700' }}>
                                                     {formatDuration(journey.totalDurationMin)}
                                                 </Text>
+                                                <Text style={{ color: theme.color, opacity: 0.6, fontSize: 14 }}>
+                                                    {formatClock(journey.departureTime)} → {formatClock(journey.arrivalTime)}
+                                                </Text>
                                             </View>
 
-                                            {/* Meta row: walking distance + transfer count */}
+                                            {/* Leg pills, chained with chevrons so they read as a sequence */}
+                                            <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
+                                                {journey.legs.map((leg, i) => {
+                                                    const { category, label } = classifyRouteType(leg.routeType);
+                                                    return (
+                                                        <React.Fragment key={i}>
+                                                            {i > 0 && (
+                                                                <Ionicons name="chevron-forward" size={12} color={theme.color} style={{ opacity: 0.35 }} />
+                                                            )}
+                                                            <View
+                                                                style={{
+                                                                    flexDirection: 'row',
+                                                                    alignItems: 'center',
+                                                                    gap: 5,
+                                                                    paddingHorizontal: 10,
+                                                                    paddingVertical: 5,
+                                                                    borderRadius: 999,
+                                                                    backgroundColor: leg.routeColor ?? ACCENT,
+                                                                }}
+                                                            >
+                                                                <Ionicons name={modeIcon(category)} size={14} color={leg.routeTextColor ?? '#fff'} />
+                                                                <Text style={{ color: leg.routeTextColor ?? '#fff', fontSize: 13, fontWeight: '700' }}>
+                                                                    {label} {leg.routeName}
+                                                                </Text>
+                                                            </View>
+                                                        </React.Fragment>
+                                                    );
+                                                })}
+                                            </View>
+
                                             <Text style={{ color: theme.color, opacity: 0.6, fontSize: 13 }}>
-                                                {Math.round(journey.totalWalkingMeters)}m walking · {journey.transferCount} transfer{journey.transferCount === 1 ? '' : 's'}
+                                                {formatWalking(journey.totalWalkingMeters)} · {journey.transferCount === 0 ? 'Direct' : `${journey.transferCount} transfer${journey.transferCount === 1 ? '' : 's'}`}
                                             </Text>
 
-                                            {/* Leg pills */}
-                                            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
-                                                {journey.legs.map((leg, i) => (
-                                                    <View
-                                                        key={i}
-                                                        style={{
-                                                            flexDirection: 'row',
-                                                            alignItems: 'center',
-                                                            gap: 6,
-                                                            paddingHorizontal: 10,
-                                                            paddingVertical: 5,
-                                                            borderRadius: 999,
-                                                            backgroundColor: leg.routeColor ?? '#2563eb',
-                                                        }}
-                                                    >
-                                                        <Text style={{ color: leg.routeTextColor ?? '#fff', fontSize: 13, fontWeight: '700' }}>
-                                                            {classifyRouteType(leg.routeType).label} {leg.routeName}
-                                                        </Text>
-                                                    </View>
-                                                ))}
-                                            </View>
-
                                             {isSelected && (
-                                                <View style={{ marginTop: 8 }}>
+                                                <View style={{ marginTop: 6, paddingTop: 12, borderTopWidth: 1, borderTopColor: theme.color + '14' }}>
                                                     {journey.legs.map((leg, i) => {
                                                         const isLastLeg = i === journey.legs.length - 1;
                                                         return (
                                                             <React.Fragment key={i}>
                                                                 <TimelineRow
-                                                                    color={leg.routeColor ?? '#2563eb'}
+                                                                    color={leg.routeColor ?? ACCENT}
                                                                     textColor={theme.color}
                                                                     lineColor={theme.color + '22'}
                                                                     label={`Board at ${leg.originStopName}`}
                                                                     time={leg.departureTime ? formatClock(leg.departureTime) : undefined}
                                                                 />
                                                                 <TimelineRow
-                                                                    color={leg.routeColor ?? '#2563eb'}
+                                                                    color={leg.routeColor ?? ACCENT}
                                                                     textColor={theme.color}
                                                                     lineColor={theme.color + '22'}
                                                                     label={`Alight at ${leg.destStopName}`}

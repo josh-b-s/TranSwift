@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import MapView, { LatLng, Polyline, PROVIDER_GOOGLE} from 'react-native-maps';
+import MapView, { LatLng, Marker, Polyline, PROVIDER_GOOGLE} from 'react-native-maps';
 import {ActivityIndicator, Keyboard, StyleSheet, Text, View} from 'react-native';
 import * as Location from 'expo-location';
 import {useSelector} from 'react-redux';
@@ -56,6 +56,9 @@ export default function Index() {
         if (isFocused) {
             if (selectedPlace) {
                 modalRef.current?.present();
+            } else {
+                // Closing the sheet's header X clears the place; take the sheet down with it.
+                modalRef.current?.dismiss();
             }
         } else {
             modalRef.current?.close({ duration: 0 });
@@ -141,6 +144,13 @@ export default function Index() {
                         strokeColor={routeColor ?? '#2563eb'}
                     />
                 ) : null)}
+
+                {selectedPlace && (
+                    <Marker
+                        coordinate={{latitude: selectedPlace.latitude, longitude: selectedPlace.longitude}}
+                        title={selectedPlace.name}
+                    />
+                )}
 
                 {/*<DebugMapOverlay />*/}
             </MapView>

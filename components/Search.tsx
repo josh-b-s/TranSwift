@@ -1,13 +1,13 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import {Alert, FlatList, Keyboard, Text, TextInput, TouchableOpacity, View} from 'react-native';
+import {ActivityIndicator, Alert, FlatList, Keyboard, Text, TextInput, TouchableOpacity, View} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch, RootState } from '@/store/store';
 import { clearResults, searchPlaces, selectPlace, setQuery, setDepartureTime, setWalkingSpeed } from '@/store/search.slice';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { SHADOW, TOP_SAFE, useThemeStyle } from '@/constants/themes';
-import {computeRoute} from "@/store/route.slice";
+import { ACCENT, SHADOW, TOP_SAFE, useThemeStyle } from '@/constants/themes';
+import {clearRoute, computeRoute} from "@/store/route.slice";
 import DepartureTimeModal from '@/components/DepartureTimeModal';
 
 const GOOGLE_MAPS_APIKEY = process.env.EXPO_PUBLIC_API_KEY ?? '';
@@ -51,6 +51,14 @@ export default function Search() {
         return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
     }, [query, userLocation, dispatch]);
 
+    const clearSearch = useCallback(() => {
+        dispatch(setQuery(''));
+        dispatch(clearResults());
+        dispatch(selectPlace(null));
+        dispatch(clearRoute());
+        Keyboard.dismiss();
+    }, [dispatch]);
+
     const onSelect = useCallback((place: any) => {
         dispatch(selectPlace(place));
         Keyboard.dismiss();
@@ -69,23 +77,26 @@ export default function Search() {
 
     return (
         <View className="absolute left-4 right-4 z-[9999]" style={{ top: TOP_SAFE(useSafeAreaInsets()) }}>
-            <View className="flex-row items-center rounded-full px-3 py-2.5"
+            <View className="flex-row items-center rounded-full px-3 py-2"
                   style={[{ backgroundColor: theme.backgroundColor }, SHADOW]}>
-                <Ionicons name="search" size={20} color="#666" className="mx-2" />
+                <Ionicons name="search" size={20} color={theme.color} style={{ opacity: 0.5, marginHorizontal: 8 }} />
                 <TextInput
                     value={query}
                     onChangeText={(t) => dispatch(setQuery(t))}
-                    placeholder="Search places..."
-                    className="text-xl flex-1 placeholder:text-gray-500"
-                    style={{ backgroundColor: theme.backgroundColor, color: theme.color }}
+                    placeholder="Where to?"
+                    placeholderTextColor={theme.color + '80'}
+                    className="flex-1 py-1.5"
+                    style={{ backgroundColor: theme.backgroundColor, color: theme.color, fontSize: 17 }}
                     returnKeyType="search"
                 />
-                {(query.length > 0 || loading) && (
-                    <TouchableOpacity onPress={() => { dispatch(setQuery('')); dispatch(clearResults()); Keyboard.dismiss(); }}
+                {loading && <ActivityIndicator size="small" color={ACCENT} style={{ marginHorizontal: 8 }} />}
+                {query.length > 0 && (
+                    <TouchableOpacity onPress={clearSearch}
                                       accessibilityRole="button"
-                                      accessibilityLabel={loading ? 'Searching' : 'Clear search'}
-                                      className="p-1.5 ml-1.5">
-                        <Ionicons name={loading ? 'hourglass' : 'close'} size={20} color="#666" />
+                                      accessibilityLabel="Clear search"
+                                      hitSlop={8}
+                                      className="p-1.5 ml-1">
+                        <Ionicons name="close-circle" size={22} color={theme.color} style={{ opacity: 0.4 }} />
                     </TouchableOpacity>
                 )}
             </View>
@@ -157,14 +168,19 @@ export default function Search() {
                                 onPress={() => onSelect(item)}
                                 accessibilityRole="button"
                                 accessibilityLabel={`${item.name}, ${item.address}`}
-                                className="flex-row items-center px-3 py-3"
-                                style={index < results.length - 1 ? { borderBottomWidth: 1, borderBottomColor: theme.color + '22' } : undefined}
+                                className="flex-row items-center px-4 py-3"
+                                style={index < results.length - 1 ? { borderBottomWidth: 1, borderBottomColor: theme.color + '14' } : undefined}
                             >
-                                <View className="flex-1">
-                                    <Text className="text-lg font-semibold mb-0.5" style={{ color: theme.color }}>{item.name}</Text>
-                                    <Text className="opacity-50" style={{ color: theme.color }}>{item.address}</Text>
+                                <View
+                                    className="items-center justify-center rounded-full mr-3"
+                                    style={{ width: 36, height: 36, backgroundColor: ACCENT + '1f' }}
+                                >
+                                    <Ionicons name="location-sharp" size={18} color={ACCENT} />
                                 </View>
-                                <Ionicons name="chevron-forward" size={20} color="#666" />
+                                <View className="flex-1">
+                                    <Text className="text-base font-semibold" numberOfLines={1} style={{ color: theme.color }}>{item.name}</Text>
+                                    <Text className="text-sm mt-0.5" numberOfLines={1} style={{ color: theme.color, opacity: 0.55 }}>{item.address}</Text>
+                                </View>
                             </TouchableOpacity>
                         )}
                     />
