@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "mapApp",
-    "slug": "mapApp",
+    "name": "TranSwift",
+    "slug": "transwift",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "mapapp",
+    "scheme": "transwift",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
@@ -23,7 +23,7 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.mapApp"
+      "package": "com.anonymous.transwift"
     },
     "web": {
       "bundler": "metro",
