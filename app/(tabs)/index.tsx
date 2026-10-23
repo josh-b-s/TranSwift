@@ -13,10 +13,12 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import Search from '@/components/Search';
 import LocationButton from '@/components/LocationButton';
 import RouteBottomSheetModal from '@/components/RouteBottomSheetModal';
+import MapPickOverlay from '@/components/MapPickOverlay';
 import DebugMapOverlay from '@/components/DebugMapOverlay';
 import DebugControls from '@/components/DebugControls';
 import {MAP_STYLE_DARK, SHADOW, TOP_SAFE, useThemeStyle} from '@/constants/themes';
 import {selectDisplayedJourney} from '@/store/route.slice';
+import {isCurrentLocation} from '@/services/places/endpoints';
 import {useGoToUserLocation} from '../../hooks/goToUserLocation';
 
 const EMPTY_COORDS: LatLng[] = [];
@@ -39,6 +41,8 @@ export default function Index() {
     const routeColor = displayedJourney?.routeColor;
     const routeLoading = useSelector((s: RootState) => s.route.loading);
     const selectedPlace = useSelector((s: RootState) => s.search.selected);
+    const origin = useSelector((s: RootState) => s.search.origin);
+    const pickingField = useSelector((s: RootState) => s.search.pickingField);
     const debugEnabled = useSelector((s: RootState) => s.debug.enabled);
 
     const goToUserLocation = useGoToUserLocation(mapRef);
@@ -52,9 +56,11 @@ export default function Index() {
     // Settings screen is already on screen, so an animated slide-down would
     // visibly play over it instead of on the map.
     const isFocused = useIsFocused();
+    // Hidden while choosing a point on the map, so it doesn't cover the map.
+    const showSheet = selectedPlace !== null && pickingField === null;
     useEffect(() => {
         if (isFocused) {
-            if (selectedPlace) {
+            if (showSheet) {
                 modalRef.current?.present();
             } else {
                 // Closing the sheet's header X clears the place; take the sheet down with it.
@@ -63,17 +69,11 @@ export default function Index() {
         } else {
             modalRef.current?.close({ duration: 0 });
         }
-    }, [isFocused, selectedPlace]);
+    }, [isFocused, showSheet]);
 
     useEffect(() => {
         goToUserLocation();
     }, [goToUserLocation]);
-
-    useEffect(() => {
-        if (selectedPlace) {
-            modalRef.current?.present();
-        }
-    }, [selectedPlace]);
 
     useEffect(() => {
         if (!routeCoords?.length) return;
@@ -99,7 +99,7 @@ export default function Index() {
 
     return (
         <View style={{flex: 1}}>
-            <Search/>
+            {pickingField === null && <Search/>}
 
             <MapView
                 ref={mapRef}
@@ -145,7 +145,14 @@ export default function Index() {
                     />
                 ) : null)}
 
-                {selectedPlace && (
+                {!isCurrentLocation(origin) && (
+                    <Marker
+                        coordinate={{latitude: origin.latitude, longitude: origin.longitude}}
+                        title={origin.name}
+                        pinColor="green"
+                    />
+                )}
+                {selectedPlace && !isCurrentLocation(selectedPlace) && (
                     <Marker
                         coordinate={{latitude: selectedPlace.latitude, longitude: selectedPlace.longitude}}
                         title={selectedPlace.name}
@@ -157,13 +164,13 @@ export default function Index() {
 
             {routeLoading && (
                 // A small floating pill instead of a full-screen dim+spinner —
-                // the search bar's own hourglass icon already signals place
+                // the search bar's own spinner already signals place
                 // lookups, so a second full-screen treatment for route
                 // computation felt heavier than the wait usually warrants.
                 <View
                     style={{
                         position: 'absolute',
-                        top: TOP_SAFE(insets) + 128,
+                        top: TOP_SAFE(insets) + 120,
                         left: 0,
                         right: 0,
                         alignItems: 'center',
@@ -192,6 +199,7 @@ export default function Index() {
                 </View>
             )}
 
+            <MapPickOverlay mapRef={mapRef} />
             <LocationButton mapRef={mapRef} animatedPosition={bottomSheetPosition} />
             {/*<DebugControls />*/}
             <RouteBottomSheetModal ref={modalRef} animatedPosition={bottomSheetPosition} />

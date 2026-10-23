@@ -7,6 +7,7 @@ import { RootState, AppDispatch } from '@/store/store';
 import { ACCENT, SHADOW, TOP_SAFE, useThemeStyle } from '@/constants/themes';
 import { modeIcon } from '@/constants/modeIcons';
 import RouteSheetHeader from '@/components/RouteSheetHeader';
+import RouteOptionPills from '@/components/RouteOptionPills';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { ArrowLeftRight, Bus, ChevronRight, CircleAlert, Footprints, type LucideIcon, Zap } from 'lucide-react-native';
@@ -14,6 +15,7 @@ import * as Haptics from 'expo-haptics';
 import { clearRoute, selectJourney } from '@/store/route.slice';
 import { selectPlace, setQuery } from '@/store/search.slice';
 import {classifyRouteType} from "@/services/gtfs/config/routeTypeUtil";
+import { routeErrorMessage } from '@/services/gtfs/router/routeErrorMessage';
 
 type Props = {
     animatedPosition: SharedValue<number>;
@@ -116,10 +118,11 @@ const RouteBottomSheetModal = forwardRef<BottomSheetModal, Props>(
                             onClose={closeRoute}
                         />
                     )}
+                    {selectedPlace && <RouteOptionPills />}
                     {error ? (
                         <View style={{ padding: 24, alignItems: 'center', gap: 8 }}>
                             <CircleAlert size={28} color="#ef4444" />
-                            <Text style={{ color: '#ef4444', fontSize: 15, textAlign: 'center' }}>{error}</Text>
+                            <Text style={{ color: '#ef4444', fontSize: 15, textAlign: 'center' }}>{routeErrorMessage(error)}</Text>
                         </View>
                     ) : journeys.length === 0 ? (
                         loading ? (

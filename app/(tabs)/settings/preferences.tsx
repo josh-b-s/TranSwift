@@ -126,7 +126,7 @@ export default function Preferences() {
 
             <SectionLabel text="Walking speeds" theme={theme} />
             <Text style={{ color: theme.color, opacity: 0.5, fontSize: 12, marginBottom: 4 }}>
-                These are the presets the walking-speed pill on the search bar cycles through.
+                These are the presets the walking-speed pill on the route sheet cycles through.
             </Text>
 
             {walkingSpeeds.map((option) => {
