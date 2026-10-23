@@ -1,9 +1,11 @@
 /**
  * feedSuggestion.ts — decides whether to prompt the user about GTFS data for
  * where they are:
- *  - inside an imported feed's coverage, and its timetable ends soon: re-download it;
- *  - outside every imported feed: suggest the best catalog feed that covers them,
- *    by bounding box first, then by region for feeds the catalog has no box for.
+ *  - a feed that covers them is already imported and its timetable ends soon: re-download it;
+ *  - no imported feed covers them: suggest the best catalog feed that does.
+ * Coverage is checked by bounding box first, then by region (reverse geocode) for
+ * feeds the catalog has no box for. The same checks run against imported feeds, so
+ * a feed already on the device is never suggested again.
  */
 
 import * as Location from 'expo-location';
@@ -21,16 +23,26 @@ async function regionOf(at: Point): Promise<Region | null> {
     return place?.isoCountryCode && place.region ? { country: place.isoCountryCode, subdivision: place.region } : null;
 }
 
-async function bestCatalogFeed(feeds: CatalogFeed[], at: Point): Promise<CatalogFeed | undefined> {
-    const [byBox] = feedsAround(feeds, at);
-    if (byBox) return byBox;
+/** Catalog feeds covering `at`: by bounding box, or failing that by region. */
+async function catalogFeedsAt(feeds: CatalogFeed[], at: Point): Promise<CatalogFeed[]> {
+    const byBox = feedsAround(feeds, at);
+    if (byBox.length > 0) return byBox;
     const region = await regionOf(at);
-    return region ? feedsInRegion(feeds, region)[0] : undefined;
+    return region ? feedsInRegion(feeds, region) : [];
 }
 
 export type FeedSuggestion =
     | { kind: 'nearby'; feed: CatalogFeed }
     | { kind: 'expiring'; entry: GtfsDatabaseEntry; daysLeft: number };
+
+function expiryOf(entries: GtfsDatabaseEntry[]): FeedSuggestion | null {
+    const latest = entries.reduce((a, b) => ((b.stats!.serviceEnd ?? '') > (a.stats!.serviceEnd ?? '') ? b : a));
+    const end = latest.stats!.serviceEnd;
+    // Without a source URL there is nothing to re-download.
+    if (!end || !latest.source) return null;
+    const daysLeft = daysUntilGtfsDate(end);
+    return daysLeft <= EXPIRY_WARNING_DAYS ? { kind: 'expiring', entry: latest, daysLeft } : null;
+}
 
 export async function findFeedSuggestion(at: Point): Promise<FeedSuggestion | null> {
     await ensureActiveStats();
@@ -40,16 +52,14 @@ export async function findFeedSuggestion(at: Point): Promise<FeedSuggestion | nu
     if (entries.some((e) => !e.stats)) return null;
 
     const covering = entries.filter((e) => e.stats!.coverage && coverageContains(e.stats!.coverage, at));
-    if (covering.length > 0) {
-        const latest = covering.reduce((a, b) => ((b.stats!.serviceEnd ?? '') > (a.stats!.serviceEnd ?? '') ? b : a));
-        const end = latest.stats!.serviceEnd;
-        // Without a source URL there is nothing to re-download.
-        if (!end || !latest.source) return null;
-        const daysLeft = daysUntilGtfsDate(end);
-        return daysLeft <= EXPIRY_WARNING_DAYS ? { kind: 'expiring', entry: latest, daysLeft } : null;
-    }
+    if (covering.length > 0) return expiryOf(covering);
 
     const { feeds } = await loadCatalog();
-    const best = await bestCatalogFeed(feeds, at);
-    return best ? { kind: 'nearby', feed: best } : null;
+    const candidates = await catalogFeedsAt(feeds, at);
+    if (candidates.length === 0) return null;
+
+    // Covers this spot in the catalog but not by its stops, or has no catalog box at all.
+    const candidateIds = new Set(candidates.map((f) => f.id));
+    const imported = entries.filter((e) => e.source && candidateIds.has(e.source.id));
+    return imported.length > 0 ? expiryOf(imported) : { kind: 'nearby', feed: candidates[0] };
 }
