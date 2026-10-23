@@ -132,3 +132,23 @@ export function formatEta(seconds: number | null): string | null {
     if (seconds < 90) return `About ${Math.round(seconds / 10) * 10} sec left`;
     return `About ${Math.round(seconds / 60)} min left`;
 }
+
+const MEGABYTE = 1024 * 1024;
+
+export function formatMegabytes(bytes: number): string {
+    return bytes >= 10 * MEGABYTE
+        ? `${Math.round(bytes / MEGABYTE)} MB`
+        : `${(bytes / MEGABYTE).toFixed(1)} MB`;
+}
+
+/** Progress for the download step, shown before the import's own bar starts. */
+export function downloadProgress(written: number, total: number): ImportProgress {
+    return {
+        fraction: total > 0 ? Math.min(written / total, 1) : 0,
+        label: 'Downloading',
+        detail: total > 0
+            ? `${formatMegabytes(written)} of ${formatMegabytes(total)}`
+            : `${formatMegabytes(written)} so far`,
+        etaSeconds: null,
+    };
+}

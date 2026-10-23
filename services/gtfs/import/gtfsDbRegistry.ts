@@ -18,6 +18,13 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { setActiveDbPath, clearActiveDbPath } from '@/services/db/sqliteDb';
 import { invalidateNativeRouter } from '../router/gtfsRouterNative';
 
+/** Where a feed was downloaded from, kept for licence credit and later update checks. */
+export type FeedSource = {
+    label: string;
+    url: string;
+    license?: string;
+};
+
 export type GtfsDatabaseEntry = {
     id: string;
     name: string;
@@ -28,6 +35,8 @@ export type GtfsDatabaseEntry = {
      *  paying the real import cost. Optional because entries created before
      *  this field existed won't have one; those just never match. */
     zipHash?: string;
+    /** Set for feeds imported from the catalog; absent for zips picked from the device. */
+    source?: FeedSource;
 };
 
 type RegistryFile = {
@@ -194,7 +203,12 @@ export async function setActiveDatabase(id: string): Promise<void> {
  * collides with an existing entry, silently disambiguates it file-system
  * style ("Melbourne" -> "Melbourne (1)") rather than failing the import.
  */
-export async function registerDatabase(name: string, fileName: string, zipHash?: string): Promise<GtfsDatabaseEntry> {
+export async function registerDatabase(
+    name: string,
+    fileName: string,
+    zipHash?: string,
+    source?: FeedSource,
+): Promise<GtfsDatabaseEntry> {
     const reg = await readRegistry();
     const uniqueName = dedupeName(name, reg.databases.map(d => d.name));
     const entry: GtfsDatabaseEntry = {
@@ -203,6 +217,7 @@ export async function registerDatabase(name: string, fileName: string, zipHash?:
         fileName,
         importedAt: Date.now(),
         zipHash,
+        source,
     };
     reg.databases.push(entry);
     reg.activeId = entry.id;

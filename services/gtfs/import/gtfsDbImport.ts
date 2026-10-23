@@ -15,6 +15,7 @@ import {
     DuplicateFeedError,
     findDatabaseByHash,
     nameFromZipFileName,
+    type FeedSource,
     registerDatabase,
     type GtfsDatabaseEntry,
 } from './gtfsDbRegistry';
@@ -52,8 +53,9 @@ export async function pickGtfsZip(): Promise<DocumentPicker.DocumentPickerAsset 
  * specifically and offer to just select the existing one instead.
  */
 export async function importZipAsNewDatabase(
-    zip: DocumentPicker.DocumentPickerAsset,
+    zip: { uri: string; name?: string },
     onProgress?: (p: ImportProgressEvent) => void,
+    source?: FeedSource,
 ): Promise<GtfsDatabaseEntry> {
     // { md5: true } asks expo-file-system to compute the hash natively
     // rather than reading the whole (potentially 100+MB) zip into JS memory
@@ -71,6 +73,6 @@ export async function importZipAsNewDatabase(
 
     await importGtfsZipToPath(zip.uri, dbPath, onProgress);
 
-    const name = nameFromZipFileName(zip.name ?? 'Imported feed');
-    return registerDatabase(name, fileName, md5);
+    const name = source?.label ?? nameFromZipFileName(zip.name ?? 'Imported feed');
+    return registerDatabase(name, fileName, md5, source);
 }

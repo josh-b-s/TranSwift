@@ -1,6 +1,7 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
-import { Bus, CircleCheck, CirclePlus, CircleX, Pencil, Trash2 } from 'lucide-react-native';
+import { useRouter, useFocusEffect } from 'expo-router';
+import { Bus, CircleCheck, CirclePlus, CircleX, Globe, Pencil, Trash2 } from 'lucide-react-native';
 import { useThemeStyle } from '@/constants/themes';
 import ImportProgressCard from '@/components/ImportProgressCard';
 import { createProgressTracker, type ImportProgress } from '@/services/gtfs/import/importProgress';
@@ -34,6 +35,7 @@ type ImportState = { busy: false } | { busy: true; fileName: string; progress: I
  */
 export default function GtfsData() {
     const theme = useThemeStyle();
+    const router = useRouter();
     const [databases, setDatabases] = useState<GtfsDatabaseEntry[]>([]);
     const [activeId, setActiveId] = useState<string | null>(null);
     const [loaded, setLoaded] = useState(false);
@@ -55,9 +57,12 @@ export default function GtfsData() {
         setLoaded(true);
     }, []);
 
-    useEffect(() => {
-        refresh();
-    }, [refresh]);
+    // Focus rather than mount, so a feed imported from Browse Feeds shows up on return.
+    useFocusEffect(
+        useCallback(() => {
+            refresh();
+        }, [refresh]),
+    );
 
     async function handleAddZip() {
         setError('');
@@ -282,6 +287,24 @@ export default function GtfsData() {
                     </View>
                 );
             })}
+
+            <Pressable
+                disabled={busy}
+                onPress={() => router.push('/settings/browse-feeds')}
+                style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
+                    padding: 16,
+                    borderRadius: 16,
+                    backgroundColor: theme.backgroundColor,
+                    opacity: busy ? 0.5 : 1,
+                }}
+            >
+                <Globe size={20} color={theme.color} />
+                <Text style={{ color: theme.color, fontSize: 15, fontWeight: '600' }}>Browse feeds</Text>
+            </Pressable>
 
             <Pressable
                 disabled={busy}
