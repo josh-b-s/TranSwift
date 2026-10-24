@@ -107,6 +107,7 @@ function toSegment(seg: import('@mapapp/gtfs-router-rust').RouteSegment): RouteS
         type: seg.isWalk ? 'walk' : 'transit',
         departureTime: secToTimeString(seg.departureTimeSec),
         arrivalTime: secToTimeString(seg.arrivalTimeSec),
+        stops: seg.stops,
     };
 }
 

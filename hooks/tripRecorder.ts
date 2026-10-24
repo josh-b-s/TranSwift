@@ -5,12 +5,13 @@ import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch, RootState } from '@/store/store';
 import { endTrip, setTripStep } from '@/store/trip.slice';
 import { createTripSession } from '@/services/trips/tripSession';
+import { createAlightAlert } from '@/services/trips/alightAlert';
 import { startTracking } from '@/services/trips/locationTracking';
 import { applyTrip } from '@/services/trips/personalBests';
 import { saveTrip, type SavedTrip } from '@/services/trips/tripStore';
 import { saveBests } from '@/services/trips/bestsStore';
 import { summarizeTrip, walkTotals } from '@/services/trips/tripSummary';
-import { notifyTripDone, requestNotificationPermission } from '@/services/trips/tripNotification';
+import { notifyGetOff, notifyTripDone, requestNotificationPermission } from '@/services/trips/tripNotification';
 
 /** While a trip is running, tracks the rider through its steps and saves the trip on arrival. */
 export function useTripRecorder() {
@@ -27,6 +28,8 @@ export function useTripRecorder() {
         if (startedAt === null) return;
 
         const session = createTripSession(steps);
+        const checkAlight = createAlightAlert(steps, ride =>
+            notifyGetOff(ride.to).catch(err => console.warn('[trip] get-off alert failed:', err)));
         let cancelled = false;
         let finished = false;
         let stopTracking: (() => void) | undefined;
@@ -56,8 +59,13 @@ export function useTripRecorder() {
                     accuracy: coords.accuracy,
                 });
             }
-            if (session.done) finish();
-            else if (session.stepIndex !== before) dispatch(setTripStep(session.stepIndex));
+            if (session.done) {
+                finish();
+                return;
+            }
+            if (session.stepIndex !== before) dispatch(setTripStep(session.stepIndex));
+            const { coords } = locations[locations.length - 1];
+            checkAlight(session.stepIndex, coords);
         })
             .then(stop => {
                 if (cancelled) {

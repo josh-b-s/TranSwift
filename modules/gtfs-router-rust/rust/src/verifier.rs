@@ -29,7 +29,7 @@
 
 use crate::geo::{haversine_meters, LatLon};
 use crate::loader::GtfsIndex;
-use crate::raptor::{Journey, Leg, RouteSegment};
+use crate::raptor::{ride_stops, Journey, Leg, RouteSegment};
 use crate::repo::StopsCache;
 
 fn walk_time_sec(meters: f64, speed_mps: f64) -> i64 {
@@ -203,6 +203,7 @@ fn build_journey(
             origin_stop_name: from_name.to_string(), dest_stop_name: to_name.to_string(),
             is_walk: true, departure_time_sec: None, arrival_time_sec: None,
             pattern_pk: None,
+            stops: vec![],
         }
     };
 
@@ -261,6 +262,7 @@ fn build_journey(
                     dest_stop_name: alight_stop.stop_name.clone(), is_walk: false,
                     departure_time_sec: Some(*depart_sec), arrival_time_sec: Some(*arrive_sec),
                     pattern_pk: Some(*pattern_pk),
+                    stops: ride_stops(&seq_list, stops, board_stop, alight_stop, *board_seq, *alight_seq),
                 });
                 legs.push(Leg {
                     route_name, route_type, route_color, route_text_color,

@@ -1,5 +1,5 @@
 import type { LatLng } from '@/services/places/places';
-import type { GtfsJourney } from '@/services/gtfs/router/raptorRouter';
+import type { GtfsJourney, RouteStop } from '@/services/gtfs/router/raptorRouter';
 import { encodeLine } from './lineCodec';
 
 type StepBase = { from: string; to: string; end: LatLng };
@@ -15,6 +15,8 @@ export type RideStep = StepBase & {
     routeColor?: string;
     routeTextColor?: string;
     line: string;
+    /** Board to alight, so the alert can tell when the stop before yours is near. */
+    stops: RouteStop[];
 };
 
 export type TripStep = WalkStep | RideStep;
@@ -32,6 +34,7 @@ export function stepsFromJourney(journey: GtfsJourney): TripStep[] {
                 routeColor: seg.routeColor,
                 routeTextColor: seg.routeTextColor,
                 line: encodeLine(seg.coords),
+                stops: seg.stops ?? [],
             };
         }
         // The first and last walks start or end wherever the rider is, so only the ones between stops repeat.

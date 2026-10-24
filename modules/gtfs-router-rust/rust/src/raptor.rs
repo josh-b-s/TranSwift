@@ -21,7 +21,7 @@
 use std::collections::{HashMap, HashSet};
 use crate::geo::{haversine_meters, LatLon};
 use crate::loader::GtfsIndex;
-use crate::repo::StopsCache;
+use crate::repo::{StopRow, StopsCache};
 use crate::settings::{
     DEFAULT_MAX_WALK_DISTANCE_M, ASSUMED_TRANSIT_SPEED_MPS, BEST_MARKED_CAP, MAX_ROUNDS, NEARBY_STOPS,
 };
@@ -48,6 +48,35 @@ pub struct RouteSegment {
     /// run_search returns. Never exposed over the FFI boundary — see
     /// lib.rs's segment_to_ffi, which doesn't carry this field forward.
     pub pattern_pk: Option<i64>,
+    /// Every stop a ride passes, board to alight in travel order. Empty for walks.
+    pub stops: Vec<RouteStop>,
+}
+
+#[derive(Debug, Clone)]
+pub struct RouteStop {
+    pub name: String,
+    pub lat: f64,
+    pub lon: f64,
+}
+
+/// The stops between `board_seq` and `alight_seq` on a pattern, in the order the vehicle visits them.
+pub fn ride_stops(
+    seq_list: &[(i64, i64)],
+    stops: &StopsCache,
+    board: &StopRow,
+    alight: &StopRow,
+    board_seq: i64,
+    alight_seq: i64,
+) -> Vec<RouteStop> {
+    let (lo, hi) = (board_seq.min(alight_seq), board_seq.max(alight_seq));
+    let as_stop = |s: &StopRow| RouteStop { name: s.stop_name.clone(), lat: s.stop_lat, lon: s.stop_lon };
+    let mut ride: Vec<RouteStop> = seq_list.iter()
+        .filter(|(_, seq)| *seq >= lo && *seq <= hi)
+        .filter_map(|(stop_pk, _)| stops.get(*stop_pk).map(as_stop))
+        .collect();
+    if board_seq > alight_seq { ride.reverse(); }
+    if ride.is_empty() { ride = vec![as_stop(board), as_stop(alight)]; }
+    ride
 }
 
 #[derive(Debug, Clone)]
@@ -591,6 +620,7 @@ fn reconstruct_path(
             origin_stop_name: from_name.to_string(), dest_stop_name: to_name.to_string(),
             is_walk: true, departure_time_sec: None, arrival_time_sec: None,
             pattern_pk: None,
+            stops: vec![],
         }
     };
 
@@ -654,6 +684,7 @@ fn reconstruct_path(
                     dest_stop_name: alight_stop.stop_name.clone(), is_walk: false,
                     departure_time_sec: depart_sec, arrival_time_sec: arrive_sec,
                     pattern_pk: Some(*pattern_pk),
+                    stops: ride_stops(&seq_list, stops, board_stop, alight_stop, *board_seq, *alight_seq),
                 });
                 legs.push(Leg {
                     route_name, route_type, route_color, route_text_color,

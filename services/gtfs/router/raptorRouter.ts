@@ -125,6 +125,10 @@ type ParentInfo =
     boardKey: StopKey; boardSeq: number; alightSeq: number
 };
 
+export interface RouteStop extends LatLng {
+    name: string;
+}
+
 export interface RouteSegment {
     coords: LatLng[];
     routeName: string;
@@ -136,6 +140,8 @@ export interface RouteSegment {
     type: 'transit' | 'walk';
     departureTime?: string;
     arrivalTime?: string;
+    /** Every stop a ride passes, board to alight. Absent on walks. */
+    stops?: RouteStop[];
 }
 
 export interface GtfsJourney {
@@ -1249,10 +1255,26 @@ function reconstructPath(
             ];
         }
 
+        const rideStops = (index.patternStops.get(makeKey(agency, patternId)) ?? [])
+            .filter(s => s.stop_sequence >= Math.min(boardSeq, alightSeq) && s.stop_sequence <= Math.max(boardSeq, alightSeq))
+            .sort((a, b) => a.stop_sequence - b.stop_sequence)
+            .flatMap(s => {
+                const stop = index.stopsByKey.get(keyOf(s.stop_id, agency));
+                return stop ? [{name: stop.stop_name, latitude: stop.stop_lat, longitude: stop.stop_lon}] : [];
+            });
+        if (boardSeq > alightSeq) rideStops.reverse();
+        if (rideStops.length === 0) {
+            rideStops.push(
+                {name: boardStop.stop_name, latitude: boardStop.stop_lat, longitude: boardStop.stop_lon},
+                {name: alightStop.stop_name, latitude: alightStop.stop_lat, longitude: alightStop.stop_lon},
+            );
+        }
+
         segments.push({
             coords, routeName, routeType, routeColor, routeTextColor,
             originStopName: boardStop.stop_name, destStopName: alightStop.stop_name,
             type: 'transit', departureTime: departTimeStr, arrivalTime: arriveTimeStr,
+            stops: rideStops,
         });
         legs.push({
             routeName, routeType, routeColor, routeTextColor,

@@ -26,6 +26,7 @@ import {useGoToUserLocation} from '../../hooks/goToUserLocation';
 import {useFeedSuggestion} from '../../hooks/feedSuggestion';
 import {useTripRecorder} from '@/hooks/tripRecorder';
 import {useTripNotificationTap} from '@/hooks/tripNotificationTap';
+import {RIDE_LINE_WIDTH, RideStopMarkers} from '@/components/RideStopMarkers';
 
 const EMPTY_COORDS: LatLng[] = [];
 const EMPTY_SEGMENTS: NonNullable<ReturnType<typeof selectDisplayedJourney>>['segments'] = [];
@@ -138,7 +139,7 @@ export default function Index() {
                         <Polyline
                             key={index}
                             coordinates={segment.coords}
-                            strokeWidth={segment.type === 'walk' ? 3 : 5}
+                            strokeWidth={segment.type === 'walk' ? 4 : RIDE_LINE_WIDTH}
                             strokeColor={segment.routeColor ?? routeColor ?? '#2563eb'}
                             lineDashPattern={segment.type === 'walk' ? [8, 8] : undefined}
                             lineCap="round"
@@ -153,6 +154,10 @@ export default function Index() {
                         strokeColor={routeColor ?? '#2563eb'}
                     />
                 ) : null)}
+
+                {!debugEnabled && routeSegments.map((segment, index) => segment.type === 'transit' && (
+                    <RideStopMarkers key={index} segment={segment} />
+                ))}
 
                 {!isCurrentLocation(origin) && (
                     <Marker

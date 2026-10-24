@@ -118,6 +118,14 @@ pub struct RouteSegment {
     pub is_walk: bool,
     pub departure_time_sec: Option<i32>,
     pub arrival_time_sec: Option<i32>,
+    pub stops: Vec<RouteStop>,
+}
+
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct RouteStop {
+    pub name: String,
+    pub latitude: f64,
+    pub longitude: f64,
 }
 
 #[derive(Debug, Clone, uniffi::Record)]
@@ -1254,6 +1262,9 @@ fn segment_to_ffi(s: raptor::RouteSegment) -> RouteSegment {
         is_walk: s.is_walk,
         departure_time_sec: s.departure_time_sec.map(|v| v as i32),
         arrival_time_sec: s.arrival_time_sec.map(|v| v as i32),
+        stops: s.stops.into_iter()
+            .map(|p| RouteStop { name: p.name, latitude: p.lat, longitude: p.lon })
+            .collect(),
     }
 }
 
