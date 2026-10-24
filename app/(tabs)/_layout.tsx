@@ -1,6 +1,6 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
-import { Map as MapIcon, Settings as SettingsIcon } from 'lucide-react-native';
+import { History as HistoryIcon, Map as MapIcon, Settings as SettingsIcon } from 'lucide-react-native';
 import { useThemeStyle } from '@/constants/themes';
 
 export default function TabsLayout() {
@@ -26,6 +26,13 @@ export default function TabsLayout() {
                 options={{
                     title: 'Map',
                     tabBarIcon: ({ color, size }) => <MapIcon size={size} color={color} />,
+                }}
+            />
+            <Tabs.Screen
+                name="history"
+                options={{
+                    title: 'History',
+                    tabBarIcon: ({ color, size }) => <HistoryIcon size={size} color={color} />,
                 }}
             />
             <Tabs.Screen

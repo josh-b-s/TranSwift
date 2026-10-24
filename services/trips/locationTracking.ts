@@ -1,5 +1,6 @@
 import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
+import { dropWhileSimulating, subscribeSimulatedFixes } from '@/services/debug/locationSimulator';
 
 const TASK_NAME = 'trip-location-updates';
 
@@ -23,11 +24,7 @@ TaskManager.defineTask<{ locations: Location.LocationObject[] }>(TASK_NAME, asyn
 
 const logStopFailure = (err: unknown) => console.warn('[trip] failed to stop location updates:', err);
 
-/**
- * Streams fixes to `onLocations`, including with the screen off when background permission is
- * granted, and otherwise only while the app is open. Returns a function that stops it.
- */
-export async function startTracking(onLocations: Listener): Promise<() => void> {
+async function startDeviceTracking(onLocations: Listener): Promise<() => void> {
     const foreground = await Location.requestForegroundPermissionsAsync();
     if (foreground.status !== 'granted') throw new Error('Allow location access to record your trip.');
 
@@ -56,5 +53,19 @@ export async function startTracking(onLocations: Listener): Promise<() => void> 
     return () => {
         listener = null;
         Location.stopLocationUpdatesAsync(TASK_NAME).catch(logStopFailure);
+    };
+}
+
+/**
+ * Streams fixes to `onLocations`, including with the screen off when background permission is
+ * granted, and otherwise only while the app is open. Returns a function that stops it.
+ * Simulated fixes (see the debug movement controls) replace device fixes while they run.
+ */
+export async function startTracking(onLocations: Listener): Promise<() => void> {
+    const stopDevice = await startDeviceTracking(dropWhileSimulating(onLocations));
+    const stopSimulated = subscribeSimulatedFixes(onLocations);
+    return () => {
+        stopDevice();
+        stopSimulated();
     };
 }

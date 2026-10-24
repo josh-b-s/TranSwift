@@ -9,7 +9,7 @@ import { startTracking } from '@/services/trips/locationTracking';
 import { applyTrip } from '@/services/trips/personalBests';
 import { saveTrip, type SavedTrip } from '@/services/trips/tripStore';
 import { saveBests } from '@/services/trips/bestsStore';
-import { summarizeTrip } from '@/services/trips/tripSummary';
+import { summarizeTrip, walkTotals } from '@/services/trips/tripSummary';
 import { notifyTripDone, requestNotificationPermission } from '@/services/trips/tripNotification';
 
 /** While a trip is running, tracks the rider through its steps and saves the trip on arrival. */
@@ -36,6 +36,7 @@ export function useTripRecorder() {
             dispatch(endTrip());
             const { bests: updated, broken } = applyTrip(bests, { startedAt, legs: session.legs });
             const trip: SavedTrip = { startedAt, legs: session.legs, records: broken };
+            trip.totals = walkTotals(trip);
             Promise.all([saveTrip(trip), saveBests(updated)])
                 .then(() => {
                     if (AppState.currentState === 'active') router.push(`/trip/${startedAt}`);

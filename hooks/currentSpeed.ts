@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import * as Location from 'expo-location';
+import { dropWhileSimulating, subscribeSimulatedFixes } from '@/services/debug/locationSimulator';
 
 /** Live speed in m/s from GPS, or null until a valid reading arrives. Only watches while `active`. */
 export function useCurrentSpeedMps(active: boolean): number | null {
@@ -11,13 +12,17 @@ export function useCurrentSpeedMps(active: boolean): number | null {
         let cancelled = false;
         let subscription: Location.LocationSubscription | undefined;
 
+        const onFix = ({ coords }: Location.LocationObject) =>
+            setSpeed(coords.speed != null && coords.speed >= 0 ? coords.speed : null);
+        const stopSimulated = subscribeSimulatedFixes(fixes => onFix(fixes[fixes.length - 1]));
+
         (async () => {
             const { status } = await Location.requestForegroundPermissionsAsync();
             if (status !== 'granted' || cancelled) return;
 
             const sub = await Location.watchPositionAsync(
                 { accuracy: Location.Accuracy.High, timeInterval: 1000, distanceInterval: 0 },
-                ({ coords }) => setSpeed(coords.speed != null && coords.speed >= 0 ? coords.speed : null),
+                dropWhileSimulating(onFix),
             );
             // The effect may have been cleaned up while the watch was starting.
             if (cancelled) sub.remove();
@@ -27,6 +32,7 @@ export function useCurrentSpeedMps(active: boolean): number | null {
         return () => {
             cancelled = true;
             subscription?.remove();
+            stopSimulated();
         };
     }, [active]);
 

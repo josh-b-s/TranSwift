@@ -65,7 +65,7 @@ export default function TripSummaryScreen() {
                         </Text>
                     )}
                 </View>
-                <Pressable accessibilityRole="button" accessibilityLabel="Done" hitSlop={8} onPress={() => router.replace('/')}>
+                <Pressable accessibilityRole="button" accessibilityLabel="Done" hitSlop={8} onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}>
                     <Text style={{ color: ACCENT, fontSize: 16, fontWeight: '700' }}>Done</Text>
                 </Pressable>
             </View>

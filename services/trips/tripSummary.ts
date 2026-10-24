@@ -1,6 +1,6 @@
 import { decodePath } from './pathCodec';
 import { pathStats, type PathStats } from './pathStats';
-import type { RideLeg, SavedTrip, WalkLeg } from './tripStore';
+import type { RideLeg, SavedTrip, WalkLeg, WalkTotals } from './tripStore';
 
 export type LegSummary =
     | { kind: 'walk'; leg: WalkLeg; stats: PathStats }
@@ -31,4 +31,9 @@ export function summarizeTrip(trip: SavedTrip): TripSummary {
         rideCount: legs.length - walks.length,
         legs,
     };
+}
+
+export function walkTotals(trip: SavedTrip): WalkTotals {
+    const { distanceM, durationS, topSpeedMps } = summarizeTrip(trip);
+    return { distanceM, durationS, topSpeedMps };
 }

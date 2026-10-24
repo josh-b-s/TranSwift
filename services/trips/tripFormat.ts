@@ -1,6 +1,7 @@
 import { SPEED_UNITS } from '@/constants/speedUnits';
 import type { SpeedUnit } from '@/services/preferences/preferencesStore';
 import type { BrokenRecord } from './personalBests';
+import type { SavedLeg } from './tripStore';
 
 const PACE_BASE: Record<SpeedUnit, { meters: number; label: string }> = {
     kmh: { meters: 1000, label: '/km' },
@@ -42,4 +43,8 @@ export function recordLines(records: BrokenRecord[], unit: SpeedUnit): string[] 
             ? [`Longest walk yet: ${formatDistance(record.distanceM)} (was ${formatDistance(record.previousM)}).`]
             : [];
     });
+}
+
+export function tripTitle(legs: SavedLeg[]): string {
+    return legs.length === 0 ? 'Trip' : `${legs[0].from} to ${legs[legs.length - 1].to}`;
 }

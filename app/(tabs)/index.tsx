@@ -17,6 +17,8 @@ import RouteBottomSheetModal from '@/components/RouteBottomSheetModal';
 import MapPickOverlay from '@/components/MapPickOverlay';
 import DebugMapOverlay from '@/components/DebugMapOverlay';
 import DebugControls from '@/components/DebugControls';
+import DebugMovementControls from '@/components/DebugMovementControls';
+import SimulatedLocationMarker from '@/components/SimulatedLocationMarker';
 import {MAP_STYLE_DARK, SHADOW, TOP_SAFE, useThemeStyle} from '@/constants/themes';
 import {selectDisplayedJourney} from '@/store/route.slice';
 import {isCurrentLocation} from '@/services/places/endpoints';
@@ -166,6 +168,7 @@ export default function Index() {
                     />
                 )}
 
+                {__DEV__ && <SimulatedLocationMarker/>}
                 {/*<DebugMapOverlay />*/}
             </MapView>
 
@@ -210,6 +213,7 @@ export default function Index() {
             <Speedometer animatedPosition={bottomSheetPosition} />
             <LocationButton mapRef={mapRef} animatedPosition={bottomSheetPosition} />
             {/*<DebugControls />*/}
+            {__DEV__ && <DebugMovementControls mapRef={mapRef} animatedPosition={bottomSheetPosition}/>}
             <RouteBottomSheetModal ref={modalRef} animatedPosition={bottomSheetPosition} />
         </View>
     );
