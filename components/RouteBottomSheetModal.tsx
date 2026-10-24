@@ -261,7 +261,7 @@ const RouteBottomSheetModal = forwardRef<BottomSheetModal, Props>(
                                                                     textColor={theme.color}
                                                                     lineColor={theme.color + '22'}
                                                                     label={`Board at ${leg.originStopName}`}
-                                                                    time={leg.departureTime ? formatClock(leg.departureTime) : undefined}
+                                                                    time={leg.departureTime ? formatClock(leg.departureTime) + formatDelay(leg.departureDelaySec) : undefined}
                                                                 />
                                                                 <TimelineRow
                                                                     color={leg.routeColor ?? ACCENT}
@@ -301,6 +301,11 @@ export default RouteBottomSheetModal;
 // One stop/transfer on the expanded journey's board/alight timeline — a
 // dot on a connecting vertical line down the left edge, so a multi-transfer
 // route reads as a path instead of a wall of stacked text.
+function formatDelay(delaySec?: number): string {
+    const min = Math.round((delaySec ?? 0) / 60);
+    return min === 0 ? '' : ` (${min > 0 ? '+' : ''}${min} min)`;
+}
+
 function TimelineRow({ color, textColor, lineColor, label, time, isLast, bold }: {
     color: string;
     textColor: string;

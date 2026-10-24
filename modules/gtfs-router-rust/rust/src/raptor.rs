@@ -60,6 +60,8 @@ pub struct Leg {
     pub dest_stop_name: String,
     pub departure_time_sec: Option<i64>,
     pub arrival_time_sec: Option<i64>,
+    /// Realtime delay already included in `departure_time_sec`.
+    pub departure_delay_sec: i64,
 }
 
 #[derive(Debug, Clone)]
@@ -657,6 +659,7 @@ fn reconstruct_path(
                     route_name, route_type, route_color, route_text_color,
                     origin_stop_name: board_stop.stop_name.clone(), dest_stop_name: alight_stop.stop_name.clone(),
                     departure_time_sec: depart_sec, arrival_time_sec: arrive_sec,
+                    departure_delay_sec: board_entry.map_or(0, |e| e.departure_delay_sec),
                 });
 
                 all_coords.extend(coords);

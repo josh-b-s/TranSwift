@@ -20,6 +20,7 @@ mod repo;
 mod graph;
 mod corridor;
 mod loader;
+mod realtime;
 mod raptor;
 mod verifier;
 mod fxhash;
@@ -129,6 +130,8 @@ pub struct Leg {
     pub dest_stop_name: String,
     pub departure_time_sec: Option<i32>,
     pub arrival_time_sec: Option<i32>,
+    /// Realtime delay already included in `departure_time_sec`.
+    pub departure_delay_sec: i32,
 }
 
 #[derive(Debug, Clone, uniffi::Record)]
@@ -153,6 +156,17 @@ pub struct Journey {
 /// Diagnostic-only per-stage timing, surfaced so the JS side can profile
 /// against gtfsLoader.ts's own console.log breakdown without guessing —
 /// see loader.rs's `mark!` macro for where these come from.
+/// What one realtime feed contained, for checking its ids match the timetable.
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct RealtimeFeedStats {
+    pub trip_updates: u32,
+    /// Updates whose trip_id is not in the timetable.
+    pub unmatched: u32,
+    /// Trips that got usable delay or cancellation data.
+    pub applied: u32,
+    pub sample_unmatched_trip_id: Option<String>,
+}
+
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct TimingEntry {
     pub label: String,
@@ -251,6 +265,12 @@ pub enum RouterError {
     NoRoute(String),
     #[error("No service found in the search window near this time")]
     NoServiceFound,
+    #[error("Realtime feed error: {0}")]
+    Realtime(String),
+}
+
+impl From<realtime::overlay::OverlayError> for RouterError {
+    fn from(e: realtime::overlay::OverlayError) -> Self { RouterError::Realtime(e.to_string()) }
 }
 
 impl From<rusqlite::Error> for RouterError {
@@ -296,6 +316,8 @@ pub struct GtfsRouterEngine {
     /// timetable prewarm opens its own read-only connection to it.
     db_path: Mutex<Option<String>>,
     prewarm_started: std::sync::atomic::AtomicBool,
+    /// Latest realtime delays; replaced wholesale by `set_realtime`.
+    realtime: RwLock<Arc<realtime::overlay::Overlay>>,
 }
 
 #[uniffi::export]
@@ -311,6 +333,7 @@ impl GtfsRouterEngine {
             last_warmup_timings: Mutex::new(Vec::new()),
             db_path: Mutex::new(None),
             prewarm_started: std::sync::atomic::AtomicBool::new(false),
+            realtime: RwLock::new(Arc::new(realtime::overlay::Overlay::default())),
         }
     }
 
@@ -370,6 +393,30 @@ impl GtfsRouterEngine {
     /// remaining legitimate one-time-per-DB costs.
     pub async fn warm_up(self: Arc<Self>, db_path: String) -> Result<(), RouterError> {
         run_blocking(move || self.warm_up_blocking(db_path)).await
+    }
+
+    /// Replaces the realtime overlay with the delays and cancellations in
+    /// raw GTFS-realtime TripUpdates feeds (one per transport mode, say),
+    /// merged. Returns stats for each feed, in input order. Later searches use it;
+    /// there is no timetable rebuild.
+    pub async fn set_realtime(self: Arc<Self>, feeds: Vec<Vec<u8>>) -> Result<Vec<RealtimeFeedStats>, RouterError> {
+        run_blocking(move || {
+            let conn_guard = self.conn.lock().unwrap();
+            let Some(conn) = conn_guard.as_ref() else { return Err(RouterError::NotWarmedUp) };
+            let (overlay, per_feed) = realtime::overlay::Overlay::from_feeds(&feeds, conn)?;
+            *self.realtime.write().unwrap() = Arc::new(overlay);
+            Ok(per_feed.into_iter().map(|s| RealtimeFeedStats {
+                trip_updates: s.trip_updates as u32,
+                unmatched: s.unmatched as u32,
+                applied: s.applied as u32,
+                sample_unmatched_trip_id: s.sample_unmatched_trip_id,
+            }).collect())
+        }).await
+    }
+
+    /// Drops all realtime data so searches use the static timetable only.
+    pub fn clear_realtime(&self) {
+        *self.realtime.write().unwrap() = Arc::new(realtime::overlay::Overlay::default());
     }
 }
 
@@ -527,6 +574,7 @@ impl GtfsRouterEngine {
         *self.corridor_cache.lock().unwrap() = corridor::resolver::CorridorCache::new();
         *self.bfs_cache.lock().unwrap() = corridor::resolver::SeedBfsCache::new();
         *self.active_services_cache.lock().unwrap() = None;
+        *self.realtime.write().unwrap() = Arc::new(realtime::overlay::Overlay::default());
     }
 
     /// Runs the whole search on a worker thread (see `run_blocking`) so the
@@ -577,13 +625,14 @@ impl GtfsRouterEngine {
 
         let mut corridor_cache = self.corridor_cache.lock().unwrap();
         let mut bfs_cache = self.bfs_cache.lock().unwrap();
+        let realtime = Arc::clone(&self.realtime.read().unwrap());
 
         let mut index = loader::load_gtfs_index_for_trip(
             conn, &state.stops, &state.patterns, &state.routes, &state.graph, &state.headway, &state.pattern_cumulative,
             &mut corridor_cache, &mut bfs_cache,
             &self.active_services_cache,
             origin_ll, dest_ll, depart_sec_of_day as i64,
-            &today_date, today_dow, &tomorrow_date, tomorrow_dow, walking_speed_mps, max_walk_distance_m, None,
+            &today_date, today_dow, &tomorrow_date, tomorrow_dow, walking_speed_mps, max_walk_distance_m, None, &realtime,
         )?;
 
         if index.no_service_found {
@@ -622,7 +671,7 @@ impl GtfsRouterEngine {
                     &mut corridor_cache, &mut bfs_cache,
                     &self.active_services_cache,
                     origin_ll, dest_ll, depart_sec_of_day as i64,
-                    &today_date, today_dow, &tomorrow_date, tomorrow_dow, walking_speed_mps, max_walk_distance_m, Some(10 * 3600),
+                    &today_date, today_dow, &tomorrow_date, tomorrow_dow, walking_speed_mps, max_walk_distance_m, Some(10 * 3600), &realtime,
                 )?;
                 if index.no_service_found { return Err(RouterError::NoServiceFound); }
                 let t_retry = Instant::now();
@@ -1208,5 +1257,6 @@ fn leg_to_ffi(l: raptor::Leg) -> Leg {
         dest_stop_name: l.dest_stop_name,
         departure_time_sec: l.departure_time_sec.map(|v| v as i32),
         arrival_time_sec: l.arrival_time_sec.map(|v| v as i32),
+        departure_delay_sec: l.departure_delay_sec as i32,
     }
 }

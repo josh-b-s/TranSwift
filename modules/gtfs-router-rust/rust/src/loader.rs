@@ -48,6 +48,7 @@ use std::time::Instant;
 pub type ActiveServicesCacheEntry = (String, String, Arc<HashSet<(i64, String)>>);
 use rusqlite::Connection;
 use crate::geo::{haversine_meters, LatLon};
+use crate::realtime::overlay::Overlay;
 use crate::graph::coarse::CoarseGraph;
 use crate::repo::{PatternCumulativeCache, PatternHeadwayCache, PatternsCache, RoutesCache, StopsCache};
 use crate::corridor::resolver::{resolve_corridor, CorridorCache, SeedBfsCache};
@@ -95,6 +96,8 @@ pub struct StopTimeEntry {
     /// still rides PAST a non-0 stop (the vehicle keeps going), it just
     /// won't record an arrival there.
     pub drop_off_type: i64,
+    /// Realtime delay already included in `departure_sec`; 0 when none.
+    pub departure_delay_sec: i64,
 }
 
 #[derive(Debug, Clone)]
@@ -255,6 +258,7 @@ pub fn load_gtfs_index_for_trip(
     walking_speed_mps: f64,
     max_walk_distance_m: f64,
     force_window_sec: Option<i64>,
+    realtime: &Overlay,
 ) -> rusqlite::Result<GtfsIndex> {
     let t_total = Instant::now();
     let mut timings: Vec<(String, i64)> = Vec::new();
@@ -784,9 +788,11 @@ pub fn load_gtfs_index_for_trip(
             for row in rows {
                 rows_returned += 1;
                 let (trip_pk, stop_pk, stop_sequence, arrival_sec, departure_sec, pickup_type, drop_off_type) = row?;
+                if realtime.is_cancelled(trip_pk) { continue; }
                 windowed_trip_pks.insert(trip_pk);
                 let Some(&pattern_pk) = trip_pk_to_pattern.get(&trip_pk) else { continue };
-                let entry = Rc::new(StopTimeEntry { trip_pk, pattern_pk, stop_sequence, arrival_sec, departure_sec, pickup_type, drop_off_type });
+                let (arrival_sec, departure_sec, departure_delay_sec) = realtime.apply(trip_pk, stop_sequence, arrival_sec, departure_sec);
+                let entry = Rc::new(StopTimeEntry { trip_pk, pattern_pk, stop_sequence, arrival_sec, departure_sec, pickup_type, drop_off_type, departure_delay_sec });
                 stop_times_by_stop.entry(stop_pk).or_default().push(Rc::clone(&entry));
                 stop_times_by_stop_and_pattern.entry((stop_pk, pattern_pk)).or_default().push(Rc::clone(&entry));
                 stop_times_by_stop_and_trip.entry(stop_pk).or_default().insert(trip_pk, entry);
@@ -805,9 +811,11 @@ pub fn load_gtfs_index_for_trip(
                 let (trip_pk, stop_pk, stop_sequence, arrival_sec, departure_sec, pickup_type, drop_off_type) = row?;
                 if !active_trip_pks.contains(&trip_pk) { continue; }
                 rows_returned += 1;
+                if realtime.is_cancelled(trip_pk) { continue; }
                 windowed_trip_pks.insert(trip_pk);
                 let Some(&pattern_pk) = trip_pk_to_pattern.get(&trip_pk) else { continue };
-                let entry = Rc::new(StopTimeEntry { trip_pk, pattern_pk, stop_sequence, arrival_sec, departure_sec, pickup_type, drop_off_type });
+                let (arrival_sec, departure_sec, departure_delay_sec) = realtime.apply(trip_pk, stop_sequence, arrival_sec, departure_sec);
+                let entry = Rc::new(StopTimeEntry { trip_pk, pattern_pk, stop_sequence, arrival_sec, departure_sec, pickup_type, drop_off_type, departure_delay_sec });
                 stop_times_by_stop.entry(stop_pk).or_default().push(Rc::clone(&entry));
                 stop_times_by_stop_and_pattern.entry((stop_pk, pattern_pk)).or_default().push(Rc::clone(&entry));
                 stop_times_by_stop_and_trip.entry(stop_pk).or_default().insert(trip_pk, entry);

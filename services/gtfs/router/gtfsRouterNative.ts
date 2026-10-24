@@ -22,6 +22,7 @@ import type {
 import { createDebugSinkCollector } from '../debug/debugSinkCollector';
 import { formatTimings } from './formatTimings';
 import { getCurrentDbPath } from '@/services/db/sqliteDb';
+import { refreshRealtime } from '../realtime/gtfsRealtime';
 
 const { GtfsRouterEngine } = gtfsRouterRust.gtfs_router;
 
@@ -128,6 +129,7 @@ function toJourney(j: Journey): GtfsJourney {
             destStopName: leg.destStopName,
             departureTime: secToTimeString(leg.departureTimeSec),
             arrivalTime: secToTimeString(leg.arrivalTimeSec),
+            departureDelaySec: leg.departureDelaySec,
         })),
         routeName: j.routeName,
         routeType: j.routeType,
@@ -186,6 +188,7 @@ export async function computeGtfsRouteNative(
         throw new Error('No GTFS database selected. Import or pick one in Settings → GTFS data.');
     }
     const eng = await getEngine(dbPath);
+    await refreshRealtime(eng);
 
     const today = departureTime;
     const tomorrow = new Date(today.getTime() + 24 * 3600 * 1000);

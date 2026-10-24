@@ -10,6 +10,7 @@ crate-type = ["cdylib", "staticlib", "lib"]
 uniffi = { version = "0.30", features = ["cli"] }
 rusqlite = { version = "0.31", features = ["bundled"] }
 thiserror = "2"
+prost = "0.14.4"
 
 [build-dependencies]
 uniffi = { version = "0.30", features = ["build"] }

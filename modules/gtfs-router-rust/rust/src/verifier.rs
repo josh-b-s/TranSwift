@@ -233,7 +233,7 @@ fn build_journey(
                     total_walking_meters += dist_m;
                 }
             }
-            Step::Transit { pattern_pk, board, alight, board_seq, alight_seq, depart_sec, arrive_sec, .. } => {
+            Step::Transit { trip_pk, pattern_pk, board, alight, board_seq, alight_seq, depart_sec, arrive_sec } => {
                 let (Some(board_stop), Some(alight_stop)) = (stops.get(*board), stops.get(*alight)) else { continue };
                 let pat_meta = index.patterns_by_pk.get(pattern_pk);
 
@@ -266,6 +266,9 @@ fn build_journey(
                     route_name, route_type, route_color, route_text_color,
                     origin_stop_name: board_stop.stop_name.clone(), dest_stop_name: alight_stop.stop_name.clone(),
                     departure_time_sec: Some(*depart_sec), arrival_time_sec: Some(*arrive_sec),
+                    departure_delay_sec: index.stop_times_by_stop_and_trip.get(board)
+                        .and_then(|m| m.get(trip_pk))
+                        .map_or(0, |e| e.departure_delay_sec),
                 });
 
                 all_coords.extend(coords);

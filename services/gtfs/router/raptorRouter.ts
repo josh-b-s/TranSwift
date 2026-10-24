@@ -144,6 +144,8 @@ export interface GtfsJourney {
     legs: Array<{
         routeName: string; routeType: number; routeColor?: string; routeTextColor?: string;
         originStopName: string; destStopName: string; departureTime?: string; arrivalTime?: string;
+        /** Realtime delay already included in departureTime; 0 or absent when on time. */
+        departureDelaySec?: number;
     }>;
     routeName: string;
     routeType: number;

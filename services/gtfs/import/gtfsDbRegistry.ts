@@ -42,6 +42,10 @@ export type GtfsDatabaseEntry = {
     source?: FeedSource;
     /** Computed once after import. Absent on entries imported before it existed. */
     stats?: FeedStats;
+    /** GTFS-realtime TripUpdates URLs, e.g. one per transport mode. Set by hand; realtime is off without any. */
+    realtimeUrls?: string[];
+    /** Optional auth header sent with every realtime URL, written "Name: value". */
+    realtimeHeader?: string;
 };
 
 type RegistryFile = {
@@ -256,6 +260,22 @@ export async function renameDatabase(id: string, newName: string): Promise<void>
     if (collision) throw new DuplicateNameError(trimmed);
 
     entry.name = trimmed;
+    await writeRegistry(reg);
+}
+
+export async function getActiveDatabaseEntry(): Promise<GtfsDatabaseEntry | null> {
+    const reg = await readRegistry();
+    return reg.databases.find(d => d.id === reg.activeId) ?? null;
+}
+
+/** Empty values clear the setting. */
+export async function setRealtimeConfig(id: string, urls: string[], header: string): Promise<void> {
+    const reg = await readRegistry();
+    const entry = reg.databases.find(d => d.id === id);
+    if (!entry) throw new Error(`Unknown GTFS database id: ${id}`);
+    const cleaned = urls.map(u => u.trim()).filter(Boolean);
+    entry.realtimeUrls = cleaned.length > 0 ? cleaned : undefined;
+    entry.realtimeHeader = header.trim() || undefined;
     await writeRegistry(reg);
 }
 
