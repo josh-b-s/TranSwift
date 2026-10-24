@@ -1,0 +1,42 @@
+import * as FileSystem from 'expo-file-system/legacy';
+import type { EncodedPath } from './pathCodec';
+import type { BrokenRecord } from './personalBests';
+
+/** A walk with the rider's recorded path. */
+export type WalkLeg = {
+    kind: 'walk';
+    stepIndex: number;
+    from: string;
+    to: string;
+    bestKey?: string;
+    path: EncodedPath;
+};
+
+/** A ride with the line it followed, not the rider's own movement. */
+export type RideLeg = {
+    kind: 'ride';
+    stepIndex: number;
+    from: string;
+    to: string;
+    routeName: string;
+    routeType: number;
+    routeColor?: string;
+    routeTextColor?: string;
+    line: string;
+};
+
+export type SavedLeg = WalkLeg | RideLeg;
+
+export type SavedTrip = { startedAt: number; legs: SavedLeg[]; /** Records this trip broke. */ records: BrokenRecord[] };
+
+const TRIPS_DIR = `${FileSystem.documentDirectory}trips/`;
+const tripPath = (startedAt: number) => `${TRIPS_DIR}${startedAt}.json`;
+
+export async function saveTrip(trip: SavedTrip): Promise<void> {
+    await FileSystem.makeDirectoryAsync(TRIPS_DIR, { intermediates: true });
+    await FileSystem.writeAsStringAsync(tripPath(trip.startedAt), JSON.stringify(trip));
+}
+
+export async function loadTrip(startedAt: number): Promise<SavedTrip> {
+    return JSON.parse(await FileSystem.readAsStringAsync(tripPath(startedAt))) as SavedTrip;
+}
