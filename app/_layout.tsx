@@ -10,6 +10,7 @@ import '@/global.css';
 import { warmUpGtfsEngine } from '@/services/gtfs/warmup/gtfsWarmup';
 import { loadPreferences } from '@/store/preferences.slice';
 import { restoreActiveDatabase } from '@/services/gtfs/import/gtfsDbRegistry';
+import '@/services/trips/locationTracking';
 
 export default function Layout() {
     useEffect(() => {

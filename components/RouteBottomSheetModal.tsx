@@ -8,11 +8,13 @@ import { ACCENT, SHADOW, TOP_SAFE, useThemeStyle } from '@/constants/themes';
 import { modeIcon } from '@/constants/modeIcons';
 import RouteSheetHeader from '@/components/RouteSheetHeader';
 import RouteOptionPills from '@/components/RouteOptionPills';
+import TripButton from '@/components/TripButton';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { ArrowLeftRight, Bus, ChevronRight, CircleAlert, Footprints, type LucideIcon, Zap } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { clearRoute, selectJourney } from '@/store/route.slice';
+import { endTrip } from '@/store/trip.slice';
 import { selectPlace, setQuery } from '@/store/search.slice';
 import {classifyRouteType} from "@/services/gtfs/config/routeTypeUtil";
 import { routeErrorMessage } from '@/services/gtfs/router/routeErrorMessage';
@@ -70,6 +72,7 @@ const RouteBottomSheetModal = forwardRef<BottomSheetModal, Props>(
         const closeRoute = () => {
             dispatch(selectPlace(null));
             dispatch(clearRoute());
+            dispatch(endTrip());
             dispatch(setQuery(''));
         };
 
@@ -123,6 +126,7 @@ const RouteBottomSheetModal = forwardRef<BottomSheetModal, Props>(
                         />
                     )}
                     {selectedPlace && <RouteOptionPills />}
+                    {selectedPlace && !error && <TripButton />}
                         {/* Sort control, only worth showing when there's more than one option */}
                         {!error && journeys.length > 1 && (
                                 <View

@@ -22,6 +22,8 @@ import {selectDisplayedJourney} from '@/store/route.slice';
 import {isCurrentLocation} from '@/services/places/endpoints';
 import {useGoToUserLocation} from '../../hooks/goToUserLocation';
 import {useFeedSuggestion} from '../../hooks/feedSuggestion';
+import {useTripRecorder} from '@/hooks/tripRecorder';
+import {useTripNotificationTap} from '@/hooks/tripNotificationTap';
 
 const EMPTY_COORDS: LatLng[] = [];
 const EMPTY_SEGMENTS: NonNullable<ReturnType<typeof selectDisplayedJourney>>['segments'] = [];
@@ -49,6 +51,8 @@ export default function Index() {
 
     const goToUserLocation = useGoToUserLocation(mapRef);
     useFeedSuggestion();
+    useTripRecorder();
+    useTripNotificationTap();
 
     // The sheet is a root-level portal (mounted by BottomSheetModalProvider
     // above the tab navigator), so switching tabs doesn't hide it on its
