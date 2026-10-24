@@ -10,7 +10,6 @@
 
 import * as FileSystem from 'expo-file-system/legacy';
 import * as DocumentPicker from 'expo-document-picker';
-import { CancelledError } from './cancelledError';
 import { computeFeedStats } from './gtfsFeedStats';
 import { importGtfsZipToPath, type ImportProgressEvent } from './rustGtfsImporter';
 import {
@@ -78,14 +77,12 @@ export async function importZipAsNewDatabase(
     try {
         await importGtfsZipToPath(zip.uri, dbPath, onProgress, signal);
     } catch (err) {
-        if (err instanceof CancelledError) {
-            // The aborted import leaves a half-built db (and maybe WAL files) behind.
-            await Promise.all(
-                ['', '-wal', '-shm', '-journal'].map((ext) =>
-                    FileSystem.deleteAsync(`${dbPath}${ext}`, { idempotent: true }),
-                ),
-            );
-        }
+        // A failed or aborted import leaves a half-built db (and maybe WAL files) behind.
+        await Promise.all(
+            ['', '-wal', '-shm', '-journal'].map((ext) =>
+                FileSystem.deleteAsync(`${dbPath}${ext}`, { idempotent: true }),
+            ),
+        );
         throw err;
     }
 

@@ -17,7 +17,7 @@ export async function downloadZip(
     fileName: string,
     onProgress: (written: number, total: number) => void,
     signal?: AbortSignal,
-): Promise<{ uri: string; name: string }> {
+): Promise<{ uri: string; name: string; etag?: string; lastModified?: string }> {
     await FileSystem.makeDirectoryAsync(DOWNLOAD_DIR, { intermediates: true });
     const target = `${DOWNLOAD_DIR}${fileName}`;
     const task = FileSystem.createDownloadResumable(
@@ -42,5 +42,7 @@ export async function downloadZip(
         throw new CancelledError();
     }
     if (!res || res.status !== 200) throw new Error(`Download failed (HTTP ${res?.status ?? 'none'})`);
-    return { uri: res.uri, name: fileName };
+    const header = (name: string) =>
+        Object.entries(res.headers ?? {}).find(([k]) => k.toLowerCase() === name)?.[1];
+    return { uri: res.uri, name: fileName, etag: header('etag'), lastModified: header('last-modified') };
 }

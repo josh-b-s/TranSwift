@@ -24,6 +24,8 @@ export async function importCatalogFeed(
             label: feed.name ? `${feed.provider} (${feed.name})` : feed.provider,
             url: feed.zipUrl,
             license: feed.licenseUrl || undefined,
+            etag: zip.etag,
+            lastModified: zip.lastModified,
         }, signal);
 
         const old = replaceId ? (await listDatabases()).find((d) => d.id === replaceId) : undefined;

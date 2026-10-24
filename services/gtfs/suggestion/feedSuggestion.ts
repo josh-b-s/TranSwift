@@ -15,6 +15,7 @@ import { coverageContains, type Point } from '../catalog/coverage';
 import { loadCatalog } from '../catalog/feedCatalog';
 import { ensureActiveStats, listDatabases, type GtfsDatabaseEntry } from '../import/gtfsDbRegistry';
 import { daysUntilGtfsDate } from './serviceDate';
+import { hasNewerVersion } from './feedUpdate';
 
 const EXPIRY_WARNING_DAYS = 14;
 
@@ -33,7 +34,8 @@ async function catalogFeedsAt(feeds: CatalogFeed[], at: Point): Promise<CatalogF
 
 export type FeedSuggestion =
     | { kind: 'nearby'; feed: CatalogFeed }
-    | { kind: 'expiring'; entry: GtfsDatabaseEntry; daysLeft: number };
+    | { kind: 'expiring'; entry: GtfsDatabaseEntry; daysLeft: number }
+    | { kind: 'updated'; entry: GtfsDatabaseEntry };
 
 function expiryOf(entries: GtfsDatabaseEntry[]): FeedSuggestion | null {
     const latest = entries.reduce((a, b) => ((b.stats!.serviceEnd ?? '') > (a.stats!.serviceEnd ?? '') ? b : a));
@@ -44,6 +46,26 @@ function expiryOf(entries: GtfsDatabaseEntry[]): FeedSuggestion | null {
     return daysLeft <= EXPIRY_WARNING_DAYS ? { kind: 'expiring', entry: latest, daysLeft } : null;
 }
 
+/** A newer upstream version, or realtime ids that stopped matching. Only for entries that can be re-downloaded. */
+async function updateOf(entries: GtfsDatabaseEntry[]): Promise<FeedSuggestion | null> {
+    const downloadable = entries.filter((e) => e.source);
+    const mismatched = downloadable.find((e) => e.realtimeMismatch);
+    if (mismatched) return { kind: 'updated', entry: mismatched };
+
+    for (const entry of downloadable) {
+        try {
+            if (await hasNewerVersion(entry)) return { kind: 'updated', entry };
+        } catch (err) {
+            console.warn(`[feedSuggestion] update check failed for "${entry.name}":`, err);
+        }
+    }
+    return null;
+}
+
+async function expiryOrUpdateOf(entries: GtfsDatabaseEntry[]): Promise<FeedSuggestion | null> {
+    return expiryOf(entries) ?? (await updateOf(entries));
+}
+
 export async function findFeedSuggestion(at: Point): Promise<FeedSuggestion | null> {
     await ensureActiveStats();
     const entries = await listDatabases();
@@ -52,7 +74,7 @@ export async function findFeedSuggestion(at: Point): Promise<FeedSuggestion | nu
     if (entries.some((e) => !e.stats)) return null;
 
     const covering = entries.filter((e) => e.stats!.coverage && coverageContains(e.stats!.coverage, at));
-    if (covering.length > 0) return expiryOf(covering);
+    if (covering.length > 0) return expiryOrUpdateOf(covering);
 
     const { feeds } = await loadCatalog();
     const candidates = await catalogFeedsAt(feeds, at);
@@ -61,5 +83,5 @@ export async function findFeedSuggestion(at: Point): Promise<FeedSuggestion | nu
     // Covers this spot in the catalog but not by its stops, or has no catalog box at all.
     const candidateIds = new Set(candidates.map((f) => f.id));
     const imported = entries.filter((e) => e.source && candidateIds.has(e.source.id));
-    return imported.length > 0 ? expiryOf(imported) : { kind: 'nearby', feed: candidates[0] };
+    return imported.length > 0 ? expiryOrUpdateOf(imported) : { kind: 'nearby', feed: candidates[0] };
 }

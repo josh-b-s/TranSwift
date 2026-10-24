@@ -22,11 +22,13 @@ function show(suggestion: FeedSuggestion, router: Router) {
         return;
     }
 
-    const { entry, daysLeft } = suggestion;
-    const when = daysLeft < 0 ? 'ended' : daysLeft === 0 ? 'ends today' : `ends in ${daysLeft} days`;
+    const { entry } = suggestion;
+    const message = suggestion.kind === 'updated'
+        ? `A newer version of "${entry.name}" is available. Re-download it?`
+        : `The timetable in "${entry.name}" ${suggestion.daysLeft < 0 ? 'ended' : suggestion.daysLeft === 0 ? 'ends today' : `ends in ${suggestion.daysLeft} days`}. Re-download the latest version?`;
     Alert.alert(
         'Transit data is out of date',
-        `The timetable in "${entry.name}" ${when}. Re-download the latest version?`,
+        message,
         [
             { text: 'Not now', style: 'cancel' },
             {

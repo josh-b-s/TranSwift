@@ -99,7 +99,12 @@ export async function importGtfsZipToPath(
         console.log(`[rustGtfsImporter] import complete in ${elapsed()}`);
     } catch (err) {
         if (signal?.aborted) throw new CancelledError();
-        console.error(`[rustGtfsImporter] import failed after ${elapsed()}:`, err);
+        // A plain log of the native error prints only the variant name, and Metro's log forwarding drops odd characters, so spell the fields out as plain ASCII.
+        const e = err as { name?: unknown; message?: unknown; inner?: unknown };
+        const text = (v: unknown) => String(v).replace(/[^\x20-\x7e]/g, '?').replace(/%/g, 'pct');
+        console.error(
+            `[rustGtfsImporter] import failed after ${elapsed()}: name=${text(e.name)} message=${text(e.message)} inner=${text(JSON.stringify(e.inner))}`,
+        );
         throw err;
     }
 }

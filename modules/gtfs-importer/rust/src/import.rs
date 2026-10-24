@@ -376,6 +376,8 @@ fn process_agency(
     }
     for rows in trip_stop_times.values_mut() {
         rows.sort_by_key(|r| r.stop_sequence);
+        // Some feeds repeat a stop_sequence within a trip, which breaks pattern_stops' primary key; the stable sort keeps file order, so the first row wins.
+        rows.dedup_by_key(|r| r.stop_sequence);
     }
 
     // ── group trips into patterns by (route, direction, exact stop seq) ──

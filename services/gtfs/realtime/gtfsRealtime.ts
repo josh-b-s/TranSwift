@@ -1,7 +1,10 @@
-import { getActiveDatabaseEntry } from '../import/gtfsDbRegistry';
+import { getActiveDatabaseEntry, setRealtimeMismatch } from '../import/gtfsDbRegistry';
 
 const MIN_REFRESH_MS = 30_000;
 const MAX_STALE_MS = 5 * 60_000;
+// A feed with at least this many updates, most matching no trip, means the timetable is out of date.
+const MISMATCH_MIN_UPDATES = 20;
+const MISMATCH_RATIO = 0.5;
 
 type FeedStats = { tripUpdates: number; unmatched: number; applied: number; sampleUnmatchedTripId?: string };
 type Engine = { setRealtime(feeds: ArrayBuffer[]): Promise<FeedStats[]>; clearRealtime(): void };
@@ -78,7 +81,10 @@ export async function refreshRealtime(engine: Engine): Promise<void> {
             return `${feedLabel(f.url)} ${s.applied} applied of ${s.tripUpdates} updates (${s.unmatched} unmatched${sample})`;
         });
         console.log(`[gtfsRealtime] ${used.length}/${urls.length} feeds\n  ${perFeed.join('\n  ')}`);
+
+        const mismatch = stats.some(s => s.tripUpdates >= MISMATCH_MIN_UPDATES && s.unmatched / s.tripUpdates > MISMATCH_RATIO);
+        await setRealtimeMismatch(entry.id, mismatch);
     } catch (err) {
-        console.warn('[gtfsRealtime] could not apply feeds, keeping last known delays:', err);
+        console.warn('[gtfsRealtime] realtime update failed, keeping last known delays:', err);
     }
 }

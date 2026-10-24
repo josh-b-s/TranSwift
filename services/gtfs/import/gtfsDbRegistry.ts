@@ -26,6 +26,9 @@ export type FeedSource = {
     label: string;
     url: string;
     license?: string;
+    /** Validators the server sent with the zip, compared later to spot a newer version. */
+    etag?: string;
+    lastModified?: string;
 };
 
 export type GtfsDatabaseEntry = {
@@ -46,6 +49,8 @@ export type GtfsDatabaseEntry = {
     realtimeUrls?: string[];
     /** Optional auth header sent with every realtime URL, written "Name: value". */
     realtimeHeader?: string;
+    /** Set when most of a realtime feed's trip ids matched no trip here, which suggests an older timetable. */
+    realtimeMismatch?: boolean;
 };
 
 type RegistryFile = {
@@ -266,6 +271,15 @@ export async function renameDatabase(id: string, newName: string): Promise<void>
 export async function getActiveDatabaseEntry(): Promise<GtfsDatabaseEntry | null> {
     const reg = await readRegistry();
     return reg.databases.find(d => d.id === reg.activeId) ?? null;
+}
+
+/** Writes only when the flag changes. */
+export async function setRealtimeMismatch(id: string, mismatch: boolean): Promise<void> {
+    const reg = await readRegistry();
+    const entry = reg.databases.find(d => d.id === id);
+    if (!entry || !!entry.realtimeMismatch === mismatch) return;
+    entry.realtimeMismatch = mismatch || undefined;
+    await writeRegistry(reg);
 }
 
 /** Empty values clear the setting. */
