@@ -1,5 +1,5 @@
-import React, { useEffect, useRef } from 'react';
-import MapView, { LatLng, Marker, Polyline, PROVIDER_GOOGLE} from 'react-native-maps';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import MapView, { LatLng, Marker, Polyline, PROVIDER_GOOGLE, Region} from 'react-native-maps';
 import {ActivityIndicator, Keyboard, StyleSheet, Text, View} from 'react-native';
 import * as Location from 'expo-location';
 import {useSelector} from 'react-redux';
@@ -14,6 +14,8 @@ import Search from '@/components/Search';
 import LocationButton from '@/components/LocationButton';
 import Speedometer from '@/components/Speedometer';
 import RouteBottomSheetModal from '@/components/RouteBottomSheetModal';
+import StopDeparturesSheet from '@/components/StopDeparturesSheet';
+import {StopDots} from '@/components/StopDots';
 import MapPickOverlay from '@/components/MapPickOverlay';
 import DebugMapOverlay from '@/components/DebugMapOverlay';
 import DebugControls from '@/components/DebugControls';
@@ -26,14 +28,19 @@ import {useGoToUserLocation} from '../../hooks/goToUserLocation';
 import {useFeedSuggestion} from '../../hooks/feedSuggestion';
 import {useTripRecorder} from '@/hooks/tripRecorder';
 import {useTripNotificationTap} from '@/hooks/tripNotificationTap';
+import {useStopsInView} from '@/hooks/stopsInView';
+import type {RepoStop} from '@/services/gtfs/core/gtfsRepo';
 import {RIDE_LINE_WIDTH, RideStopMarkers} from '@/components/RideStopMarkers';
 
 const EMPTY_COORDS: LatLng[] = [];
+// Latitude span the map zooms in to when a stop is tapped, at most.
+const STOP_FOCUS_DELTA = 0.008;
 const EMPTY_SEGMENTS: NonNullable<ReturnType<typeof selectDisplayedJourney>>['segments'] = [];
 
 export default function Index() {
     const mapRef = useRef<MapView>(null);
     const modalRef = useRef<BottomSheetModal>(null);
+    const departuresRef = useRef<BottomSheetModal>(null);
     const bottomSheetPosition = useSharedValue(1000);
     const {colorScheme} = useColorScheme();
     const theme = useThemeStyle();
@@ -51,6 +58,9 @@ export default function Index() {
     const origin = useSelector((s: RootState) => s.search.origin);
     const pickingField = useSelector((s: RootState) => s.search.pickingField);
     const debugEnabled = useSelector((s: RootState) => s.debug.enabled);
+
+    const [region, setRegion] = useState<Region | null>(null);
+    const [departureStop, setDepartureStop] = useState<RepoStop | null>(null);
 
     const goToUserLocation = useGoToUserLocation(mapRef);
     useFeedSuggestion();
@@ -80,6 +90,33 @@ export default function Index() {
             modalRef.current?.close({ duration: 0 });
         }
     }, [isFocused, showSheet]);
+
+    // Stop dots give way to the route once a place is chosen, and so does the departures sheet.
+    const stopsTappable = isFocused && selectedPlace === null && pickingField === null && !debugEnabled;
+    const stopsInView = useStopsInView(region, stopsTappable);
+    useEffect(() => {
+        if (selectedPlace !== null) setDepartureStop(null);
+    }, [selectedPlace]);
+    // Same handling as the route sheet above: closed, not dismissed, while another tab is showing.
+    useEffect(() => {
+        if (!isFocused) {
+            departuresRef.current?.close({ duration: 0 });
+        } else if (departureStop) {
+            departuresRef.current?.present();
+        } else {
+            departuresRef.current?.dismiss();
+        }
+    }, [isFocused, departureStop]);
+
+    const selectStop = useCallback((stop: RepoStop) => {
+        setDepartureStop(stop);
+        // Aim a little south of the stop so the sheet doesn't cover it.
+        const delta = Math.min(region?.latitudeDelta ?? STOP_FOCUS_DELTA, STOP_FOCUS_DELTA);
+        mapRef.current?.animateToRegion(
+            { latitude: stop.stop_lat - delta * 0.25, longitude: stop.stop_lon, latitudeDelta: delta, longitudeDelta: delta },
+            400,
+        );
+    }, [region]);
 
     useEffect(() => {
         goToUserLocation();
@@ -133,6 +170,7 @@ export default function Index() {
                     }
                 }}
                 onPress={() => Keyboard.dismiss()}
+                onRegionChangeComplete={setRegion}
             >
                 {!debugEnabled && (routeSegments.length > 0 ? (
                     routeSegments.map((segment, index) => (
@@ -158,6 +196,8 @@ export default function Index() {
                 {!debugEnabled && routeSegments.map((segment, index) => segment.type === 'transit' && (
                     <RideStopMarkers key={index} segment={segment} />
                 ))}
+
+                <StopDots stops={stopsInView} onSelect={selectStop} />
 
                 {!isCurrentLocation(origin) && (
                     <Marker
@@ -220,6 +260,12 @@ export default function Index() {
             {/*<DebugControls />*/}
             {__DEV__ && <DebugMovementControls mapRef={mapRef} animatedPosition={bottomSheetPosition}/>}
             <RouteBottomSheetModal ref={modalRef} animatedPosition={bottomSheetPosition} />
+            <StopDeparturesSheet
+                ref={departuresRef}
+                stop={departureStop}
+                animatedPosition={bottomSheetPosition}
+                onClose={() => setDepartureStop(null)}
+            />
         </View>
     );
 }

@@ -6,10 +6,11 @@ import { ACCENT, useThemeStyle } from '@/constants/themes';
 type Props = {
     name: string;
     address?: string;
+    closeLabel?: string;
     onClose: () => void;
 };
 
-export default function RouteSheetHeader({ name, address, onClose }: Props) {
+export default function RouteSheetHeader({ name, address, closeLabel = 'Close route', onClose }: Props) {
     const theme = useThemeStyle();
 
     return (
@@ -35,7 +36,7 @@ export default function RouteSheetHeader({ name, address, onClose }: Props) {
                 onPress={onClose}
                 hitSlop={8}
                 accessibilityRole="button"
-                accessibilityLabel="Close route"
+                accessibilityLabel={closeLabel}
                 style={{
                     width: 32, height: 32, borderRadius: 16,
                     backgroundColor: theme.color + '14',

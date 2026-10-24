@@ -6,7 +6,7 @@ import type { RouteSegment, RouteStop } from '@/services/gtfs/router/raptorRoute
 export const RIDE_LINE_WIDTH = 7;
 // Half-length of the line each dot is drawn as (about 1 m). Much shorter and the map rounds it away,
 // so some stops get no dot.
-const HALF_LENGTH_DEG = 1e-5;
+export const HALF_LENGTH_DEG = 1e-5;
 
 /**
  * A white dot at each stop a ride passes, one native line per stop. The dots are round-capped
