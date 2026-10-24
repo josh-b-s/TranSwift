@@ -6,8 +6,8 @@ const MAX_STALE_MS = 5 * 60_000;
 const MISMATCH_MIN_UPDATES = 20;
 const MISMATCH_RATIO = 0.5;
 
-type FeedStats = { tripUpdates: number; unmatched: number; applied: number; sampleUnmatchedTripId?: string };
-type Engine = { setRealtime(feeds: ArrayBuffer[]): Promise<FeedStats[]>; clearRealtime(): void };
+type FeedStats = { tripUpdates: number; unmatched: number; unmatchedNotScheduled: number; addedUsable: number; applied: number; sampleUnmatchedTripId?: string };
+type Engine = { setRealtime(feeds: ArrayBuffer[], serviceMidnightEpoch: bigint): Promise<FeedStats[]>; clearRealtime(): void };
 
 let lastKey: string | null = null;
 let lastRefreshAt = 0;
@@ -18,6 +18,13 @@ function parseHeader(header: string): [string, string] | null {
     const i = header.indexOf(':');
     if (i <= 0) return null;
     return [header.slice(0, i).trim(), header.slice(i + 1).trim()];
+}
+
+/** Local midnight today in POSIX seconds; added trips carry absolute times that the engine turns into seconds since midnight. */
+function localMidnightEpoch(): bigint {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return BigInt(Math.floor(d.getTime() / 1000));
 }
 
 /** ".../v1/metro/trip-updates" -> "metro", for log lines. */
@@ -72,13 +79,13 @@ export async function refreshRealtime(engine: Engine): Promise<void> {
     if (used.length === 0) return;
 
     try {
-        const stats = await engine.setRealtime(used.map(f => f.bytes));
+        const stats = await engine.setRealtime(used.map(f => f.bytes), localMidnightEpoch());
         lastKey = key;
         lastRefreshAt = now;
         const perFeed = used.map((f, i) => {
             const s = stats[i];
             const sample = s.sampleUnmatchedTripId ? `, e.g. unmatched "${s.sampleUnmatchedTripId}"` : '';
-            return `${feedLabel(f.url)} ${s.applied} applied of ${s.tripUpdates} updates (${s.unmatched} unmatched${sample})`;
+            return `${feedLabel(f.url)} ${s.applied} applied of ${s.tripUpdates} updates (${s.unmatched} unmatched, ${s.unmatchedNotScheduled} of them added/replacement, ${s.addedUsable} rideable${sample})`;
         });
         console.log(`[gtfsRealtime] ${used.length}/${urls.length} feeds\n  ${perFeed.join('\n  ')}`);
 

@@ -792,6 +792,7 @@ pub fn load_gtfs_index_for_trip(
                 windowed_trip_pks.insert(trip_pk);
                 let Some(&pattern_pk) = trip_pk_to_pattern.get(&trip_pk) else { continue };
                 let (arrival_sec, departure_sec, departure_delay_sec) = realtime.apply(trip_pk, stop_sequence, arrival_sec, departure_sec);
+                let (pickup_type, drop_off_type) = if realtime.is_skipped(trip_pk, stop_sequence) { (1, 1) } else { (pickup_type, drop_off_type) };
                 let entry = Rc::new(StopTimeEntry { trip_pk, pattern_pk, stop_sequence, arrival_sec, departure_sec, pickup_type, drop_off_type, departure_delay_sec });
                 stop_times_by_stop.entry(stop_pk).or_default().push(Rc::clone(&entry));
                 stop_times_by_stop_and_pattern.entry((stop_pk, pattern_pk)).or_default().push(Rc::clone(&entry));
@@ -815,6 +816,7 @@ pub fn load_gtfs_index_for_trip(
                 windowed_trip_pks.insert(trip_pk);
                 let Some(&pattern_pk) = trip_pk_to_pattern.get(&trip_pk) else { continue };
                 let (arrival_sec, departure_sec, departure_delay_sec) = realtime.apply(trip_pk, stop_sequence, arrival_sec, departure_sec);
+                let (pickup_type, drop_off_type) = if realtime.is_skipped(trip_pk, stop_sequence) { (1, 1) } else { (pickup_type, drop_off_type) };
                 let entry = Rc::new(StopTimeEntry { trip_pk, pattern_pk, stop_sequence, arrival_sec, departure_sec, pickup_type, drop_off_type, departure_delay_sec });
                 stop_times_by_stop.entry(stop_pk).or_default().push(Rc::clone(&entry));
                 stop_times_by_stop_and_pattern.entry((stop_pk, pattern_pk)).or_default().push(Rc::clone(&entry));

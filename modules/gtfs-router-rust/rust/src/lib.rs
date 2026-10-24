@@ -162,6 +162,10 @@ pub struct RealtimeFeedStats {
     pub trip_updates: u32,
     /// Updates whose trip_id is not in the timetable.
     pub unmatched: u32,
+    /// Of the unmatched, how many are added, unscheduled or replacement trips.
+    pub unmatched_not_scheduled: u32,
+    /// Of those, how many had stop times the router can ride.
+    pub added_usable: u32,
     /// Trips that got usable delay or cancellation data.
     pub applied: u32,
     pub sample_unmatched_trip_id: Option<String>,
@@ -397,17 +401,21 @@ impl GtfsRouterEngine {
 
     /// Replaces the realtime overlay with the delays and cancellations in
     /// raw GTFS-realtime TripUpdates feeds (one per transport mode, say),
-    /// merged. Returns stats for each feed, in input order. Later searches use it;
+    /// merged. `service_midnight_epoch` is local midnight today in POSIX
+    /// seconds, used to turn absolute stop times of added trips into
+    /// seconds since midnight. Returns stats for each feed, in input order. Later searches use it;
     /// there is no timetable rebuild.
-    pub async fn set_realtime(self: Arc<Self>, feeds: Vec<Vec<u8>>) -> Result<Vec<RealtimeFeedStats>, RouterError> {
+    pub async fn set_realtime(self: Arc<Self>, feeds: Vec<Vec<u8>>, service_midnight_epoch: i64) -> Result<Vec<RealtimeFeedStats>, RouterError> {
         run_blocking(move || {
             let conn_guard = self.conn.lock().unwrap();
             let Some(conn) = conn_guard.as_ref() else { return Err(RouterError::NotWarmedUp) };
-            let (overlay, per_feed) = realtime::overlay::Overlay::from_feeds(&feeds, conn)?;
+            let (overlay, per_feed) = realtime::overlay::Overlay::from_feeds(&feeds, service_midnight_epoch, conn)?;
             *self.realtime.write().unwrap() = Arc::new(overlay);
             Ok(per_feed.into_iter().map(|s| RealtimeFeedStats {
                 trip_updates: s.trip_updates as u32,
                 unmatched: s.unmatched as u32,
+                unmatched_not_scheduled: s.unmatched_not_scheduled as u32,
+                added_usable: s.added_usable as u32,
                 applied: s.applied as u32,
                 sample_unmatched_trip_id: s.sample_unmatched_trip_id,
             }).collect())
@@ -634,6 +642,7 @@ impl GtfsRouterEngine {
             origin_ll, dest_ll, depart_sec_of_day as i64,
             &today_date, today_dow, &tomorrow_date, tomorrow_dow, walking_speed_mps, max_walk_distance_m, None, &realtime,
         )?;
+        realtime::inject::inject_added_trips(&mut index, &realtime, &state.routes);
 
         if index.no_service_found {
             return Err(RouterError::NoServiceFound);
@@ -673,6 +682,7 @@ impl GtfsRouterEngine {
                     origin_ll, dest_ll, depart_sec_of_day as i64,
                     &today_date, today_dow, &tomorrow_date, tomorrow_dow, walking_speed_mps, max_walk_distance_m, Some(10 * 3600), &realtime,
                 )?;
+                realtime::inject::inject_added_trips(&mut index, &realtime, &state.routes);
                 if index.no_service_found { return Err(RouterError::NoServiceFound); }
                 let t_retry = Instant::now();
                 let retried = search_journeys(&index, &state.stops, origin_ll, dest_ll, depart_sec_of_day as i64, walking_speed_mps, max_walk_distance_m)

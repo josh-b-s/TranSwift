@@ -5,6 +5,8 @@ use prost::Message;
 
 /// TripDescriptor.ScheduleRelationship::CANCELED
 pub const TRIP_CANCELED: i32 = 3;
+/// StopTimeUpdate.ScheduleRelationship::SKIPPED
+pub const STOP_SKIPPED: i32 = 1;
 
 #[derive(Clone, PartialEq, Message)]
 pub struct FeedMessage {
@@ -30,6 +32,8 @@ pub struct TripUpdate {
 pub struct TripDescriptor {
     #[prost(string, optional, tag = "1")]
     pub trip_id: Option<String>,
+    #[prost(string, optional, tag = "5")]
+    pub route_id: Option<String>,
     #[prost(int32, optional, tag = "4")]
     pub schedule_relationship: Option<i32>,
 }
@@ -44,10 +48,15 @@ pub struct StopTimeUpdate {
     pub departure: Option<StopTimeEvent>,
     #[prost(string, optional, tag = "4")]
     pub stop_id: Option<String>,
+    #[prost(int32, optional, tag = "5")]
+    pub schedule_relationship: Option<i32>,
 }
 
 #[derive(Clone, PartialEq, Message)]
 pub struct StopTimeEvent {
     #[prost(int32, optional, tag = "1")]
     pub delay: Option<i32>,
+    /// Absolute POSIX time in seconds.
+    #[prost(int64, optional, tag = "2")]
+    pub time: Option<i64>,
 }
