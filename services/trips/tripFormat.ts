@@ -20,6 +20,12 @@ export function formatDuration(totalSeconds: number): string {
     return m > 0 ? `${m}m ${String(s % 60).padStart(2, '0')}s` : `${s}s`;
 }
 
+/** For the live walk readout: how far the rider is from their best. */
+export function formatPaceDelta(aheadS: number): string {
+    if (Math.abs(aheadS) < 1) return 'On pace';
+    return `${formatDuration(Math.abs(aheadS))} ${aheadS > 0 ? 'ahead' : 'behind'}`;
+}
+
 export function formatSpeed(mps: number, unit: SpeedUnit): string {
     if (mps <= 0) return '--';
     return `${(mps * SPEED_UNITS[unit].perMps).toFixed(1)} ${SPEED_UNITS[unit].label}`;

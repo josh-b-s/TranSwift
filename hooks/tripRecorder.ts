@@ -3,9 +3,10 @@ import { Alert, AppState } from 'react-native';
 import { router } from 'expo-router';
 import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch, RootState } from '@/store/store';
-import { endTrip, setTripStep } from '@/store/trip.slice';
+import { endTrip, setTripPace, setTripStep } from '@/store/trip.slice';
 import { createTripSession } from '@/services/trips/tripSession';
 import { createAlightAlert } from '@/services/trips/alightAlert';
+import { paceAgainstBest } from '@/services/trips/livePace';
 import { startTracking } from '@/services/trips/locationTracking';
 import { applyTrip } from '@/services/trips/personalBests';
 import { saveTrip, type SavedTrip } from '@/services/trips/tripStore';
@@ -30,6 +31,7 @@ export function useTripRecorder() {
         const session = createTripSession(steps);
         const checkAlight = createAlightAlert(steps, ride =>
             notifyGetOff(ride.to).catch(err => console.warn('[trip] get-off alert failed:', err)));
+        let lastPace: number | null = null;
         let cancelled = false;
         let finished = false;
         let stopTracking: (() => void) | undefined;
@@ -46,6 +48,18 @@ export function useTripRecorder() {
                     else return notifyTripDone(startedAt, summarizeTrip(trip), speedUnitRef.current);
                 })
                 .catch(err => Alert.alert('Could not save trip', String(err)));
+        };
+
+        // Only dispatches when the whole-second reading changes. Also clears it when a step ends.
+        const updatePace = () => {
+            const step = steps[session.stepIndex];
+            const best = step.type === 'walk' && step.bestKey ? bests.legs[step.bestKey] : undefined;
+            const progress = session.walkProgress;
+            const ahead = best && progress ? paceAgainstBest(progress, best.avgSpeedMps) : null;
+            const rounded = ahead === null ? null : Math.round(ahead);
+            if (rounded === lastPace) return;
+            lastPace = rounded;
+            dispatch(setTripPace(rounded));
         };
 
         startTracking(locations => {
@@ -66,6 +80,7 @@ export function useTripRecorder() {
             if (session.stepIndex !== before) dispatch(setTripStep(session.stepIndex));
             const { coords } = locations[locations.length - 1];
             checkAlight(session.stepIndex, coords);
+            updatePace();
         })
             .then(stop => {
                 if (cancelled) {

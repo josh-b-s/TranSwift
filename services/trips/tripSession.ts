@@ -1,6 +1,7 @@
 import { haversineMeters } from '@/services/geo/geoUtil';
 import type { LatLng } from '@/services/places/places';
 import { encodePath, type Sample } from './pathCodec';
+import type { WalkProgress } from './livePace';
 import type { TripStep } from './tripSteps';
 import type { SavedLeg } from './tripStore';
 
@@ -19,6 +20,7 @@ const isNear = (fix: Sample, target: LatLng) =>
 export function createTripSession(steps: TripStep[]) {
     let index = 0;
     let samples: Sample[] = [];
+    let walkedM = 0;
     const legs: SavedLeg[] = [];
 
     const finishStep = () => {
@@ -46,6 +48,7 @@ export function createTripSession(steps: TripStep[]) {
             });
         }
         samples = [];
+        walkedM = 0;
         index += 1;
     };
 
@@ -53,12 +56,24 @@ export function createTripSession(steps: TripStep[]) {
         get stepIndex() { return index; },
         get done() { return index >= steps.length; },
         get legs() { return legs; },
+        /** Distance and time on the current walk so far, or null when not walking. */
+        get walkProgress(): WalkProgress | null {
+            if (samples.length < 2) return null;
+            return { distanceM: walkedM, elapsedS: (samples[samples.length - 1].time - samples[0].time) / 1000 };
+        },
 
         addFix({ latitude, longitude, time, accuracy }: Fix) {
             if (index >= steps.length) return;
             if (accuracy === null || accuracy > MAX_ACCURACY_M) return;
 
-            if (steps[index].type === 'walk') samples.push({ latitude, longitude, time });
+            if (steps[index].type === 'walk') {
+                const last = samples[samples.length - 1];
+                if (last) walkedM += haversineMeters(
+                    { lat: last.latitude, lon: last.longitude },
+                    { lat: latitude, lon: longitude },
+                );
+                samples.push({ latitude, longitude, time });
+            }
             // A loop, since a very short step can already be satisfied by the same fix.
             while (index < steps.length && isNear({ latitude, longitude, time }, steps[index].end)) finishStep();
         },

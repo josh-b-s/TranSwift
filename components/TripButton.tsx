@@ -8,6 +8,7 @@ import { selectDisplayedJourney } from '@/store/route.slice';
 import { endTrip, startTrip } from '@/store/trip.slice';
 import { stepsFromJourney } from '@/services/trips/tripSteps';
 import { loadBests } from '@/services/trips/bestsStore';
+import { formatPaceDelta } from '@/services/trips/tripFormat';
 import { SPEED_UNITS } from '@/constants/speedUnits';
 import { ACCENT, useThemeStyle } from '@/constants/themes';
 
@@ -17,7 +18,7 @@ export default function TripButton() {
     const theme = useThemeStyle();
     const unit = SPEED_UNITS[useSelector((s: RootState) => s.preferences.speedUnit)];
     const journey = useSelector(selectDisplayedJourney);
-    const { startedAt, steps, stepIndex, bests } = useSelector((s: RootState) => s.trip);
+    const { startedAt, steps, stepIndex, bests, paceS } = useSelector((s: RootState) => s.trip);
 
     const running = startedAt !== null;
     if (!running && !journey?.segments.length) return null;
@@ -27,7 +28,8 @@ export default function TripButton() {
         ? `${step.type === 'walk' ? 'Walk' : 'Ride'} to ${step.to}`
         : 'Start trip';
     const best = running && step.type === 'walk' && step.bestKey ? bests.legs[step.bestKey] : undefined;
-    const hint = best ? `Beat ${(best.avgSpeedMps * unit.perMps).toFixed(1)} ${unit.label} · tap to end` : 'Tap to end';
+    const pace = paceS === null ? '' : `${formatPaceDelta(paceS)} · `;
+    const hint = best ? `${pace}Beat ${(best.avgSpeedMps * unit.perMps).toFixed(1)} ${unit.label} · tap to end` : 'Tap to end';
     const Icon = running ? Square : Play;
     const color = running ? theme.color : '#fff';
 
