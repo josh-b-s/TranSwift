@@ -12,6 +12,7 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "preprocess-gtfs": "ts-node --project tsconfig.scripts.json scripts/preprocess-gtfs.ts",
+    "test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./tests/register.mjs --test \"tests/**/*.test.ts\"",
     "postinstall": "patch-package",
     "prebuild": "npx expo prebuild",
     "build:gtfs-importer": "cd modules/gtfs-importer/rust && npx ubrn build android --and-generate --release",
