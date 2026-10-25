@@ -1,19 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch, RootState } from '@/store/store';
 import { advanceStep, BFS_STEP_INTERVAL_MS, DebugPhase, retreatStep, setBfsCandidateMode, setPlaying, toggleDebugEnabled, toggleHopColorMode } from '@/store/debug.slice';
 import { SHADOW, useThemeStyle } from '@/constants/themes';
-import {compareRouters} from "@/services/gtfs/router/routeCompare";
-
-// TEMPORARY hardcoded test pair for the "Compare routers" button below —
-// Flinders St Station -> Melbourne Central. Swap for whatever
-// location.slice/search.slice actually stores once you point me at it;
-// this is just so you can A/B test right now without wiring real search
-// state into the debug panel.
-const TEST_ORIGIN = {latitude: -37.8183, longitude: 144.9671};
-const TEST_DESTINATION = {latitude: -37.8103, longitude: 144.9628};
 
 // Only 2 phases now — corridor-finding (bfs, which subsumes what used to
 // be separate seed/corridor phases; see DebugMapOverlay.tsx) and raptor
@@ -53,31 +44,6 @@ export default function DebugControls() {
     const dispatch = useDispatch<AppDispatch>();
     const theme = useThemeStyle();
     const { enabled, hasData, phase, stepIndex, playing, bfsCandidateMode, hopColorMode, bfsRoundCount, bfsCandidateCount, raptorStepCount: raptorStepTotal } = useSelector((s: RootState) => s.debug);
-
-    // GTFS import (prep folders / list incoming / benchmark / run import)
-    // has moved to app/(tabs)/settings/gtfs.tsx as a proper screen — this
-    // panel now only keeps the router A/B compare tool, which doesn't fit
-    // that settings screen.
-    const [compareBusy, setCompareBusy] = useState(false);
-    const [compareStatus, setCompareStatus] = useState<string>('');
-
-    async function handleCompareRouters() {
-        setCompareBusy(true);
-        setCompareStatus('Comparing TS vs Rust routers…');
-        try {
-            const {tsMs, rustMs, tsResult, rustResult} = await compareRouters(TEST_ORIGIN, TEST_DESTINATION);
-            const speedup = (tsMs / rustMs).toFixed(2);
-            setCompareStatus(
-                `TS: ${tsMs.toFixed(0)}ms (${tsResult.journeys.length}j) | ` +
-                `Rust: ${rustMs.toFixed(0)}ms (${rustResult.journeys.length}j) | ` +
-                `${speedup}x. Full detail in console.`
-            );
-        } catch (err) {
-            setCompareStatus(`Compare failed: ${String(err)}`);
-        } finally {
-            setCompareBusy(false);
-        }
-    }
 
     // Total steps for the CURRENT phase — this is the one thing that
     // genuinely differs per phase (and, for bfs, per candidate mode) now:
@@ -181,34 +147,6 @@ export default function DebugControls() {
                             </TouchableOpacity>
                         )}
                     </View>
-                </View>
-            )}
-
-            {enabled && (
-                <View
-                    className="rounded-2xl px-3 py-2"
-                    style={[{ backgroundColor: theme.backgroundColor }, SHADOW]}
-                >
-                    <Text style={{ color: theme.color, opacity: 0.6, fontSize: 11, fontWeight: '600', marginBottom: 4 }}>
-                        Router compare
-                    </Text>
-                    <View className="flex-row items-center" style={{ gap: 4 }}>
-                        <TouchableOpacity
-                            className="p-1.5"
-                            disabled={compareBusy}
-                            onPress={handleCompareRouters}
-                        >
-                            <Ionicons name="git-compare-outline" size={18} color={theme.color} />
-                        </TouchableOpacity>
-                        {compareBusy && (
-                            <Text style={{ color: theme.color, fontSize: 11 }}>comparing…</Text>
-                        )}
-                    </View>
-                    {!!compareStatus && (
-                        <Text style={{ color: theme.color, opacity: 0.7, fontSize: 10, marginTop: 4, maxWidth: 220 }}>
-                            {compareStatus}
-                        </Text>
-                    )}
                 </View>
             )}
         </View>

@@ -74,11 +74,9 @@ export interface GtfsDebugInfo {
      *  polylines) — lets a debug overlay draw the corridor as a single
      *  shape instead of scattering a marker over every tagged stop. */
     corridorBoundary: { left: LatLng[]; right: LatLng[] }[];
-    /** Fixed walk-tolerance radius circles at origin/destination — see
-     *  corridorTagging.ts's ORIGIN_DEST_WALK_RADIUS_M. These get unioned
-     *  into the real corridor regardless of the taper, so without drawing
-     *  them explicitly the debug view understates the corridor's true
-     *  extent at both ends. */
+    /** Fixed walk-tolerance radius circles at origin/destination. They are
+     *  unioned into the real corridor regardless of the taper, so without
+     *  drawing them the debug view understates the corridor at both ends. */
     walkRadiusCircles: { center: LatLng; radiusMeters: number }[];
     /** RAPTOR route-check polylines, one list per round — every individual
      *  candidate route examined during that round. Meant to be displayed

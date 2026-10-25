@@ -35,16 +35,16 @@ type State = {
     error?: string | null;
     showResults: boolean;
     /** Epoch ms for the planned departure. null = "leave now" — computeRoute
-     *  passes `undefined` through to computeGtfsRoute in that case, which
+     *  passes `undefined` through to computeGtfsRouteNative in that case, which
      *  falls back to `new Date()` at call time, so "now" always reflects
      *  the actual moment of search rather than whenever this was picked. */
     departureTime: number | null;
-    /** Meters/sec. Mirrors WALK_SPEED_MPS.NORMAL from raptorRouter.ts as the
-     *  default so an untouched picker matches computeGtfsRoute's own default. */
+    /** Meters/sec. Defaults to computeGtfsRouteNative's own default (1.4) so an
+     *  untouched picker matches it. */
     walkingSpeedMps: number;
 };
 
-const DEFAULT_WALKING_SPEED_MPS = 1.4; // WALK_SPEED_MPS.NORMAL
+const DEFAULT_WALKING_SPEED_MPS = 1.4;
 
 const initialState: State = {
     query: '',

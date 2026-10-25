@@ -1,9 +1,7 @@
 // debugSinkCollector.ts
 //
-// Bridges the Rust engine's live DebugEvent callback stream into the same
-// GtfsDebugInfo shape computeGtfsRoute() (TS path) produces as a single
-// batched object, so debug.slice.ts / DebugMapOverlay.tsx work against
-// either backend without changes.
+// Bridges the Rust engine's live DebugEvent callback stream into one
+// batched GtfsDebugInfo object for debug.slice.ts / DebugMapOverlay.tsx.
 //
 // IMPORTANT: DebugSink (like ProgressCallback in rustGtfsImporter.ts) is a
 // plain TS interface, not a class — it doesn't exist at runtime, so ubrn's
@@ -44,17 +42,16 @@
 // candidate's own hops (same dedup-shared-point logic the Rust side used
 // to do itself), so a stale/duplicate join point doesn't leak in.
 //
-// KNOWN GAPS vs the TS path (see lib.rs's DebugEvent enum):
+// KNOWN GAPS in GtfsDebugInfo (see lib.rs's DebugEvent enum):
 //   - No `bfsTreeEdges`. The Rust side emits per-level frontier SNAPSHOTS
 //     (SeedBfsLevel{level, stops}), not individual parent->child discovery
 //     edges. Doesn't matter anymore under the round-stepped bfs phase —
 //     nothing here consumes tree-edge order any more, only per-round sets.
 //   - No `corridorStops` (flat list) — only the tapered-boundary polygons
 //     (`corridorBoundary`) survive. lib.rs never emits a corridor-stops event.
-//   - No `walkRadiusCircles` — the fixed-radius origin/dest circles are a
-//     TS-side rendering detail (corridorTagging.ts), not something Rust
-//     reports. DebugMapOverlay already `?? []`s this, so it just renders
-//     nothing extra rather than crashing.
+//   - No `walkRadiusCircles` — Rust doesn't report the fixed-radius
+//     origin/dest circles. DebugMapOverlay already `?? []`s this, so it just
+//     renders nothing extra rather than crashing.
 //
 // RETRY NOTE: compute_route() internally retries once with a wider window
 // on certain failures (see lib.rs), re-emitting the pre-search debug events

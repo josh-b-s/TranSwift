@@ -1,11 +1,4 @@
-/**
- * geoUtil.ts — config geo-math primitives.
- *
- * Previously an identical haversineMeters implementation was copy-pasted
- * into topologyGraph.ts, corridorTagging.ts, and gtfsLoader.ts. One
- * implementation here, imported everywhere — no functional change, just
- * removes the drift risk of three copies silently diverging.
- */
+/** geoUtil.ts — shared geo-math primitives. */
 
 export interface LatLon {
     lat: number;

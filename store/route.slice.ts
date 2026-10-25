@@ -1,15 +1,9 @@
 import { createAsyncThunk, createSlice, PayloadAction } from '@reduxjs/toolkit';
 import type { LatLng } from '@/services/places/places';
-import { computeGtfsRoute } from '@/services/gtfs/router/raptorRouter';
 import type { GtfsRouteResult, GtfsJourney } from '@/services/gtfs/router/routeTypes';
 import { computeGtfsRouteNative } from '@/services/gtfs/router/gtfsRouterNative';
 import { setDebugData } from './debug.slice';
 import { publishDebugData } from '@/services/gtfs/debug/debugDataStore';
-import { USE_NATIVE_ROUTER } from '@/services/gtfs/router/routerConfig';
-
-// Flip USE_NATIVE_ROUTER (routerConfig.ts) to compare the Rust engine
-// against the existing TS/op-sqlite path — both are called with the exact
-// same args and return the exact same GtfsRouteResult/GtfsJourney shape.
 
 export const computeRoute = createAsyncThunk<
     GtfsRouteResult,
@@ -17,22 +11,20 @@ export const computeRoute = createAsyncThunk<
         origin: LatLng;
         destination: LatLng;
         debugMode?: boolean;
-        /** Undefined -> computeGtfsRoute's own default (`new Date()` at call
+        /** Undefined -> computeGtfsRouteNative's own default (`new Date()` at call
          *  time, i.e. "leave now"). Passed through as-is, not defaulted here,
          *  so "now" is always the actual moment of search. */
         departureTime?: Date;
-        /** Undefined -> computeGtfsRoute's own default (WALK_SPEED_MPS.NORMAL). */
+        /** Undefined -> computeGtfsRouteNative's own default (1.4 m/s). */
         walkingSpeedMps?: number;
     },
     { rejectValue: string }
 >('route/compute', async ({ origin, destination, debugMode = false, departureTime, walkingSpeedMps }, { rejectWithValue, dispatch }) => {
     try {
-        const result = USE_NATIVE_ROUTER
-            // maxWalkDistanceM (undefined -> computeGtfsRouteNative's own
-            // hardcoded default) not yet exposed on this thunk's args — see
-            // TODO in gtfsRouterNative.ts.
-            ? await computeGtfsRouteNative(origin, destination, departureTime, walkingSpeedMps, undefined, debugMode)
-            : await computeGtfsRoute(origin, destination, departureTime, walkingSpeedMps, debugMode);
+        // maxWalkDistanceM (undefined -> computeGtfsRouteNative's own
+        // hardcoded default) not yet exposed on this thunk's args — see
+        // TODO in gtfsRouterNative.ts.
+        const result = await computeGtfsRouteNative(origin, destination, departureTime, walkingSpeedMps, undefined, debugMode);
         // Dispatched here (inside the thunk) rather than via route.slice's own
         // extraReducers, since debug data belongs in debug.slice, not route
         // state — this keeps "what journey is displayed" and "what did the

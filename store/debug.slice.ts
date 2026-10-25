@@ -44,7 +44,7 @@ export const BFS_STEP_INTERVAL_MS = Math.round(1000 / BFS_TARGET_FPS);
 
 type State = {
     /** Master toggle. When false, computeRoute doesn't even ask
-     *  computeGtfsRoute to assemble debug data (see route.slice.ts) — this
+     *  computeGtfsRouteNative to assemble debug data (see route.slice.ts) — this
      *  isn't just a rendering toggle, it avoids the (small) collection cost
      *  on every normal search. */
     enabled: boolean;

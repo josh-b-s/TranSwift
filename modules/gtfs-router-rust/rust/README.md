@@ -6,6 +6,9 @@ Full logic port of `coarseGraph.ts` → `seedRouteBfs.ts` → `corridorTagging.t
 bundled, `thiserror` for the error enum, no build.rs — bindings are
 generated via the `uniffi-bindgen` bin target same as the importer).
 
+The JS originals listed below were removed from the app once this crate became the
+only router. They are still in git history if you need to compare behaviour.
+
 ## ⚠️ Not yet compiler-verified
 
 This was written and cross-checked by hand (every `use crate::...` and every

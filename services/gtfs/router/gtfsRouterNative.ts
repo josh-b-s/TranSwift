@@ -1,9 +1,7 @@
 // gtfsRouterNative.ts
 //
-// Thin adapter over the uniffi-generated Rust GtfsRouterEngine, shaped to
-// match computeGtfsRoute()'s public signature/return type exactly, so call
-// sites (and the comparison harness below) can swap implementations by
-// changing one import.
+// Thin adapter over the uniffi-generated Rust GtfsRouterEngine, returning
+// the app's own GtfsRouteResult shape.
 
 import gtfsRouterRust from '@mapapp/gtfs-router-rust';
 import type {
@@ -164,13 +162,12 @@ function summarizeJourneys(journeys: Journey[]): string {
 }
 
 /**
- * Same signature/contract as computeGtfsRoute() in raptorRouter.ts, backed by
- * the Rust RAPTOR engine instead. Resolves the currently-active database
- * path via getCurrentDbPath() on every call (rather than a path param), so
- * switching the selected database in settings/gtfs.tsx takes effect on the
- * next search without route.slice.ts's call site needing to know about it —
- * same call shape as the TS path. getEngine() already re-warms whenever the
- * resolved path differs from what it last warmed up against.
+ * Runs a search on the Rust RAPTOR engine. Resolves the currently-active
+ * database path via getCurrentDbPath() on every call (rather than a path
+ * param), so switching the selected database in settings/gtfs.tsx takes
+ * effect on the next search without route.slice.ts's call site needing to
+ * know about it. getEngine() already re-warms whenever the resolved path
+ * differs from what it last warmed up against.
  */
 export async function computeGtfsRouteNative(
     origin: LatLng,
@@ -211,10 +208,9 @@ export async function computeGtfsRouteNative(
             collector?.sink ?? undefined, // pass the plain-object `sink`, not the collector wrapper — see debugSinkCollector.ts's header note on classes vs plain-object callback interfaces. undefined (not null) confirmed correct for the None case from the generated binding's FfiConverterOptional.
         );
 
-        // Diagnostic — mirrors gtfsLoader.ts's own per-stage console.log
-        // breakdown, sourced from lib.rs's new RouteResult.timings field
-        // (loader.rs's per-stage Instant timers + compute_route's own
-        // raptor_search timer). "total" is loader.rs's load time only;
+        // Diagnostic — per-stage breakdown, sourced from lib.rs's
+        // RouteResult.timings field (loader.rs's per-stage Instant timers +
+        // compute_route's own raptor_search timer). "total" is loader.rs's load time only;
         // raptor_search is a separate top-level entry, not summed into it.
         try { console.log(summarizeJourneys(result.journeys)); } catch { /* logging only */ }
         // Logging must never fail a route: fall back to the raw one-line format.
@@ -232,9 +228,7 @@ export async function computeGtfsRouteNative(
             debug: collector?.toDebugInfo(),  // unchanged — toDebugInfo lives on the wrapper, not the sink
         };
     } catch (err) {
-        // RouterError variants come through here (e.g. NoServiceFound) — map to
-        // whatever shape your callers already expect from computeGtfsRoute's
-        // rejection path.
+        // RouterError variants come through here (e.g. NoServiceFound).
         throw err as RouterError;
     }
 }
