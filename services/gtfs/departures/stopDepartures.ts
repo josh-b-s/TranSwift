@@ -1,4 +1,4 @@
-import type { QueryableDb } from '@/services/db/sqlChunkUtil';
+import type { QueryableDb } from '@/services/db/queryableDb';
 import { makeKey, parseKey } from '@/services/gtfs/core/gtfsKeyUtil';
 import { fallbackRouteColor } from '@/services/gtfs/config/routeTypeUtil';
 import { getActiveServiceKeys } from './activeServices';

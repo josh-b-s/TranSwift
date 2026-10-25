@@ -1,4 +1,4 @@
-import type { QueryableDb } from '@/services/db/sqlChunkUtil';
+import type { QueryableDb } from '@/services/db/queryableDb';
 import { makeKey } from '@/services/gtfs/core/gtfsKeyUtil';
 
 const DOW_COLUMNS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
