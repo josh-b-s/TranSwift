@@ -20,6 +20,7 @@ import MapPickOverlay from '@/components/map/MapPickOverlay';
 import DebugMapOverlay from '@/components/debug/DebugMapOverlay';
 import DebugControls from '@/components/debug/DebugControls';
 import DebugMovementControls from '@/components/debug/DebugMovementControls';
+import UserLocationMarker from '@/components/map/UserLocationMarker';
 import SimulatedLocationMarker from '@/components/debug/SimulatedLocationMarker';
 import {MAP_STYLE_DARK, SHADOW, TOP_SAFE, useThemeStyle} from '@/constants/themes';
 import {selectDisplayedJourney} from '@/store/route.slice';
@@ -152,7 +153,6 @@ export default function Index() {
                 ref={mapRef}
                 key={colorScheme}
                 style={StyleSheet.absoluteFillObject}
-                showsUserLocation
                 showsMyLocationButton={false}
                 showsCompass={false}
                 userInterfaceStyle={colorScheme ?? 'light'}
@@ -213,6 +213,7 @@ export default function Index() {
                     />
                 )}
 
+                <UserLocationMarker/>
                 {__DEV__ && <SimulatedLocationMarker/>}
                 {/*<DebugMapOverlay />*/}
             </MapView>

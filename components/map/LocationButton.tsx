@@ -1,6 +1,6 @@
 import React, { RefObject } from 'react';
-import { TouchableOpacity } from 'react-native';
-import { LocateFixed } from 'lucide-react-native';
+import { TouchableOpacity, View } from 'react-native';
+import ArrowLogo from '@/components/ui/ArrowLogo';
 import Animated, { SharedValue } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { useDispatch } from 'react-redux';
@@ -8,7 +8,7 @@ import { AppDispatch } from '@/store/store';
 import { setUserLocation } from '@/store/location.slice';
 import MapView, { LatLng } from 'react-native-maps';
 import * as Location from 'expo-location';
-import { ACCENT, SHADOW, useThemeStyle } from '@/constants/themes';
+import { SHADOW, useThemeStyle } from '@/constants/themes';
 import {useGoToUserLocation} from "@/hooks/goToUserLocation";
 import {useSheetFollowTop} from "@/hooks/sheetFollowTop";
 
@@ -34,7 +34,9 @@ export default function LocationButton({ mapRef, animatedPosition }: {
                     goToUserLocation();
                 }}
             >
-                <LocateFixed size={24} color={ACCENT} />
+                <View style={{ transform: [{ rotate: '45deg' }] }}>
+                    <ArrowLogo width={22} />
+                </View>
             </TouchableOpacity>
         </Animated.View>
     );
