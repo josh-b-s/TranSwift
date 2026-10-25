@@ -17,6 +17,7 @@
 import * as FileSystem from 'expo-file-system/legacy';
 import { setActiveDbPath, clearActiveDbPath } from '@/services/db/sqliteDb';
 import { invalidateNativeRouter } from '../router/gtfsRouterNative';
+import { invalidateGtfsRepoCaches } from '../core/gtfsRepo';
 import { computeFeedStats, type FeedStats } from './gtfsFeedStats';
 
 /** Where a feed was downloaded from, kept for licence credit and later update checks. */
@@ -161,6 +162,12 @@ function dedupeName(candidate: string, existingNames: string[]): string {
     return attempt;
 }
 
+/** Drops everything cached from the previous database: the router engine and the stop caches. */
+function invalidateDatabaseCaches(): void {
+    invalidateNativeRouter();
+    invalidateGtfsRepoCaches();
+}
+
 /**
  * Repoints the app at whichever database was active last session. Call
  * this once at startup (see app/_layout.tsx) BEFORE anything else touches
@@ -205,7 +212,7 @@ export async function setActiveDatabase(id: string): Promise<void> {
     if (!entry) throw new Error(`Unknown GTFS database id: ${id}`);
 
     setActiveDbPath(dbPathFor(entry));
-    invalidateNativeRouter(); // forces the next search to re-warm against the new file
+    invalidateDatabaseCaches();
 
     reg.activeId = id;
     await writeRegistry(reg);
@@ -239,7 +246,7 @@ export async function registerDatabase(
     await writeRegistry(reg);
 
     setActiveDbPath(dbPathFor(entry));
-    invalidateNativeRouter();
+    invalidateDatabaseCaches();
 
     return entry;
 }
@@ -310,11 +317,11 @@ export async function deleteDatabase(id: string): Promise<void> {
         if (fallback) {
             reg.activeId = fallback.id;
             setActiveDbPath(dbPathFor(fallback));
-            invalidateNativeRouter();
+            invalidateDatabaseCaches();
         } else {
             reg.activeId = null;
             clearActiveDbPath();
-            invalidateNativeRouter();
+            invalidateDatabaseCaches();
         }
     }
 
