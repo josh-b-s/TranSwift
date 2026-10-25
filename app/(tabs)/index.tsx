@@ -22,7 +22,7 @@ import DebugControls from '@/components/debug/DebugControls';
 import DebugMovementControls from '@/components/debug/DebugMovementControls';
 import UserLocationMarker from '@/components/map/UserLocationMarker';
 import SimulatedLocationMarker from '@/components/debug/SimulatedLocationMarker';
-import {MAP_STYLE_DARK, SHADOW, TOP_SAFE, useThemeStyle} from '@/constants/themes';
+import {SHADOW, TOP_SAFE, useThemeStyle} from '@/constants/themes';
 import {selectDisplayedJourney} from '@/store/route.slice';
 import {isCurrentLocation} from '@/services/places/endpoints';
 import {useGoToUserLocation} from '../../hooks/goToUserLocation';
@@ -156,7 +156,6 @@ export default function Index() {
                 showsMyLocationButton={false}
                 showsCompass={false}
                 userInterfaceStyle={colorScheme ?? 'light'}
-                customMapStyle={colorScheme === 'dark' ? MAP_STYLE_DARK : []}
                 onMapReady={() => {
                     if (userLocation) {
                         mapRef.current?.animateToRegion(

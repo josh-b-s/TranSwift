@@ -83,7 +83,6 @@ export default function TripSummaryScreen() {
                             style={{ flex: 1 }}
                             showsCompass={false}
                             userInterfaceStyle={colorScheme ?? 'light'}
-                            customMapStyle={colorScheme === 'dark' ? MAP_STYLE_DARK : []}
                             onMapReady={fitMap}
                         >
                             {lines.map((line, i) => (

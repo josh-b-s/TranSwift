@@ -1,0 +1,34 @@
+diff --git a/node_modules/react-native-maps/android/build.gradle b/node_modules/react-native-maps/android/build.gradle
+index 067a913..4066af9 100644
+--- a/node_modules/react-native-maps/android/build.gradle
++++ b/node_modules/react-native-maps/android/build.gradle
+@@ -63,7 +63,7 @@ repositories {
+ dependencies {
+   implementation 'com.facebook.react:react-native:+'
+   implementation "com.google.android.gms:play-services-base:${safeExtGet('playServicesVersion', '18.2.0')}"
+-  implementation "com.google.android.gms:play-services-maps:${safeExtGet('playServicesVersion', '18.2.0')}"
++  implementation "com.google.android.gms:play-services-maps:${safeExtGet('playServicesVersion', '19.2.0')}"
+   implementation "com.google.android.gms:play-services-location:21.0.1"
+   implementation 'com.google.maps.android:android-maps-utils:3.8.2'
+   implementation "androidx.work:work-runtime:2.7.1"
+diff --git a/node_modules/react-native-maps/android/src/main/java/com/rnmaps/maps/MapManager.java b/node_modules/react-native-maps/android/src/main/java/com/rnmaps/maps/MapManager.java
+index 69a724d..7b30daa 100644
+--- a/node_modules/react-native-maps/android/src/main/java/com/rnmaps/maps/MapManager.java
++++ b/node_modules/react-native-maps/android/src/main/java/com/rnmaps/maps/MapManager.java
+@@ -27,6 +27,7 @@ import com.google.android.gms.maps.MapsInitializer;
+ import com.google.android.gms.maps.model.CameraPosition;
+ import com.google.android.gms.maps.model.LatLng;
+ import com.google.android.gms.maps.model.LatLngBounds;
++import com.google.android.gms.maps.model.MapColorScheme;
+ 
+ import java.util.Map;
+ 
+@@ -81,6 +82,8 @@ public class MapManager extends ViewGroupManager<MapView> {
+     @Override
+     protected MapView createViewInstance(int reactTag, @NonNull ThemedReactContext reactContext, @Nullable ReactStylesDiffMap initialProps, @Nullable StateWrapper stateWrapper) {
+         this.googleMapOptions = new GoogleMapOptions();
++        // Dark mode follows the device. Needs play-services-maps 19.2.0+ and no JSON map style.
++        googleMapOptions.mapColorScheme(MapColorScheme.FOLLOW_SYSTEM);
+         if (initialProps != null) {
+             if (initialProps.getString("googleMapId") != null) {
+                 googleMapOptions.mapId(initialProps.getString("googleMapId"));
