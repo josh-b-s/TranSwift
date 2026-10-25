@@ -1,7 +1,7 @@
 // debugBfsPoints.ts
 // Location: services/gtfs/debug/debugBfsPoints.ts
 
-import type { GtfsDebugInfo } from '@/services/gtfs/router/raptorRouter';
+import type { GtfsDebugInfo } from '@/services/gtfs/router/routeTypes';
 
 export type Pt = { latitude: number; longitude: number };
 

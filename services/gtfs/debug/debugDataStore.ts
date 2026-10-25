@@ -12,7 +12,7 @@
 
 import { useSelector } from 'react-redux';
 import type { RootState } from '@/store/store';
-import type { GtfsDebugInfo } from '@/services/gtfs/router/raptorRouter';
+import type { GtfsDebugInfo } from '@/services/gtfs/router/routeTypes';
 import { flattenBfsCandidates, raptorStepCount } from './debugBfsPoints';
 import type { BfsCandidateStep } from './debugBfsPoints';
 

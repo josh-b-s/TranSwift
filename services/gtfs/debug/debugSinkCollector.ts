@@ -69,7 +69,7 @@
 
 import {DebugEvent_Tags} from '@/modules/gtfs-router-rust';
 import type {DebugEvent, DebugSink} from '@/modules/gtfs-router-rust';
-import type {GtfsDebugInfo} from '../router/raptorRouter';
+import type {GtfsDebugInfo} from '../router/routeTypes';
 import type {Pt, SeedPathHop} from '../debug/debugBfsPoints';
 
 export interface DebugCollectorHandle {

@@ -1,6 +1,6 @@
 import { type ElementRef, useEffect, useRef, useState } from 'react';
 import { Marker, Polyline } from 'react-native-maps';
-import type { RouteSegment, RouteStop } from '@/services/gtfs/router/raptorRouter';
+import type { RouteSegment, RouteStop } from '@/services/gtfs/router/routeTypes';
 
 /** Width of a ride's line on the map. The stop dots use the same width so each reads as a bead on it. */
 export const RIDE_LINE_WIDTH = 7;

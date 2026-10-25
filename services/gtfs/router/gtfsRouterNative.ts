@@ -17,8 +17,7 @@ import type {
     GtfsRouteResult,
     GtfsJourney,
     RouteSegment,
-    WALK_SPEED_MPS,
-} from './raptorRouter';
+} from './routeTypes';
 import { createDebugSinkCollector } from '../debug/debugSinkCollector';
 import { formatTimings } from './formatTimings';
 import { getCurrentDbPath } from '@/services/db/sqliteDb';

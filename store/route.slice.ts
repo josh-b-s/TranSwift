@@ -1,6 +1,7 @@
 import { createAsyncThunk, createSlice, PayloadAction } from '@reduxjs/toolkit';
 import type { LatLng } from '@/services/places/places';
-import { computeGtfsRoute, GtfsRouteResult, GtfsJourney } from '@/services/gtfs/router/raptorRouter';
+import { computeGtfsRoute } from '@/services/gtfs/router/raptorRouter';
+import type { GtfsRouteResult, GtfsJourney } from '@/services/gtfs/router/routeTypes';
 import { computeGtfsRouteNative } from '@/services/gtfs/router/gtfsRouterNative';
 import { setDebugData } from './debug.slice';
 import { publishDebugData } from '@/services/gtfs/debug/debugDataStore';

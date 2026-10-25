@@ -29,7 +29,7 @@ import {fallbackRouteColor} from '@/services/gtfs/config/routeTypeUtil';
 import {makeKey, parseKey} from '../core/gtfsKeyUtil';
 import {haversineMeters as haversineMetersShared} from '../../geo/geoUtil';
 import {MAX_TRANSFER_WALK_SEC, NEARBY_STOPS} from '@/services/gtfs/config/routingSettings';
-import type { SeedPathHop } from '@/services/gtfs/debug/debugBfsPoints';
+import type { GtfsDebugInfo, GtfsJourney, GtfsRouteResult, RouteSegment, RouteStop } from './routeTypes';
 
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -125,103 +125,7 @@ type ParentInfo =
     boardKey: StopKey; boardSeq: number; alightSeq: number
 };
 
-export interface RouteStop extends LatLng {
-    name: string;
-}
-
-export interface RouteSegment {
-    coords: LatLng[];
-    routeName: string;
-    routeType: number;
-    routeColor?: string;
-    routeTextColor?: string;
-    originStopName: string;
-    destStopName: string;
-    type: 'transit' | 'walk';
-    departureTime?: string;
-    arrivalTime?: string;
-    /** Every stop a ride passes, board to alight. Absent on walks. */
-    stops?: RouteStop[];
-}
-
-export interface GtfsJourney {
-    coords: LatLng[];
-    segments: RouteSegment[];
-    legs: Array<{
-        routeName: string; routeType: number; routeColor?: string; routeTextColor?: string;
-        originStopName: string; destStopName: string; departureTime?: string; arrivalTime?: string;
-        /** Realtime delay already included in departureTime; 0 or absent when on time. */
-        departureDelaySec?: number;
-    }>;
-    routeName: string;
-    routeType: number;
-    routeColor?: string;
-    routeTextColor?: string;
-    originStopName: string;
-    destStopName: string;
-    transferStopName?: string;
-    totalDurationMin: number;
-    totalWalkingMeters: number;
-    transferCount: number;
-    departureTime: string;
-    arrivalTime: string;
-}
-
-export interface GtfsDebugInfo {
-    /** Every stop the corridor filter kept, for drawing "here's the search
-     *  space" on the map. */
-    corridorStops: LatLng[];
-    /** The raw BFS seed paths the corridor was tapered around — one
-     *  polyline per path, in origin->destination order. */
-    seedPaths: LatLng[][];
-    seedPathHops: SeedPathHop[][]; // NEW — per-candidate, ordered hop list
-    /** Depth (relative to the shortest meet BFS found — see seed_bfs.rs's
-     *  rank_meets depth-bucketing) of the matching entry in `seedPaths`/
-     *  `seedPathHops`. NEW — lets a debug overlay color candidates by
-     *  transfer-count tier. Populated by the native/Rust path only (see
-     *  lib.rs's SeedPath.depth); the TS path below doesn't track a
-     *  comparable depth concept, so it stays empty there, same treatment
-     *  routeChecks already gets.
-     */
-    seedPathDepths: number[];
-
-    /** BFS's frontier at the end of each level, in order — level 0 is the
-     *  origin seed set. Lets a debug replay show the coarse-graph search
-     *  expanding outward before any of the corridor/RAPTOR stages. */
-    bfsLevels: LatLng[][];
-    /** The BFS exploration tree's (parent, child) edges as LatLng pairs —
-     *  lets a debug overlay draw the search as a connected "web" (merged
-     *  polylines along tree branches) instead of per-stop dots. */
-    bfsTreeEdges: { from: LatLng; to: LatLng }[];
-    /** RAPTOR's marked-stop set at the END of each round, one entry per
-     *  round actually run. Lets a debug overlay show the search frontier
-     *  expanding round by round. */
-    roundMarkedStops: LatLng[][];
-    /** One tapered-buffer outline per seed path (left/right boundary
-     *  polylines) — lets a debug overlay draw the corridor as a single
-     *  shape instead of scattering a marker over every tagged stop. */
-    corridorBoundary: { left: LatLng[]; right: LatLng[] }[];
-    /** Fixed walk-tolerance radius circles at origin/destination — see
-     *  corridorTagging.ts's ORIGIN_DEST_WALK_RADIUS_M. These get unioned
-     *  into the real corridor regardless of the taper, so without drawing
-     *  them explicitly the debug view understates the corridor's true
-     *  extent at both ends. */
-    walkRadiusCircles: { center: LatLng; radiusMeters: number }[];
-    /** RAPTOR route-check polylines, one list per round — every individual
-     *  candidate route examined during that round. Meant to be displayed
-     *  one at a time (see DebugMapOverlay.tsx's flattenRaptorSteps), not
-     *  accumulated. Populated by the native/Rust path only; the TS path
-     *  below doesn't emit per-pattern debug events, so it stays empty
-     *  there — that's fine, computeGtfsRouteNative is the primary path. */
-    routeChecks: LatLng[][][];
-}
-
-export interface GtfsRouteResult {
-    journeys: GtfsJourney[]; // sorted by arrival time ascending; caller can re-sort
-    /** Only populated when computeGtfsRoute is called with debugMode=true —
-     *  omitted entirely otherwise so normal searches pay zero cost for this. */
-    debug?: GtfsDebugInfo;
-}
+export type { RouteStop, RouteSegment, GtfsJourney, GtfsDebugInfo, GtfsRouteResult } from './routeTypes';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Nearest-stops helper (in-memory linear scan — fine at ~20K stops)

@@ -1,5 +1,5 @@
 import type { LatLng } from '@/services/places/places';
-import type { GtfsJourney, RouteStop } from '@/services/gtfs/router/raptorRouter';
+import type { GtfsJourney, RouteStop } from '@/services/gtfs/router/routeTypes';
 import { encodeLine } from './lineCodec';
 
 type StepBase = { from: string; to: string; end: LatLng };
