@@ -1,16 +1,9 @@
-import {type DB as OPSQLiteDB, open, type Transaction as OPSQLiteTx} from '@op-engineering/op-sqlite';
+import {type DB as OPSQLiteDB, open} from '@op-engineering/op-sqlite';
 import * as FileSystem from 'expo-file-system/legacy';
 
-// The file op-sqlite (and the Rust engine, via getCurrentDbPath() callers)
-// currently point at. null means "no database selected yet" — there is
-// deliberately no legacy default file here any more: every real database
-// now comes from an explicit import via gtfsDbRegistry.ts, and the app
-// startup path (see app/_layout.tsx's restoreActiveDatabase() call) is
-// expected to call setActiveDbPath() before anything else touches the db.
-// Falling back to a fixed default path silently was the bug that caused a
-// stale/wrong file to be queried after a restart — better to fail loudly
-// via getDb()'s "no database selected" error than to succeed against the
-// wrong data.
+// The database file op-sqlite and the Rust engine use. null means none is selected.
+// There is no default file on purpose: querying a stale default after a restart was a past
+// bug, so getDb() fails loudly instead.
 let currentDbPath: string | null = null;
 
 export function getCurrentDbPath(): string | null {
@@ -18,29 +11,19 @@ export function getCurrentDbPath(): string | null {
 }
 
 /**
- * Switches which on-disk .db file getDb()/getOrCreateDbForImport() open.
- * Drops the cached op-sqlite connection (if any) so the NEXT call reopens
- * against the new path instead of silently continuing to serve queries
- * against the old file. Does not touch the Rust router engine's own
- * warmedUpPath cache — callers (gtfsDbRegistry.ts) are expected to also call
- * invalidateNativeRouter() so the next route search re-warms against the
- * new path too.
+ * Points getDb() at another file and drops the open connection.
+ * Callers also reset the router engine and stop caches, see gtfsDbRegistry.ts.
  */
 export function setActiveDbPath(path: string): void {
     if (path === currentDbPath) return;
     currentDbPath = path;
-    _db = null;
+    dbPromise = null;
 }
 
-/**
- * Clears the active database entirely (back to the "nothing selected"
- * state) — used when the currently-active database is deleted and there's
- * no other one to fall back to. Distinct from setActiveDbPath() since that
- * function's no-op-if-unchanged check can't express "go back to null".
- */
+/** Back to "nothing selected". A separate function because setActiveDbPath ignores unchanged paths. */
 export function clearActiveDbPath(): void {
     currentDbPath = null;
-    _db = null;
+    dbPromise = null;
 }
 
 export async function isDbReady(): Promise<boolean> {
@@ -49,168 +32,68 @@ export async function isDbReady(): Promise<boolean> {
     return exists;
 }
 
-/**
- * Compatibility wrapper around op-sqlite's DB object.
- *
- * WHY THIS EXISTS: op-sqlite's API shape differs from expo-sqlite's in two
- * ways that matter for the rest of this codebase:
- *
- * 1. op-sqlite's execute() only runs the FIRST statement in a
- *    semicolon-separated SQL string (expo-sqlite's execAsync ran all of
- *    them). Every multi-statement PRAGMA/DDL block that used to be one
- *    execAsync call is split and run sequentially inside execAsync() below,
- *    so every existing call site keeps working unchanged.
- *
- * 2. op-sqlite's transaction model passes an explicit `tx` object to the
- *    callback (`db.transaction(async (tx) => { tx.execute(...) })`) —
- *    there's no implicit "just keep calling db.execute() inside the
- *    callback and it magically joins the transaction" behavior the way
- *    expo-sqlite's withTransactionAsync had. topologyGraphStore.ts's
- *    savePersistedGraph() calls db.execAsync/db.runAsync DIRECTLY inside
- *    its withTransactionAsync callback (not a passed tx) — a naive wrapper
- *    would silently lose the atomicity that fix depended on (each
- *    statement would go back to being its own implicit commit). Fixed
- *    here via a mutable `currentTx` field: withTransactionAsync sets it
- *    for the duration of the callback, and every other method routes
- *    through it when set. This mirrors expo-sqlite's implicit-context
- *    behavior explicitly. Safe under this codebase's existing invariant of
- *    exactly one config connection used serially (see getDb()'s _db
- *    singleton) — op-sqlite's own docs make the same recommendation
- *    ("DO NOT OPEN MORE THAN ONE CONNECTION PER DATABASE").
- */
+/** op-sqlite behind the expo-sqlite style calls the rest of the app uses. */
 export class SQLiteDatabase {
     private raw: OPSQLiteDB;
-    private currentTx: OPSQLiteTx | null = null;
 
     constructor(raw: OPSQLiteDB) {
         this.raw = raw;
     }
 
     async getAllAsync<T>(sql: string, params: any[] = []): Promise<T[]> {
-        const {rows} = await this.target().execute(sql, params);
+        const {rows} = await this.raw.execute(sql, params);
         return (rows ?? []) as unknown as T[];
     }
 
+    /** Runs each statement in turn, because op-sqlite's execute() only runs the first one. */
     async execAsync(sql: string): Promise<void> {
         const statements = sql.split(';').map(s => s.trim()).filter(Boolean);
         for (const stmt of statements) {
-            await this.target().execute(stmt);
+            await this.raw.execute(stmt);
         }
     }
 
     async runAsync(sql: string, params: any[] = []): Promise<{ lastInsertRowId: number; changes: number }> {
-        const res = await this.target().execute(sql, params);
+        const res = await this.raw.execute(sql, params);
         return {lastInsertRowId: res.insertId ?? 0, changes: res.rowsAffected ?? 0};
-    }
-
-    async withTransactionAsync(fn: () => Promise<void>): Promise<void> {
-        await this.raw.transaction(async (tx) => {
-            this.currentTx = tx;
-            try {
-                await fn();
-            } finally {
-                this.currentTx = null;
-            }
-        });
-    }
-
-    private target(): OPSQLiteDB | OPSQLiteTx {
-        return this.currentTx ?? this.raw;
     }
 }
 
-let _db: SQLiteDatabase | null = null;
+let dbPromise: Promise<SQLiteDatabase> | null = null;
 
-export async function getDb(): Promise<SQLiteDatabase> {
-    if (_db) return _db;
+/** The shared connection. Concurrent callers share one open, since op-sqlite wants one connection per file. */
+export function getDb(): Promise<SQLiteDatabase> {
+    if (!dbPromise) {
+        const opening = openDb();
+        dbPromise = opening;
+        // A failed open is not cached, so a later call can retry once the file exists.
+        opening.catch(() => {
+            if (dbPromise === opening) dbPromise = null;
+        });
+    }
+    return dbPromise;
+}
 
+async function openDb(): Promise<SQLiteDatabase> {
     if (!currentDbPath) {
         throw new Error('No GTFS database selected. Import or pick one in Settings → GTFS data.');
     }
-
-    const ready = await isDbReady();
-    if (!ready) {
+    if (!(await isDbReady())) {
         throw new Error('GTFS database not found. Download it first.');
     }
 
-    return openAndCache();
-}
-
-/**
- * Dev/debug-only counterpart to getDb() — creates the SQLite/ folder and
- * an empty db file at currentDbPath if neither exists yet, then opens it,
- * instead of throwing. Used by the import flow (gtfsDbImport.ts /
- * gtfsInsertBenchmark.ts) which needs to run on a fresh device BEFORE the
- * normal download-a-prebuilt-db flow has ever happened (that's the whole
- * point of on-device building), so it can't go through getDb()'s "must
- * already be downloaded" check the rest of the app relies on.
- *
- * Deliberately NOT used by any normal app code path — a real user's app
- * should still fail loudly via getDb() if its expected db is missing,
- * rather than silently opening an empty one that then produces confusing
- * "no routes found" behavior instead of a clear "please download" error.
- */
-export async function getOrCreateDbForImport(): Promise<SQLiteDatabase> {
-    if (_db) return _db;
-
-    if (!currentDbPath) {
-        throw new Error('No database path set — call setActiveDbPath() first (see gtfsDbRegistry.ts).');
-    }
-
-    const ready = await isDbReady();
-    if (!ready) {
-        const dir = currentDbPath.slice(0, currentDbPath.lastIndexOf('/') + 1);
-        await FileSystem.makeDirectoryAsync(dir, {intermediates: true}).catch(() => {
-        });
-        // Opening a non-existent file with op-sqlite creates it — no
-        // explicit "create empty file" step needed beyond ensuring the
-        // parent directory exists first.
-    }
-
-    return openAndCache();
-}
-
-async function openAndCache(): Promise<SQLiteDatabase> {
-    if (!currentDbPath) {
-        // Both callers above (getDb/getOrCreateDbForImport) already guard on
-        // this — reaching here with a null path would be a bug in one of
-        // them, not a normal runtime condition.
-        throw new Error('openAndCache() called with no active database path set.');
-    }
-
-    // op-sqlite's `location` option: verify this against op-sqlite's docs
-    // for your installed version before relying on it — the docs snippet
-    // available at migration time showed `location` used for attach() with
-    // a relative-path-prepended-to-filename semantic, but didn't fully
-    // spell out open()'s resolution rules for a custom absolute directory
-    // like the one this app already uses via expo-file-system. If this
-    // doesn't resolve to currentDbPath as expected, check op-sqlite's
-    // "Gotchas" page for the current location/path resolution behavior.
     const lastSlash = currentDbPath.lastIndexOf('/');
     const name = currentDbPath.slice(lastSlash + 1);
     const location = currentDbPath.slice(0, lastSlash + 1);
-    const raw = open({name, location});
+    const db = new SQLiteDatabase(open({name, location}));
 
-    const db = new SQLiteDatabase(raw);
-
-    // Same PRAGMAs as before — execAsync splits this into 4 separate
-    // execute() calls internally now, since op-sqlite's execute() only
-    // runs the first statement of a multi-statement string.
     await db.execAsync(`
         PRAGMA journal_mode = WAL;
         PRAGMA cache_size   = -8000;
         PRAGMA temp_store   = MEMORY;
         PRAGMA mmap_size    = 268435456;
     `);
-
-    _db = db;
-    return _db;
+    return db;
 }
 
-// LatLng type kept here (used by this file's own DB-facing signatures).
-// Places/Google API code (SearchPlace, SearchOptions, searchPlaces,
-// TravelMode) lives ONLY in places/places.ts — import from there directly.
-// The previous re-export shim here has been removed now that this file
-// lives in db/ alongside other DB-connection-only modules; sqliteDb.ts
-// should own DB connection concerns only, per its module doc above.
 export type LatLng = { latitude: number; longitude: number };

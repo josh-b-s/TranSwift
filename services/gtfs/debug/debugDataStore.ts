@@ -46,10 +46,6 @@ export function publishDebugData(info: GtfsDebugInfo | null | undefined): DebugM
     };
 }
 
-export function getBfsCandidateSteps(): BfsCandidateStep[] {
-    return candidateSteps;
-}
-
 /** Subscribes to the version in Redux, returns the module-level data. The
  *  returned object is identity-stable until the next publishDebugData, so
  *  it's safe as a useMemo dependency. */
