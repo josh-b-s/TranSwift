@@ -135,3 +135,15 @@ build via `uniffi-bindgen-react-native`, see their `npm run build:*` scripts
 in `package.json`. GTFS data can be preprocessed either with
 `npm run preprocess-gtfs` or from within the app itself, via the GTFS
 settings screen (`app/(tabs)/settings/gtfs.tsx`).
+
+Unit tests run with `npm test` (node's built-in runner, no extra dependencies). They cover the stop
+departures query against the real GTFS schema in an in-memory SQLite, the stop cache, and the trip maths.
+
+## Layout
+
+- `app/` Expo Router screens.
+- `components/` grouped by feature: `debug`, `map`, `search`, `sheets`, `trip`, `ui`.
+- `hooks/` React hooks that glue services to screens.
+- `services/gtfs/` `core` (stop cache, keys, route types), `router` (Rust engine adapter, warm-up, result types),
+  `departures`, `import`, `catalog`, `suggestion`, `realtime`, `debug`.
+- `store/` Redux slices. `scripts/` GTFS preprocessing. `tests/` unit tests.
