@@ -7,34 +7,17 @@ import { flattenRaptorSteps, flattenHopColoredCandidates, hopColor, depthColor }
 import { useDebugData, useBfsCandidateSteps } from '@/services/gtfs/debug/debugDataStore';
 
 const BFS_HULL_COLOR = '#3b82f6';
-// NOTE: was a single fixed amber for every bfs candidate regardless of
-// depth — replaced by depthColor() (debugBfsPoints.ts) below, so this
-// constant is gone rather than left unused.
 const RAPTOR_HULL_COLOR = '#ef4444';
-// Fallback only — the actual route-check polyline uses the pattern's real
-// GTFS route_color (see raptorView below) when the feed provides one; this
-// is just what shows for the rare pattern with no color set.
+// Fallback only: route-check polylines normally use the pattern's GTFS route_color (see raptorView).
 const RAPTOR_ROUTE_COLOR_FALLBACK = '#ef4444';
 
 type Pt = { latitude: number; longitude: number };
 
 /**
- * Minimal convex hull (monotone chain / Andrew's algorithm) over a small
- * set of lat/lon points. Used for BOTH phases now: BFS's per-round
- * frontier and RAPTOR's per-round marked-stop frontier — same shape of
- * data (a round -> set-of-stops snapshot), same reason to hull it instead
- * of drawing N Circles (see the original rationale below).
- *
- * Why this replaces the old per-stop Circle rendering: react-native-maps
- * backs every <Circle> with a real native Google Maps object, so N stops
- * meant N native allocations + N bridge crossings per render — that's what
- * forced the old MAX_DEBUG_MARKERS sampling cap (corridor stops hit 1359,
- * RAPTOR rounds hit 2000-3000 marked stops, both OOM'd unsampled). A
- * Polygon/Polyline is ONE native object regardless of point count, so
- * there's no cap needed here at all.
- *
- * Falls back to returning the points as-is for <3 points (no polygon is
- * meaningful yet).
+ * Convex hull (monotone chain) of a small set of lat/lon points, used for both the BFS frontier and RAPTOR's marked stops.
+ * A Polygon is one native object however many points it has. A <Circle> per stop meant thousands of native allocations
+ * (corridor stops hit 1359, RAPTOR rounds 2000-3000) and ran out of memory.
+ * Returns the points as-is for fewer than 3.
  */
 function convexHull(points: Pt[]): Pt[] {
     if (points.length < 3) return points;
@@ -63,28 +46,20 @@ function convexHull(points: Pt[]): Pt[] {
         upper.push(p);
     }
 
-    // Last point of each list is the first point of the other — drop the
-    // duplicates before concatenating into the closed ring.
+    // Each list's last point is the other's first. Drop the duplicates before closing the ring.
     upper.pop();
     lower.pop();
     return [...lower, ...upper];
 }
 
-/** Middle point (by point count, not distance) of a polyline — good enough
- *  for "roughly where to put a label," not meant to be the geometric
- *  midpoint by length. */
+/** Middle point of a polyline by point count, good enough for placing a label. */
 function midpoint(coords: Pt[]): Pt {
     return coords[Math.floor(coords.length / 2)];
 }
 
 /**
- * Shared route-name label — a small pill anchored at a route's midpoint.
- * The ONE place both debug phases and (eventually) normal route rendering
- * can pull this from, per the ask to keep the rendering approach
- * consistent rather than each spot reinventing its own label. Currently
- * only wired up for the raptor phase, since that's the one place a single
- * pattern (and therefore a single unambiguous name) is guaranteed — see
- * this file's header note on why bfs candidates don't use it yet.
+ * Route-name pill anchored at a route's midpoint. Only used in the raptor phase, where a candidate is a single pattern
+ * with an unambiguous name.
  */
 function RouteNameLabel({ coords, name, color }: { coords: Pt[]; name?: string; color: string }) {
     if (!name || coords.length === 0) return null;
@@ -99,52 +74,22 @@ function RouteNameLabel({ coords, name, color }: { coords: Pt[]; name?: string; 
 }
 
 /**
- * Renders the CURRENT active unit of the last debug-mode search — not a
- * cumulative replay, except where noted (bfs's 'cumulative' candidate
- * mode, and hopColorMode below). Two phases:
+ * Renders the current step of the last debug search (not a replay, except bfs 'cumulative' mode).
+ * Must be a child of <MapView>; renders nothing when debug is off or has no data.
  *
- *  - bfs: corridor-finding. Candidate display has two INDEPENDENT toggles
- *    (both in DebugControls.tsx):
- *      - state.bfsCandidateMode ('cumulative' | 'single') — WHICH
- *        candidates are visible, gated by stepIndex/round-discovery. See
- *        bfsView below, unchanged from before.
- *      - state.hopColorMode (boolean) — HOW a visible candidate's shape is
- *        colored. When true, this OVERRIDES bfsView's flat-amber
- *        candidate rendering for whichever candidate(s) bfsCandidateMode/
- *        stepIndex currently makes visible (the current candidate alone in
- *        'single' mode, the round-gated set in 'cumulative' mode) — each of
- *        THOSE candidates' every hop is drawn, colored by hopColor() (real
- *        route_color when the hop has one, else a synthetic per-hop-index
- *        palette, else a fixed gray for walk legs). It does not change
- *        WHICH candidates are visible, only how the visible one(s) are
- *        colored. The round hull still renders underneath for context
- *        either way.
- *    Either mode draws candidates with each pattern's real GTFS shape
- *    (trimmed to the ridden portion) rather than a straight stop-to-stop
- *    line where the Rust side could resolve one — see lib.rs's
- *    shaped_edge_coords. No corridor-boundary polygon or walk-radius
- *    circles anymore — both were debug-visualization-only (routing never
- *    read them) and the app doesn't use geometric corridor filtering.
+ * bfs: two independent toggles from DebugControls.tsx. bfsCandidateMode ('cumulative' | 'single') decides which
+ * candidates are visible, see bfsView. hopColorMode decides how they are colored: when true, each visible candidate's
+ * hops are drawn via hopColor() (route_color, else a per-hop palette, else gray for walks) instead of the flat view.
+ * The round hull stays underneath either way. Candidates use each pattern's GTFS shape trimmed to the ridden part when
+ * Rust could resolve one (lib.rs's shaped_edge_coords).
  *
- *  - raptor: stepped per individual candidate-route check (see RaptorStep),
- *    NOT accumulated — only the current step's route polyline is drawn,
- *    replaced each step, since RAPTOR here only walks the small
- *    corridor-restricted candidate set. That polyline is the FULL
- *    journey-so-far — connected back through earlier rounds' boarding
- *    history, not just this round's isolated segment — colored by the
- *    pattern's real GTFS route_color when the feed has one, with its name
- *    shown via RouteNameLabel. The round's marked-stop hull is drawn
- *    alongside it for context. hopColorMode has no effect here — it's
- *    bfs-only (see DebugControls.tsx, which only shows the toggle during
- *    the bfs phase).
- *
- * Must be rendered as a child of <MapView>. Renders nothing when debug mode
- * is off or there's no data yet.
+ * raptor: one candidate-route check per step, replaced each step. The polyline is the full journey so far, colored by
+ * the pattern's route_color and labeled via RouteNameLabel, with the round's marked-stop hull beside it.
+ * hopColorMode has no effect here.
  */
 export default function DebugMapOverlay() {
     const { enabled, phase, stepIndex, bfsCandidateMode, hopColorMode } = useSelector((s: RootState) => s.debug);
-    // Data lives outside Redux (see debugDataStore.ts); candidate steps are
-    // computed once per search there, not on every render.
+    // Data lives outside Redux (debugDataStore.ts); candidate steps are computed once per search there.
     const data = useDebugData();
     const bfsCandidateSteps = useBfsCandidateSteps();
 
@@ -163,20 +108,9 @@ export default function DebugMapOverlay() {
         const round = Math.min(stepIndex, Math.max(0, levels.length - 1));
         const hull = convexHull(levels[round] ?? []);
 
-        // "candidates found so far" only grows as stepIndex advances —
-        // matches bfs's round-by-round exploration semantics instead of
-        // showing everything at once. Reuses bfsCandidateSteps' per-
-        // candidate round (flattenBfsCandidates, same helper 'single' mode
-        // uses below) as the single source of truth for "what round was
-        // this candidate discovered." An earlier version of this file
-        // derived round-membership inline via exact keyOfPt() equality
-        // against bfsLevels — that broke once seedPath endpoints started
-        // coming from trimmed real GTFS shape geometry (see
-        // debugSinkCollector.ts) instead of the literal stop coordinate,
-        // since a shape-trimmed point is near a bfsLevels stop but almost
-        // never bit-for-bit equal to it, so the exact match silently
-        // matched nothing and this view showed zero candidates. See
-        // flattenBfsCandidates' tolerance-based match in debugBfsPoints.ts.
+        // Candidates found so far grow as stepIndex advances. Uses bfsCandidateSteps' per-candidate round as the single source
+        // for discovery round. Matching bfsLevels by exact keyOfPt() equality broke once seedPath endpoints came from trimmed
+        // shapes (see debugBfsPoints.ts's tolerance match) and showed zero candidates.
         const candidates = bfsCandidateSteps
             .filter(c => c.round <= round && c.path.length > 1)
             .map(c => ({ path: c.path, depth: c.depth, pathIndex: c.pathIndex }));
@@ -184,18 +118,8 @@ export default function DebugMapOverlay() {
         return { hull, candidates };
     }, [data, phase, stepIndex, bfsCandidateMode, bfsCandidateSteps]);
 
-    // Hop-colored view: every hop of whichever candidate(s) are CURRENTLY
-    // VISIBLE per bfsView — i.e. the same one candidate in 'single' mode,
-    // or the same round-gated set in 'cumulative' mode. This used to ignore
-    // stepIndex/bfsCandidateMode entirely and show every candidate's every
-    // hop all at once regardless of which candidate you'd stepped to — in
-    // 'single' mode that meant stepping through candidates did nothing
-    // visually (still every candidate overlaid), which reads as "stuck
-    // replaying the same handful of journeys" and "multiple lines in the
-    // single-candidate view." Restricting to bfsView's own candidate set
-    // keeps hopColorMode doing what it says on the tin — recolor the
-    // visible candidate(s) by hop — without changing WHICH candidates are
-    // visible, which is still bfsCandidateMode/stepIndex's job.
+    // Hop-colored view: every hop of the candidates bfsView currently shows (one in 'single' mode, the round-gated set in
+    // 'cumulative'). Ignoring stepIndex here once made single mode look stuck, with every candidate overlaid.
     const hopColoredHops = useMemo(() => {
         if (!data || phase !== 'bfs' || !hopColorMode || !bfsView) return [];
         const visiblePathIndices = new Set(bfsView.candidates.map(c => c.pathIndex));
@@ -227,13 +151,7 @@ export default function DebugMapOverlay() {
                 />
             )}
 
-            {/* Flat candidate view — suppressed when hopColorMode is on
-                (hopColoredHops below replaces it entirely rather than
-                layering on top). Colored by DEPTH now (see depthColor) —
-                shallower/fewer-transfer candidates read as warmer colors,
-                deeper ones cooler — instead of every candidate being the
-                same fixed amber regardless of how many transfers it took
-                to find it. */}
+            {/* Flat candidate view, suppressed when hopColorMode is on. Colored by depth: fewer transfers read warmer. */}
             {phase === 'bfs' && !hopColorMode && bfsView?.candidates.map(({ path, depth }, i) => (
                 path.length >= 2 && (
                     <Polyline
@@ -245,10 +163,7 @@ export default function DebugMapOverlay() {
                 )
             ))}
 
-            {/* Hop-colored candidate view — every hop of whichever
-                candidate(s) bfsView currently has visible, each hop colored
-                by hopColor() (real route_color / per-hop-index palette /
-                walk gray). See hopColorMode's doc comment above. */}
+            {/* Hop-colored candidate view: every hop of the visible candidates, colored by hopColor(). */}
             {phase === 'bfs' && hopColorMode && hopColoredHops.map(hop => (
                 hop.coords.length >= 2 && (
                     <Polyline
@@ -261,9 +176,7 @@ export default function DebugMapOverlay() {
                 )
             ))}
 
-            {/* RAPTOR's marked-stop frontier for the round the current
-                route-check belongs to — context for "where in the search
-                this candidate sits," not the focus itself. */}
+            {/* RAPTOR's marked-stop frontier for the round of the current check, as context. */}
             {phase === 'raptor' && raptorView && raptorView.hull.length >= 3 && (
                 <Polygon
                     coordinates={raptorView.hull as MapLatLng[]}
@@ -273,10 +186,7 @@ export default function DebugMapOverlay() {
                 />
             )}
 
-            {/* The actual focus of the raptor phase: ONE candidate route,
-                replaced each step rather than accumulated. Colored by the
-                pattern's real GTFS route_color when the feed has one, with
-                its name/number labeled via the shared RouteNameLabel. */}
+            {/* The focus of the raptor phase: one candidate route, replaced each step, in the pattern's route_color with its name via RouteNameLabel. */}
             {phase === 'raptor' && raptorView && raptorView.route.length >= 2 && (
                 <>
                     <Polyline

@@ -1,12 +1,7 @@
 /**
- * preferencesStore.ts — on-disk persistence for user-editable app
- * preferences (theme mode, the walking-speed presets Search.tsx's pill
- * cycles through). Same one-JSON-file approach as gtfsDbRegistry.ts, for
- * the same reason: a handful of values, no need for a real table.
- *
- * store/preferences.slice.ts owns the in-memory/redux side and calls into
- * this file to load at startup and persist on every change; nothing else
- * should read/write PREFS_PATH directly.
+ * preferencesStore.ts: on-disk persistence for user preferences (theme mode, the walking-speed presets Search.tsx cycles through).
+ * One JSON file, like gtfsDbRegistry.ts, since it is a handful of values. store/preferences.slice.ts owns the redux side and
+ * calls this to load at startup and persist on change. Nothing else should touch PREFS_PATH.
  */
 
 import * as FileSystem from 'expo-file-system/legacy';

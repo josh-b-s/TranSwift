@@ -1,14 +1,8 @@
 // debugDataStore.ts
-//
-// Holds the (large) GtfsDebugInfo OUTSIDE Redux. A debug-mode search
-// produces thousands of coordinates; when that lived in `state.debug.data`
-// every dispatch paid for it: RTK's serializable/immutable-check
-// middleware deep-walked it (24s in the logs), Immer proxied/froze it, and
-// the advanceStep reducer re-ran flattenBfsCandidates against an Immer
-// draft of it 30x/sec during playback. Redux now only holds a small
-// `meta` (counts + a version number); the data itself lives here and
-// components read it through useDebugData(), which re-renders them when
-// the version bumps.
+// Holds the large GtfsDebugInfo outside Redux. A debug search produces thousands of coordinates. In state.debug.data every
+// dispatch paid for it: RTK's checks deep-walked it for 24s, Immer froze it, and advanceStep re-ran flattenBfsCandidates
+// on a draft 30 times a second. Redux holds only a small `meta` (counts and a version); components read the data through
+// useDebugData().
 
 import { useSelector } from 'react-redux';
 import type { RootState } from '@/store/store';
@@ -46,9 +40,10 @@ export function publishDebugData(info: GtfsDebugInfo | null | undefined): DebugM
     };
 }
 
-/** Subscribes to the version in Redux, returns the module-level data. The
- *  returned object is identity-stable until the next publishDebugData, so
- *  it's safe as a useMemo dependency. */
+/**
+ * Subscribes to the version in Redux and returns the module-level data. Identity-stable until the next publishDebugData,
+ * so it is safe as a useMemo dependency.
+ */
 export function useDebugData(): GtfsDebugInfo | null {
     useSelector((s: RootState) => s.debug.dataVersion);
     return current;

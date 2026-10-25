@@ -1,11 +1,6 @@
 /**
- * gtfsDbImport.ts — the settings screen's "Add zip" flow: pick a .zip from
- * the device, import it into a brand-new database file, and register it
- * (as the active one) in gtfsDbRegistry.ts.
- *
- * Kept separate from rustGtfsImporter.ts (the generic zip-path -> db-path
- * importer) and gtfsDbRegistry.ts (the list/active-selection bookkeeping)
- * so each file has one job.
+ * gtfsDbImport.ts: the settings screen's "Add zip" flow. Pick a zip, import it into a new database file,
+ * and register it as the active one.
  */
 
 import * as FileSystem from 'expo-file-system/legacy';
@@ -24,15 +19,10 @@ import {
 
 const SQLITE_DIR = `${FileSystem.documentDirectory}SQLite/`;
 
-/**
- * Opens the system file picker for a .zip. Returns null if the user
- * cancelled — not an error, callers should just no-op in that case.
- */
+/** Opens the system file picker for a zip. Returns null if the user cancelled. */
 export async function pickGtfsZip(): Promise<DocumentPicker.DocumentPickerAsset | null> {
     const result = await DocumentPicker.getDocumentAsync({
-        // Some Android file providers don't tag zips as application/zip, so
-        // the picker UI itself is the real filter — this is a hint, not
-        // strictly enforced everywhere.
+        // Some Android file providers don't tag zips as application/zip, so this type is only a hint.
         type: ['application/zip', 'application/x-zip-compressed'],
         copyToCacheDirectory: true,
         multiple: false,
@@ -42,17 +32,9 @@ export async function pickGtfsZip(): Promise<DocumentPicker.DocumentPickerAsset 
 }
 
 /**
- * Imports `zip` into a fresh database file and registers it, defaulting its
- * display name to the zip's own file name (minus .zip). onProgress mirrors
- * importGtfsZipToPath's per-table progress events.
- *
- * Before running the real import, hashes the zip (MD5, via op-sqlite's...
- * no — via expo-file-system's built-in md5 support, see getInfoAsync below)
- * and checks it against every already-imported feed's stored hash. A byte-
- * identical match throws DuplicateFeedError with the existing entry
- * attached, rather than silently re-running a multi-minute import into a
- * second, redundant database — callers (settings/gtfs.tsx) can catch that
- * specifically and offer to just select the existing one instead.
+ * Imports `zip` into a fresh database file and registers it, named after the zip by default.
+ * The zip is hashed first. A hash matching an imported feed throws DuplicateFeedError with that entry attached,
+ * so the settings screen can offer it instead of a multi-minute re-import.
  */
 export async function importZipAsNewDatabase(
     zip: { uri: string; name?: string },
@@ -60,9 +42,7 @@ export async function importZipAsNewDatabase(
     source?: FeedSource,
     signal?: AbortSignal,
 ): Promise<GtfsDatabaseEntry> {
-    // { md5: true } asks expo-file-system to compute the hash natively
-    // rather than reading the whole (potentially 100+MB) zip into JS memory
-    // just to hash it here.
+    // md5 is computed natively, so the zip (possibly 100+ MB) isn't read into JS memory.
     const { md5 } = await FileSystem.getInfoAsync(zip.uri, { md5: true }) as { md5?: string };
     if (md5) {
         const existing = await findDatabaseByHash(md5);

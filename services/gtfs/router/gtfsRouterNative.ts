@@ -1,7 +1,4 @@
-// gtfsRouterNative.ts
-//
-// Thin adapter over the uniffi-generated Rust GtfsRouterEngine, returning
-// the app's own GtfsRouteResult shape.
+// Thin adapter over the Rust GtfsRouterEngine that returns the app's GtfsRouteResult shape.
 
 import gtfsRouterRust from '@mapapp/gtfs-router-rust';
 import type {
@@ -27,10 +24,8 @@ const { GtfsRouterEngine } = gtfsRouterRust.gtfs_router;
 let engine: InstanceType<typeof GtfsRouterEngine> | null = null;
 let warmedUpPath: string | null = null;
 
-// warmUp/computeRoute are ASYNC now: the Rust side runs them on a worker
-// thread, so the JS thread (and UI) stays responsive during the ~12-14s
-// cold warm-up and every search. `warmUpPromise` coalesces concurrent
-// callers (app-launch warmup + an early first search) onto one warm-up.
+// warmUp and computeRoute run on a Rust worker thread, so the UI stays responsive during the 12-14s cold warm-up.
+// warmUpPromise joins concurrent callers (launch warm-up and an early first search) onto one warm-up.
 let warmUpPromise: Promise<void> | null = null;
 
 async function getEngine(dbPath: string): Promise<InstanceType<typeof GtfsRouterEngine>> {
@@ -48,12 +43,7 @@ async function getEngine(dbPath: string): Promise<InstanceType<typeof GtfsRouter
     return eng;
 }
 
-/**
- * Exposes the same singleton + warmedUpPath tracking getEngine() uses
- * internally, so gtfsWarmup.ts can pre-warm at app launch and the first
- * real search's own getEngine(dbPath) call sees warmedUpPath already set
- * and skips calling warm_up() a second time.
- */
+/** Exposes the engine singleton so gtfsWarmup.ts can warm it at launch; the first search then skips its own warm_up(). */
 export async function getNativeEngine(dbPath?: string | null) {
     if (dbPath) return getEngine(dbPath);
     if (!engine) engine = new GtfsRouterEngine();
@@ -76,12 +66,8 @@ function secToTimeString(sec?: number): string | undefined {
 }
 
 /**
- * loader.rs expects today_date/tomorrow_date as unhyphenated "YYYYMMDD"
- * (GTFS's own calendar/calendar_dates date format — see its doc comment:
- * `today_date: &str, // YYYYMMDD`), in LOCAL time, not UTC. `toISOString()`
- * gets both wrong at once: it's hyphenated ("2026-07-23") AND UTC-based, so
- * for any Melbourne search before ~10-11am local it would report the
- * previous UTC calendar day entirely, on top of the format mismatch.
+ * loader.rs wants GTFS-style YYYYMMDD in local time. toISOString() is hyphenated and UTC, so it gives the wrong
+ * day for early-morning searches in Melbourne.
  */
 function toGtfsDateString(d: Date): string {
     const y = d.getFullYear();
@@ -91,8 +77,7 @@ function toGtfsDateString(d: Date): string {
 }
 
 function toSegment(seg: import('@mapapp/gtfs-router-rust').RouteSegment): RouteSegment {
-    // segments live on Journey.segments directly (not nested under Leg) —
-    // see lib.rs's Journey struct.
+    // segments live on Journey.segments, not under Leg (see lib.rs).
     return {
         coords: seg.coords,
         routeName: seg.routeName,
@@ -109,9 +94,7 @@ function toSegment(seg: import('@mapapp/gtfs-router-rust').RouteSegment): RouteS
 }
 
 function toJourney(j: Journey): GtfsJourney {
-    // j.segments and j.legs are separate parallel arrays on Journey itself
-    // (see lib.rs) — segments are the fine-grained walk/transit polyline
-    // pieces, legs are the coarser "board here, alight there" summary.
+    // j.segments are the fine walk/transit polyline pieces; j.legs are the coarser board-here, alight-there summary.
     const segments = j.segments.map(toSegment);
     const first = j.legs[0];
     const last = j.legs[j.legs.length - 1];
@@ -144,10 +127,7 @@ function toJourney(j: Journey): GtfsJourney {
     };
 }
 
-/**
- * One-line-per-journey summary for the console, so different settings can be
- * A/B'd on the result (arrival, duration, transfers) and not just on timings.
- */
+/** One line per journey for the console, so settings can be compared on the result as well as the timings. */
 function summarizeJourneys(journeys: Journey[]): string {
     if (journeys.length === 0) return '[gtfsRouterNative] journeys: none';
     const lines = journeys.map((j, i) => {
@@ -162,21 +142,15 @@ function summarizeJourneys(journeys: Journey[]): string {
 }
 
 /**
- * Runs a search on the Rust RAPTOR engine. Resolves the currently-active
- * database path via getCurrentDbPath() on every call (rather than a path
- * param), so switching the selected database in settings/gtfs.tsx takes
- * effect on the next search without route.slice.ts's call site needing to
- * know about it. getEngine() already re-warms whenever the resolved path
- * differs from what it last warmed up against.
+ * Runs a search on the Rust RAPTOR engine. The database path is read on every call, so switching databases in settings
+ * takes effect on the next search.
  */
 export async function computeGtfsRouteNative(
     origin: LatLng,
     destination: LatLng,
     departureTime: Date = new Date(),
     walkingSpeedMps: number = 1.4, // WALK_SPEED_MPS.NORMAL
-    // TODO: not yet exposed to callers/UI — hardcoded until the front end
-    // has a real walk-tolerance control to wire through. Mirrors
-    // DEFAULT_MAX_WALK_DISTANCE_M in settings.rs (1.4 m/s * 20 min).
+    // TODO: hardcoded until the UI has a walk-limit control. Mirrors DEFAULT_MAX_WALK_DISTANCE_M in settings.rs (1.4 m/s for 20 min).
     maxWalkDistanceM: number = 1.4 * 20 * 60,
     debugMode: boolean = false,
 ): Promise<GtfsRouteResult> {
@@ -208,10 +182,7 @@ export async function computeGtfsRouteNative(
             collector?.sink ?? undefined, // pass the plain-object `sink`, not the collector wrapper — see debugSinkCollector.ts's header note on classes vs plain-object callback interfaces. undefined (not null) confirmed correct for the None case from the generated binding's FfiConverterOptional.
         );
 
-        // Diagnostic — per-stage breakdown, sourced from lib.rs's
-        // RouteResult.timings field (loader.rs's per-stage Instant timers +
-        // compute_route's own raptor_search timer). "total" is loader.rs's load time only;
-        // raptor_search is a separate top-level entry, not summed into it.
+        // Per-stage timings from lib.rs's RouteResult.timings. "total" is the load time only; raptor_search is a separate entry.
         try { console.log(summarizeJourneys(result.journeys)); } catch { /* logging only */ }
         // Logging must never fail a route: fall back to the raw one-line format.
         try {

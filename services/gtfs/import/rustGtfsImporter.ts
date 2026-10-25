@@ -1,17 +1,6 @@
 /**
- * rustGtfsImporter.ts — thin bridge from the app to the native Rust
- * import_gtfs() (see modules/gtfs-importer/rust/src/lib.rs and import.rs).
- *
- * importGtfsZipToPath() is the generic entry point: given an explicit zip
- * file and target .db path, it runs the native import and reports progress.
- * gtfsDbImport.ts (the settings screen's "Add zip" flow) calls this with a
- * fresh per-import db path from gtfsDbRegistry.ts, rather than the old
- * single-fixed-db-file/single-incoming-folder flow this file used to own.
- *
- * NOTE: ProgressCallback (from generated/gtfs_importer.ts) is a TypeScript
- * interface, not a class — it doesn't exist at runtime, so it can't be
- * `extends`-ed. Pass a plain object literal matching the interface shape
- * instead; ubrn's FfiConverterObjectWithCallbacks wraps it for the FFI call.
+ * rustGtfsImporter.ts: bridge to the native Rust import_gtfs() (modules/gtfs-importer/rust).
+ * ProgressCallback is a TypeScript interface, so it can't be extended. Pass a plain object literal; ubrn wraps it for the FFI call.
  */
 
 import {cancelImport, importGtfs, type ProgressCallback} from '@mapapp/gtfs-importer';
@@ -19,18 +8,14 @@ import {CancelledError} from './cancelledError';
 
 export type ImportProgressEvent = { table: string; inserted: number; total: number };
 
-// expo-file-system always includes the file:// scheme on uris/paths it
-// hands back, but std::fs::read on the Rust side wants a bare filesystem
-// path.
+// expo-file-system returns file:// paths, but the Rust side's std::fs::read wants a bare path.
 function stripFileScheme(p: string): string {
     return p.startsWith('file://') ? p.slice('file://'.length) : p;
 }
 
 /**
- * Runs the native Rust GTFS import from `zipPath` straight into `dbPath`
- * (a fresh, not-yet-existing file — the importer creates it). onProgress
- * fires per-table (and periodically mid-table for the two big ones,
- * stop_times/shapes — see import.rs's `% 200_000` progress calls).
+ * Runs the native import from `zipPath` into `dbPath`, a new file the importer creates.
+ * onProgress fires per table, and every 200,000 rows for stop_times and shapes.
  */
 export async function importGtfsZipToPath(
     zipPath: string,
@@ -43,9 +28,7 @@ export async function importGtfsZipToPath(
 
     console.log(`[rustGtfsImporter] starting import of ${zipPath} -> ${dbPath}`);
 
-    // Track a per-table start time so we can log a duration when a table
-    // finishes (i.e. when the next progress event names a different table,
-    // or when the whole import completes).
+    // Per-table start times, to log a duration when the next table's progress event arrives or the import completes.
     let currentTable: string | null = null;
     let tableStart = Date.now();
     let lastLoggedPercent = -1;
@@ -67,8 +50,7 @@ export async function importGtfsZipToPath(
                 console.log(`[rustGtfsImporter] starting table: ${table} (${elapsed()} total)`);
             }
 
-            // Throttle per-row logs to every 10% so big tables (stop_times,
-            // shapes) don't flood the console.
+            // Log every 10% so big tables don't flood the console.
             const percent = totalNum > 0 ? Math.floor((insertedNum / totalNum) * 100) : 0;
             if (percent >= lastLoggedPercent + 10 || insertedNum === totalNum) {
                 lastLoggedPercent = percent;

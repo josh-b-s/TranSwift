@@ -11,9 +11,10 @@ export const computeRoute = createAsyncThunk<
         origin: LatLng;
         destination: LatLng;
         debugMode?: boolean;
-        /** Undefined -> computeGtfsRouteNative's own default (`new Date()` at call
-         *  time, i.e. "leave now"). Passed through as-is, not defaulted here,
-         *  so "now" is always the actual moment of search. */
+        /**
+         * Undefined -> computeGtfsRouteNative's own default (`new Date()` at call time, i.e. "leave now"). Passed through as-is so
+         * "now" is the actual moment of search.
+         */
         departureTime?: Date;
         /** Undefined -> computeGtfsRouteNative's own default (1.4 m/s). */
         walkingSpeedMps?: number;
@@ -21,18 +22,12 @@ export const computeRoute = createAsyncThunk<
     { rejectValue: string }
 >('route/compute', async ({ origin, destination, debugMode = false, departureTime, walkingSpeedMps }, { rejectWithValue, dispatch }) => {
     try {
-        // maxWalkDistanceM (undefined -> computeGtfsRouteNative's own
-        // hardcoded default) not yet exposed on this thunk's args — see
-        // TODO in gtfsRouterNative.ts.
+        // maxWalkDistanceM (undefined -> computeGtfsRouteNative's hardcoded default) is not exposed on this thunk yet, see the TODO
+        // in gtfsRouterNative.ts.
         const result = await computeGtfsRouteNative(origin, destination, departureTime, walkingSpeedMps, undefined, debugMode);
-        // Dispatched here (inside the thunk) rather than via route.slice's own
-        // extraReducers, since debug data belongs in debug.slice, not route
-        // state — this keeps "what journey is displayed" and "what did the
-        // search look like internally" as separate concerns.
-        // The big debug payload goes to the module-level store; only its
-        // small meta enters Redux. Also DON'T return `result` as-is: a
-        // thunk's return value becomes the `fulfilled` action payload, which
-        // RTK's dev middleware deep-walks — so strip `debug` from it.
+        // Dispatched inside the thunk because debug data belongs in debug.slice, not route state. The big payload goes to the
+        // module-level store and only its small meta enters Redux. Don't return `result` as-is: a thunk's return value becomes the
+        // `fulfilled` payload, which RTK's dev middleware deep-walks, so strip `debug` from it.
         dispatch(setDebugData(publishDebugData(debugMode ? result.debug : null)));
         return { journeys: result.journeys };
     } catch (err) {
@@ -43,16 +38,12 @@ export const computeRoute = createAsyncThunk<
 });
 
 type State = {
-    // All journeys found for the current search (Pareto-optimal set: fastest,
-    // least walking, fewest transfers, etc). Populated by computeRoute; used
-    // by the bottom sheet to let the user pick/sort between options.
+    // Every journey found for the current search (the Pareto-optimal set). The bottom sheet lets the user pick between them.
     journeys: GtfsJourney[];
     selectedJourneyIndex: number;
 
-    // NOTE: the displayed journey is NOT copied into flat state fields any
-    // more (that held every polyline twice in the store, and Immer froze /
-    // RTK's dev middleware walked both copies). Read it with the
-    // `selectDisplayedJourney` selector below — journeys[selectedJourneyIndex].
+    // The displayed journey is not copied into flat state fields: that held every polyline twice, and Immer and RTK's dev
+    // middleware walked both copies. Read it with `selectDisplayedJourney` below.
 
     loading: boolean;
     error?: string | null;

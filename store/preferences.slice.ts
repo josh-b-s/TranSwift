@@ -29,10 +29,8 @@ const initialState: State = {
     loaded: false,
 };
 
-// Fire-and-forget persistence — every reducer below mutates state via Immer
-// and then calls this with the plain resulting values. Not awaited: a
-// preferences write failing shouldn't block the UI update that triggered it,
-// only log so it's visible in dev.
+// Fire and forget: reducers mutate state through Immer, then call this with the plain values. Not awaited, so a failed
+// write doesn't block the UI update. It only logs.
 function persist(state: State) {
     saveStoredPreferences({ themeMode: state.themeMode, walkingSpeeds: state.walkingSpeeds, speedUnit: state.speedUnit }).catch(err => {
         console.warn('[preferences] failed to persist:', err);

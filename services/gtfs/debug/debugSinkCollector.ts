@@ -1,68 +1,23 @@
 // debugSinkCollector.ts
+// Bridges the Rust engine's DebugEvent callback stream into one batched GtfsDebugInfo for debug.slice.ts and DebugMapOverlay.tsx.
 //
-// Bridges the Rust engine's live DebugEvent callback stream into one
-// batched GtfsDebugInfo object for debug.slice.ts / DebugMapOverlay.tsx.
+// DebugSink is a TS interface, so ubrn needs a plain object literal, not a class instance. A class threw
+// "Cannot lower this object to a pointer" the first time a real search passed one in (same pattern as
+// rustGtfsImporter.ts's progressCallback).
 //
-// IMPORTANT: DebugSink (like ProgressCallback in rustGtfsImporter.ts) is a
-// plain TS interface, not a class — it doesn't exist at runtime, so ubrn's
-// FfiConverterObjectWithCallbacks needs a plain object literal implementing
-// its shape, not a class instance. An earlier version of this file was a
-// class (`class DebugSinkCollector implements DebugSink`), which threw
-// "Cannot lower this object to a pointer" the moment a real search passed
-// an actual instance through (the no-debug `undefined` case worked fine,
-// which is why this didn't show up until debug mode was actually toggled
-// on). Rewritten as a factory function returning a plain object, same
-// pattern rustGtfsImporter.ts's progressCallback already uses successfully.
+// Two phases: "bfs" (corridor finding: seed paths and the tapered boundary, stepped per BFS round) and
+// "raptor" (stepped per candidate-route check). See debugBfsPoints.ts and DebugMapOverlay.tsx.
 //
-// TWO-PHASE MODEL (bfs / raptor): the old seed/corridor/bfs/raptor 4-phase
-// split has collapsed to 2 — corridor-finding (BFS + its seed paths +
-// tapered boundary) is all one "bfs" phase now, stepped per BFS round; and
-// "raptor" is stepped per individual candidate-route check within a round,
-// not per round itself. See debugBfsPoints.ts and DebugMapOverlay.tsx for
-// how bfsLevels/routeChecks get consumed under this model.
+// seedPaths coords come from the pattern's real GTFS shape, trimmed to the ridden part, where Rust could resolve one.
+// Each SeedPath event carries { pathIndex, hops }. seedPathHops keeps the hops, and seedPaths is rebuilt by joining
+// them and dropping the duplicated join points.
 //
-// SHAPES + COLOR: `seedPaths` coords now come from the pattern's real GTFS
-// shape (trimmed to the ridden portion) where the Rust side could resolve
-// one, not a straight stop-to-stop line — see lib.rs's emit_pre_search_debug
-// / shaped_edge_coords. No change needed here since seedPaths' TYPE hasn't
-// changed, only what's inside it. `routeChecks` entries now also carry the
-// pattern's route_color (from lib.rs's RaptorRouteCheck event) and the
-// FULL journey-so-far chain back through earlier rounds' boarding history,
-// not just the current round's own segment — again, only the CONTENTS
-// changed; see the type note on GtfsDebugInfo.routeChecks itself.
+// Gaps in GtfsDebugInfo (see lib.rs's DebugEvent): no bfsTreeEdges (Rust sends per-level snapshots), no corridorStops
+// (only corridorBoundary), no walkRadiusCircles (DebugMapOverlay defaults it to []).
 //
-// HOP-COLORED CANDIDATES (new): lib.rs's SeedPath event changed shape from
-// a single flattened `path: LatLng[]` to `{ pathIndex, hops: SeedPathHop[] }`
-// — one entry per transit boarding / walk leg, not pre-joined into one
-// polyline. This collector now ALSO builds `seedPathHops` (indexed by
-// pathIndex, each entry that candidate's ordered hop list) alongside the
-// existing flat `seedPaths` reconstruction, so nothing that reads
-// `seedPaths` today has to change — hop-colored rendering is purely
-// additive. `seedPaths[pathIndex]` is rebuilt here by concatenating that
-// candidate's own hops (same dedup-shared-point logic the Rust side used
-// to do itself), so a stale/duplicate join point doesn't leak in.
-//
-// KNOWN GAPS in GtfsDebugInfo (see lib.rs's DebugEvent enum):
-//   - No `bfsTreeEdges`. The Rust side emits per-level frontier SNAPSHOTS
-//     (SeedBfsLevel{level, stops}), not individual parent->child discovery
-//     edges. Doesn't matter anymore under the round-stepped bfs phase —
-//     nothing here consumes tree-edge order any more, only per-round sets.
-//   - No `corridorStops` (flat list) — only the tapered-boundary polygons
-//     (`corridorBoundary`) survive. lib.rs never emits a corridor-stops event.
-//   - No `walkRadiusCircles` — Rust doesn't report the fixed-radius
-//     origin/dest circles. DebugMapOverlay already `?? []`s this, so it just
-//     renders nothing extra rather than crashing.
-//
-// RETRY NOTE: compute_route() internally retries once with a wider window
-// on certain failures (see lib.rs), re-emitting the pre-search debug events
-// for the retry on the SAME sink. This collector just appends everything
-// it receives in arrival order, so a retried search's events land after
-// the first attempt's rather than replacing them. RaptorRouteCheck events
-// carry their own `round`, so a retry's round 0 will collide with the
-// first attempt's round 0 in `routeChecks[0]` the same way `roundMarkedStops`
-// already does — pre-existing behavior, not new here. SeedPath events are
-// now written by `pathIndex` (see below), so a retry's re-emitted
-// candidates overwrite rather than duplicate, same reasoning.
+// compute_route() retries once with a wider window and re-emits the pre-search events on the same sink. Candidates and
+// levels are written by index, so a retry overwrites the first attempt. routeChecks and roundMarkedStops are not:
+// a retry's round 0 collides with the first attempt's.
 
 import {DebugEvent_Tags} from '@/modules/gtfs-router-rust';
 import type {DebugEvent, DebugSink} from '@/modules/gtfs-router-rust';
@@ -74,32 +29,21 @@ export interface DebugCollectorHandle {
     toDebugInfo: () => GtfsDebugInfo;
 }
 
-/** Creates a fresh collector. Call once per search (debugMode ? createDebugSinkCollector() : null),
- *  same lifecycle as the old class was meant to have — just not a class. */
+/** Creates a fresh collector. Call once per search: debugMode ? createDebugSinkCollector() : null. */
 export function createDebugSinkCollector(): DebugCollectorHandle {
     const bfsLevels: GtfsDebugInfo['bfsLevels'] = [];
-    // Indexed by path_index (write-by-index, like bfsLevels/roundMarkedStops
-    // below, so a retry's re-emitted candidate overwrites in place rather
-    // than duplicating).
+    // Written by path_index, so a retry's re-emitted candidate overwrites instead of duplicating.
     const seedPathHops: SeedPathHop[][] = [];
-    // Depth (relative to shortest meet) of each candidate, indexed by
-    // pathIndex — same write-by-index/overwrite-on-retry treatment as
-    // seedPathHops. Comes from lib.rs's SeedPath.depth (NEW — see
-    // seed_bfs.rs's rank_meets depth-bucketing), lets rendering color a
-    // candidate by transfer-count tier instead of every candidate
-    // defaulting to one flat color.
+    // Depth of each candidate relative to the shortest meet, by pathIndex (lib.rs's SeedPath.depth).
+    // Lets rendering color by transfer-count tier.
     const seedPathDepths: number[] = [];
     const corridorBoundary: GtfsDebugInfo['corridorBoundary'] = [];
     const roundMarkedStops: GtfsDebugInfo['roundMarkedStops'] = [];
-    // Per round, every individual candidate-route polyline RAPTOR examined
-    // that round — NOT accumulated across rounds by this collector; the
-    // "show one at a time" behavior lives in DebugMapOverlay's stepIndex
-    // logic, not here. This is just the raw per-round bucket.
+    // Every candidate-route polyline RAPTOR examined, per round. The one-at-a-time reveal lives in DebugMapOverlay's stepIndex logic.
     const routeChecks: GtfsDebugInfo['routeChecks'] = [];
 
     const sink: DebugSink = {
-        // ONE bridge crossing per search: Rust hands over every pre-search
-        // event in a single batch (see lib.rs's DebugSink::on_event_batch).
+        // Rust sends every pre-search event in one batch (lib.rs's DebugSink::on_event_batch): one bridge crossing per search.
         onEventBatch(events: DebugEvent[]): void {
             for (const event of events) handleEvent(event);
         },
@@ -108,17 +52,11 @@ export function createDebugSinkCollector(): DebugCollectorHandle {
     function handleEvent(event: DebugEvent): void {
             switch (event.tag) {
                 case DebugEvent_Tags.SeedBfsLevel:
-                    // level is a sequential index but events could in principle
-                    // arrive out of order across a retry — write by index rather
-                    // than push, so a re-emitted level 0 overwrites instead of
-                    // duplicating.
+                    // Written by index rather than pushed, so a re-emitted level 0 on retry overwrites.
                     bfsLevels[event.inner.level] = event.inner.stops;
                     break;
                 case DebugEvent_Tags.SeedPath:
-                    // CHANGED: was `seedPaths.push(event.inner.path)` — a single
-                    // pre-flattened polyline. Now each event carries one
-                    // candidate's hops (plus its depth, NEW); write by
-                    // pathIndex (see comment above).
+                    // Each event carries one candidate's hops and depth; written by pathIndex.
                     seedPathHops[event.inner.pathIndex] = event.inner.hops.map(h => ({
                         pathIndex: event.inner.pathIndex,
                         hopIndex: h.hopIndex,
@@ -135,14 +73,8 @@ export function createDebugSinkCollector(): DebugCollectorHandle {
                     roundMarkedStops[event.inner.round] = event.inner.markedStops;
                     break;
                 case DebugEvent_Tags.RaptorRouteCheck:
-                    // Same index-by-round approach as roundMarkedStops, but
-                    // appending within the round's bucket since MANY patterns
-                    // can be checked in one round (unlike the single
-                    // marked-stop snapshot per round). `coords` here is the
-                    // FULL journey-so-far chain (not just this round's own
-                    // segment); routeColor/routeName are the pattern's real
-                    // GTFS color/name when the feed has them — both come
-                    // straight off the event, no reshaping needed.
+                    // Appends within the round's bucket, since many patterns are checked per round. `coords` is the full journey-so-far
+                    // chain; routeColor and routeName come straight off the event.
                     (routeChecks[event.inner.round] ??= []).push({
                         coords: event.inner.coords,
                         routeColor: event.inner.routeColor ?? undefined,
@@ -152,13 +84,10 @@ export function createDebugSinkCollector(): DebugCollectorHandle {
             }
     }
 
-    /** Rebuilds the flat single-polyline-per-candidate shape (`seedPaths`)
-     *  from `seedPathHops`, for callers that only need "the whole
-     *  candidate route" and don't care about hop boundaries — same
-     *  duplicate-join-point dedup the Rust side used to do itself before
-     *  hops were split apart. Keeps `seedPaths` working unchanged for any
-     *  existing consumer (flattenBfsCandidates, the cumulative/single bfs
-     *  view) without them needing to know hops exist at all. */
+    /**
+     * Rebuilds the one-polyline-per-candidate `seedPaths` from `seedPathHops`, dropping the duplicated join points,
+     * for consumers that don't care about hop boundaries.
+     */
     function rebuildFlatSeedPaths(): Pt[][] {
         return seedPathHops.filter(Boolean).map(hops => {
             const pts: Pt[] = [];

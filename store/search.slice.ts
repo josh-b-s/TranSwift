@@ -34,10 +34,10 @@ type State = {
     loading: boolean;
     error?: string | null;
     showResults: boolean;
-    /** Epoch ms for the planned departure. null = "leave now" — computeRoute
-     *  passes `undefined` through to computeGtfsRouteNative in that case, which
-     *  falls back to `new Date()` at call time, so "now" always reflects
-     *  the actual moment of search rather than whenever this was picked. */
+    /**
+     * Epoch ms for the planned departure. null means "leave now": computeRoute passes `undefined` through, so "now" is the moment
+     * of search, not whenever this was picked.
+     */
     departureTime: number | null;
     /** Meters/sec. Defaults to computeGtfsRouteNative's own default (1.4) so an
      *  untouched picker matches it. */

@@ -29,17 +29,10 @@ function dayLabel(d: Date, todayStart: Date): string {
 }
 
 /**
- * Custom departure date/time picker — deliberately NOT
- * @react-native-community/datetimepicker. That library's mode="datetime"
- * chains a native date-dialog then a time-dialog internally on Android,
- * and that chained reopen/dismiss cycle is a longstanding, still-open
- * upstream bug (react-native-datetimepicker#768/#907 — "Cannot read
- * property 'dismiss' of undefined") with no real fix, only workarounds.
- * Splitting into two sequential single-mode pickers avoided the crash but
- * still flashed a jarring native dialog transition. This custom modal
- * sidesteps the whole class of bug (and matches the rest of the app's
- * pill/card visual language) at the cost of a slightly less "native feel"
- * date scroller — a day-strip + hour/minute steppers, rather than a wheel.
+ * Custom departure date and time picker, used instead of @react-native-community/datetimepicker. Its mode="datetime" chains
+ * two native dialogs on Android, and that reopen/dismiss cycle crashes (upstream issues #768 and #907, still open).
+ * Two single-mode pickers avoided the crash but flashed a jarring dialog transition. This one is a day strip with hour and
+ * minute steppers instead of a wheel.
  */
 export default function DepartureTimeModal({ visible, value, onClose, onConfirm }: Props) {
     const theme = useThemeStyle();
@@ -48,9 +41,7 @@ export default function DepartureTimeModal({ visible, value, onClose, onConfirm 
     // dismissing (backdrop tap / Cancel) never mutates the real value.
     const [draft, setDraft] = useState<Date>(value ? new Date(value) : new Date());
 
-    // Re-sync the draft whenever the modal opens with a (possibly changed)
-    // external value — otherwise reopening after a Confirm would keep
-    // showing whatever was left over from the previous session.
+    // Re-sync the draft each time the modal opens, so reopening after a Confirm doesn't show the previous session's leftovers.
     useEffect(() => {
         if (visible) setDraft(value ? new Date(value) : new Date());
     }, [visible, value]);
@@ -79,10 +70,8 @@ export default function DepartureTimeModal({ visible, value, onClose, onConfirm 
         return new Date(Math.min(Math.max(d.getTime(), minMs), maxMs));
     }
 
-    // Uses Date's natural hour/minute overflow (setHours(24) → next day
-    // 00:00, setHours(-1) → previous day 23:00) instead of wrapping the
-    // number in place — stepping past midnight should actually roll the
-    // date forward/back, not silently stay on the same day.
+    // Date's own overflow (setHours(24) is next day 00:00, setHours(-1) is previous day 23:00) makes stepping past midnight
+    // roll the date, instead of wrapping the number in place.
     function adjustHour(delta: number) {
         Haptics.selectionAsync();
         setDraft(prev => {

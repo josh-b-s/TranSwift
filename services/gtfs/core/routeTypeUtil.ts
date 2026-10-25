@@ -1,18 +1,8 @@
 /**
- * routeTypeUtil.ts — classifies a GTFS `route_type` value into a small,
- * mode-agnostic category + display label. Works with any GTFS feed:
- *
- *   - Basic GTFS route_type (0-12) — the original spec's short list.
- *   - Extended GTFS route_type (100-1799) — the "Google extended" hierarchy
- *     used by many real-world feeds (including Melbourne's), where the
- *     HUNDREDS digit indicates the mode family. e.g. Melbourne uses 400 for
- *     "Urban Railway Service" (Metro trains) and 700 for buses, rather than
- *     the basic codes 1/3 you'd see in a minimal feed.
- *
- * Centralising this in one place means gtfsRoute.ts (fallback route colors)
- * and the bottom sheet (mode labels/icons) can never drift out of sync with
- * each other, and adding support for a new region's feed is a one-file change.
- *
+ * routeTypeUtil.ts: classifies a GTFS `route_type` into a mode-agnostic category and display label.
+ * Handles the basic codes (0-12) and the extended hierarchy (100-1799), where the hundreds digit is the mode family.
+ * Melbourne's feed uses 400 for metro trains and 700 for buses, for example.
+ * Keeping this in one file keeps fallback colors and the sheet's mode labels in step, and a new region's feed is a one-file change.
  * Reference: https://developers.google.com/transit/gtfs/reference/extended-route-types
  */
 
@@ -25,10 +15,7 @@ export interface RouteTypeInfo {
     label: string;
 }
 
-/**
- * Classifies a route_type into a category + human label. Handles both the
- * basic 0-12 codes and the extended 100-1799 hierarchical codes.
- */
+/** Classifies a route_type into a category and label, for both the basic and extended codes. */
 export function classifyRouteType(routeType: number): RouteTypeInfo {
     // ── Basic GTFS route_type (0-12) — exact matches ─────────────────────────
     switch (routeType) {
@@ -76,10 +63,8 @@ export function classifyRouteType(routeType: number): RouteTypeInfo {
 }
 
 /**
- * Fallback colour by category when the feed doesn't supply route_color.
- * Regional/long-distance rail (V/Line-style) gets a distinct colour from
- * urban metro rail — detected by name keywords, since route_type alone
- * can't always distinguish them.
+ * Fallback color by category when the feed has no route_color. Regional rail (V/Line style) is told apart from metro rail
+ * by name keywords, since route_type alone can't always separate them.
  */
 export function fallbackRouteColor(routeType: number, routeName: string): string {
     const {category} = classifyRouteType(routeType);

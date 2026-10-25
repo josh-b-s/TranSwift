@@ -1,20 +1,8 @@
 /**
- * gtfsKeyUtil.ts — composite (agency, id) key helpers used throughout the
- * GTFS loader/router (stop keys, pattern keys, trip keys, etc).
- *
- * THE BUG THIS FIXES: many real-world GTFS feeds use ids that themselves
- * contain colons — e.g. Melbourne's stop_id "vic:rail:CFD", or a pattern_id
- * built from a route_id like "aus:vic:vic-02-CBE:_1". If a composite key is
- * built as `${id}:${agency}` and later parsed with `.split(':')[0]` /
- * `.split(':')[1]`, that split happens on EVERY colon in the string — for
- * "2_aus:vic:vic-02-CBE:_1_b7cdc080:2" this silently returns "2_aus" instead
- * of the real pattern_id, which then fails to match anything downstream.
- * This is exactly why train patterns were vanishing after passing every
- * earlier filter correctly.
- *
- * THE FIX: put agency FIRST (agency is always a plain integer — guaranteed
- * to contain no colons) and parse by locating only the FIRST colon. Whatever
- * follows it is the id, colons and all, taken as-is — never split further.
+ * gtfsKeyUtil.ts: composite (agency, id) keys.
+ * Real feed ids contain colons (Melbourne's stop "vic:rail:CFD", pattern ids like "aus:vic:vic-02-CBE:_1"). With the key
+ * built as `${id}:${agency}` and parsed by splitting on every colon, the wrong id came back and trains vanished from results.
+ * So the agency, always a plain integer, goes first and the key is parsed on the first colon only; the rest is the id as-is.
  */
 
 export function makeKey(agency: number, id: string): string {
