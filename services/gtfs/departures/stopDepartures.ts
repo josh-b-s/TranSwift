@@ -1,6 +1,6 @@
 import type { QueryableDb } from '@/services/db/queryableDb';
 import { makeKey, parseKey } from '@/services/gtfs/core/gtfsKeyUtil';
-import { fallbackRouteColor } from '@/services/gtfs/config/routeTypeUtil';
+import { fallbackRouteColor } from '@/services/gtfs/core/routeTypeUtil';
 import { getActiveServiceKeys } from './activeServices';
 
 const HOUR_MS = 3_600_000;

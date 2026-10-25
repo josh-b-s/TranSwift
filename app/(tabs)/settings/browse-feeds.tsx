@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, FlatList, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useThemeStyle } from '@/constants/themes';
-import ImportProgressCard from '@/components/ImportProgressCard';
+import ImportProgressCard from '@/components/ui/ImportProgressCard';
 import { countriesOf, filterFeeds } from '@/services/gtfs/catalog/catalogFilter';
 import type { CatalogFeed } from '@/services/gtfs/catalog/catalogParse';
 import { loadCatalog, type CatalogResult } from '@/services/gtfs/catalog/feedCatalog';

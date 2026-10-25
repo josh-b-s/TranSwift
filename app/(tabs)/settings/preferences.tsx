@@ -6,7 +6,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch, RootState } from '@/store/store';
 import { useThemeStyle } from '@/constants/themes';
 import { SPEED_UNITS } from '@/constants/speedUnits';
-import SegmentedControl from '@/components/SegmentedControl';
+import SegmentedControl from '@/components/ui/SegmentedControl';
 import {
     addWalkingSpeed,
     removeWalkingSpeed,

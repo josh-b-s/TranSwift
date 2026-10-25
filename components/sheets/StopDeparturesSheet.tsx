@@ -5,9 +5,9 @@ import { SharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { ACCENT, SHADOW, TOP_SAFE, useThemeStyle } from '@/constants/themes';
-import RouteSheetHeader from '@/components/RouteSheetHeader';
+import RouteSheetHeader from '@/components/sheets/RouteSheetHeader';
 import { useStopDepartures } from '@/hooks/stopDepartures';
-import type { RepoStop } from '@/services/gtfs/core/gtfsRepo';
+import type { RepoStop } from '@/services/gtfs/core/stopRepo';
 import { formatClock, formatDepartureIn } from '@/services/gtfs/departures/departureFormat';
 
 type Props = {

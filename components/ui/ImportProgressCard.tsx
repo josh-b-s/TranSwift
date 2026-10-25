@@ -1,7 +1,7 @@
 import React from 'react';
 import { Alert, Pressable, Text, View } from 'react-native';
 import { useThemeStyle } from '@/constants/themes';
-import ProgressBar from '@/components/ProgressBar';
+import ProgressBar from '@/components/ui/ProgressBar';
 import { formatEta, type ImportProgress } from '@/services/gtfs/import/importProgress';
 
 type Props = {

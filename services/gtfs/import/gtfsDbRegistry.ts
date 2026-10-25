@@ -17,7 +17,7 @@
 import * as FileSystem from 'expo-file-system/legacy';
 import { setActiveDbPath, clearActiveDbPath } from '@/services/db/sqliteDb';
 import { invalidateNativeRouter } from '../router/gtfsRouterNative';
-import { invalidateGtfsRepoCaches } from '../core/gtfsRepo';
+import { invalidateStopCache } from '../core/stopRepo';
 import { computeFeedStats, type FeedStats } from './gtfsFeedStats';
 
 /** Where a feed was downloaded from, kept for licence credit and later update checks. */
@@ -165,7 +165,7 @@ function dedupeName(candidate: string, existingNames: string[]): string {
 /** Drops everything cached from the previous database: the router engine and the stop caches. */
 function invalidateDatabaseCaches(): void {
     invalidateNativeRouter();
-    invalidateGtfsRepoCaches();
+    invalidateStopCache();
 }
 
 /**

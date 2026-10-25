@@ -3,7 +3,7 @@ import { ActivityIndicator, Alert, Pressable, ScrollView, Text, TextInput, View 
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Bus, CircleCheck, CirclePlus, CircleX, Globe, Pencil, Trash2 } from 'lucide-react-native';
 import { useThemeStyle } from '@/constants/themes';
-import ImportProgressCard from '@/components/ImportProgressCard';
+import ImportProgressCard from '@/components/ui/ImportProgressCard';
 import { createProgressTracker, type ImportProgress } from '@/services/gtfs/import/importProgress';
 import { CancelledError } from '@/services/gtfs/import/cancelledError';
 import { pickGtfsZip, importZipAsNewDatabase } from '@/services/gtfs/import/gtfsDbImport';

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Region } from 'react-native-maps';
 import { getDb, isDbReady } from '@/services/db/sqliteDb';
-import { getAllStopsCached, type RepoStop } from '@/services/gtfs/core/gtfsRepo';
+import { getAllStopsCached, type RepoStop } from '@/services/gtfs/core/stopRepo';
 import { stopsInRegion } from '@/services/gtfs/departures/stopsInRegion';
 
 const NO_STOPS: RepoStop[] = [];

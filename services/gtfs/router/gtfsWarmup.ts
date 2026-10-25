@@ -1,5 +1,5 @@
 import {isDbReady, getCurrentDbPath} from '../../db/sqliteDb';
-import {getNativeEngine} from '../router/gtfsRouterNative';
+import {getNativeEngine} from './gtfsRouterNative';
 
 let warmedUp = false;
 

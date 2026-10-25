@@ -7,7 +7,7 @@ import { AppDispatch, RootState } from '@/store/store';
 import { setDepartureTime, setWalkingSpeed } from '@/store/search.slice';
 import { useRequestRoute } from '@/hooks/requestRoute';
 import { useThemeStyle } from '@/constants/themes';
-import DepartureTimeModal from '@/components/DepartureTimeModal';
+import DepartureTimeModal from '@/components/search/DepartureTimeModal';
 
 /** Departure time and walking speed for the current route. Changing either recomputes it. */
 export default function RouteOptionPills() {

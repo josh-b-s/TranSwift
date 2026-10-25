@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { getDb } from '@/services/db/sqliteDb';
-import type { RepoStop } from '@/services/gtfs/core/gtfsRepo';
+import type { RepoStop } from '@/services/gtfs/core/stopRepo';
 import { type Departure, getStopDepartures } from '@/services/gtfs/departures/stopDepartures';
 
 const WINDOW_MS = 3 * 3_600_000;

@@ -7,7 +7,7 @@ import { Stack } from 'expo-router';
 import { Provider } from 'react-redux';
 import { store } from '@/store/store';
 import '@/global.css';
-import { warmUpGtfsEngine } from '@/services/gtfs/warmup/gtfsWarmup';
+import { warmUpGtfsEngine } from '@/services/gtfs/router/gtfsWarmup';
 import { loadPreferences } from '@/store/preferences.slice';
 import { restoreActiveDatabase } from '@/services/gtfs/import/gtfsDbRegistry';
 import '@/services/trips/locationTracking';

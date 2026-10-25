@@ -14,7 +14,7 @@ import { clearRoute } from '@/store/route.slice';
 import { useRequestRoute } from '@/hooks/requestRoute';
 import { CURRENT_LOCATION, isCurrentLocation } from '@/services/places/endpoints';
 import type { SearchPlace } from '@/services/places/places';
-import EndpointField from '@/components/EndpointField';
+import EndpointField from '@/components/search/EndpointField';
 
 const GOOGLE_MAPS_APIKEY = process.env.EXPO_PUBLIC_API_KEY ?? '';
 

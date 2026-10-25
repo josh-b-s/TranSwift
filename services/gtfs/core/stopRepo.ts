@@ -23,7 +23,7 @@ async function loadStops(db: QueryableDb): Promise<RepoStop[]> {
     return rows.map(r => ({ ...r, stop_lat: r.stop_lat / COORD_SCALE, stop_lon: r.stop_lon / COORD_SCALE }));
 }
 
-/** Every stop in the active database. Loaded once; call invalidateGtfsRepoCaches() when the database changes. */
+/** Every stop in the active database. Loaded once; call invalidateStopCache() when the database changes. */
 export function getAllStopsCached(db: QueryableDb): Promise<RepoStop[]> {
     if (stopsCache) return Promise.resolve(stopsCache);
     if (stopsLoading) return stopsLoading;
@@ -40,7 +40,7 @@ export function getAllStopsCached(db: QueryableDb): Promise<RepoStop[]> {
     return loading;
 }
 
-export function invalidateGtfsRepoCaches(): void {
+export function invalidateStopCache(): void {
     stopsCache = null;
     stopsLoading = null;
 }

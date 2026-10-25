@@ -1,6 +1,6 @@
 import { Bus, CableCar, Navigation, Ship, TrainFront, TramFront } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
-import type { RouteCategory } from '@/services/gtfs/config/routeTypeUtil';
+import type { RouteCategory } from '@/services/gtfs/core/routeTypeUtil';
 
 const MODE_ICONS: Record<RouteCategory, LucideIcon> = {
     tram: TramFront,

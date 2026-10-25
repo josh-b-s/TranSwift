@@ -1,7 +1,7 @@
 import { Polyline } from 'react-native-maps';
 import { ACCENT } from '@/constants/themes';
-import type { RepoStop } from '@/services/gtfs/core/gtfsRepo';
-import { HALF_LENGTH_DEG } from '@/components/RideStopMarkers';
+import type { RepoStop } from '@/services/gtfs/core/stopRepo';
+import { HALF_LENGTH_DEG } from '@/components/map/RideStopMarkers';
 
 const DOT_WIDTH = 10;
 

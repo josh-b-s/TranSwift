@@ -1,5 +1,5 @@
 import type { Region } from 'react-native-maps';
-import type { RepoStop } from '@/services/gtfs/core/gtfsRepo';
+import type { RepoStop } from '@/services/gtfs/core/stopRepo';
 
 /** Zoomed out past this (about 2 km tall) the dots would only be clutter. */
 const MAX_LATITUDE_DELTA = 0.02;
