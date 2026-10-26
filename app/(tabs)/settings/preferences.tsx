@@ -1,16 +1,19 @@
 import React, { useState } from 'react';
 import { Alert, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
-import { CircleCheck, CirclePlus, CircleX, Footprints, type LucideIcon, Moon, Pencil, RotateCcw, Smartphone, Sun, Trash2 } from 'lucide-react-native';
+import { CircleCheck, CirclePlus, CircleX, Footprints, type LucideIcon, Minus, Moon, Pencil, Plus, RotateCcw, Smartphone, Sun, Trash2 } from 'lucide-react-native';
 import { nanoid } from '@reduxjs/toolkit';
 import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch, RootState } from '@/store/store';
 import { useThemeStyle } from '@/constants/themes';
 import { SPEED_UNITS } from '@/constants/speedUnits';
+import { MAX_MAX_WALK_DISTANCE_M, MIN_MAX_WALK_DISTANCE_M, WALK_DISTANCE_STEP_M } from '@/constants/walkLimit';
+import { formatDistance } from '@/services/trips/tripFormat';
 import SegmentedControl from '@/components/ui/SegmentedControl';
 import {
     addWalkingSpeed,
     removeWalkingSpeed,
     resetPreferences,
+    setMaxWalkDistance,
     setSpeedUnit,
     setThemeMode,
     updateWalkingSpeed,
@@ -43,6 +46,7 @@ export default function Preferences() {
     const themeMode = useSelector((s: RootState) => s.preferences.themeMode);
     const walkingSpeeds = useSelector((s: RootState) => s.preferences.walkingSpeeds);
     const speedUnit = useSelector((s: RootState) => s.preferences.speedUnit);
+    const maxWalkDistanceM = useSelector((s: RootState) => s.preferences.maxWalkDistanceM);
 
     // Inline-edit state for the walking speed list — editingId names which
     // row is currently showing text inputs instead of static text; the two
@@ -95,7 +99,7 @@ export default function Preferences() {
     function handleReset() {
         Alert.alert(
             'Reset to defaults?',
-            'Theme, speedometer unit and walking speeds will be reset to their default values.',
+            'Theme, speedometer unit, walk limit and walking speeds will be reset to their default values.',
             [
                 { text: 'Cancel', style: 'cancel' },
                 { text: 'Reset', style: 'destructive', onPress: () => { setEditingId(null); dispatch(resetPreferences()); } },
@@ -118,6 +122,41 @@ export default function Preferences() {
                 value={speedUnit}
                 onChange={(unit) => dispatch(setSpeedUnit(unit))}
             />
+
+            <SectionLabel text="Maximum walk" theme={theme} />
+            <Text style={{ color: theme.color, opacity: 0.5, fontSize: 12, marginBottom: 4 }}>
+                The farthest the router may send you on foot in one search. Applies to your next search.
+            </Text>
+            <View
+                style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: 14,
+                    borderRadius: 16,
+                    backgroundColor: theme.backgroundColor,
+                }}
+            >
+                <Pressable
+                    onPress={() => dispatch(setMaxWalkDistance(maxWalkDistanceM - WALK_DISTANCE_STEP_M))}
+                    disabled={maxWalkDistanceM <= MIN_MAX_WALK_DISTANCE_M}
+                    hitSlop={8}
+                    accessibilityLabel="Decrease maximum walk"
+                    style={{ padding: 4, opacity: maxWalkDistanceM <= MIN_MAX_WALK_DISTANCE_M ? 0.3 : 1 }}
+                >
+                    <Minus size={22} color={theme.color} />
+                </Pressable>
+                <Text style={{ color: theme.color, fontSize: 17, fontWeight: '600' }}>{formatDistance(maxWalkDistanceM)}</Text>
+                <Pressable
+                    onPress={() => dispatch(setMaxWalkDistance(maxWalkDistanceM + WALK_DISTANCE_STEP_M))}
+                    disabled={maxWalkDistanceM >= MAX_MAX_WALK_DISTANCE_M}
+                    hitSlop={8}
+                    accessibilityLabel="Increase maximum walk"
+                    style={{ padding: 4, opacity: maxWalkDistanceM >= MAX_MAX_WALK_DISTANCE_M ? 0.3 : 1 }}
+                >
+                    <Plus size={22} color={theme.color} />
+                </Pressable>
+            </View>
 
             <SectionLabel text="Walking speeds" theme={theme} />
             <Text style={{ color: theme.color, opacity: 0.5, fontSize: 12, marginBottom: 4 }}>

@@ -11,6 +11,7 @@ What the app does today, and what could come next. Written from the code as it s
 - **Pick on the map.** Choose a start or end by moving the map under a pin.
 - **Departure time.** Leave now, or pick a day and time with a custom picker (a day strip with hour and minute steppers, used instead of the native date-time picker that crashes on Android).
 - **Walking speed.** A pill on the search bar cycles through your walking speed presets, and the router uses the one selected.
+- **Walk limit.** A setting for the farthest the router may send you on foot (200 m to 5 km, default 1.68 km). It applies to the next search.
 - **Routing.** On-device RAPTOR in Rust, offline, against the GTFS database you imported. It returns several journeys at once, a Pareto set over arrival time, walking distance and transfers.
 - **Route sheet.** Lists the journeys with times, duration and walking distance. You can sort by arrival, least walking or fewest transfers. Selecting a journey draws it on the map, with every stop of each ride shown as a dot.
 - **Realtime delays.** If a feed has GTFS-Realtime TripUpdates URLs configured, delays are fetched at search time and applied inside the engine. Legs carry a `departureDelaySec`. Failures on one URL don't drop the others.
@@ -20,6 +21,7 @@ What the app does today, and what could come next. Written from the code as it s
 
 - **Stop dots.** Zoom in to about 2 km tall and every stop in view gets a tappable dot (up to 150, nearest the centre first). They hide while a route is shown, while picking on the map and in debug mode.
 - **Departures sheet.** Tapping a dot opens a sheet with the next 3 hours of scheduled departures: line badge in the route colour, "to <last stop>", minutes away or clock time, and a header listing the lines that serve the stop.
+- **From a planned route.** Tapping a stop dot on a selected route opens the same sheet. The route stop is matched back to the database by position (nearest within 50 m, same name preferred).
 - **Behaviour.** Works offline from the timetable. Reloads every minute, honours `calendar` and `calendar_dates` exceptions, includes yesterday's trips that run past midnight, and leaves out trips that end at the stop. Times are scheduled, not live, and the sheet says so.
 
 ### Recording a trip
@@ -49,12 +51,12 @@ What the app does today, and what could come next. Written from the code as it s
 
 ### Settings
 
-- **Preferences.** Theme (system, light, dark), editable walking speed presets (add, edit, reset), and speed units (km/h or mph). Pace is shown per km or per mile to match.
+- **Preferences.** Theme (system, light, dark), editable walking speed presets (add, edit, reset), maximum walk distance, and speed units (km/h or mph). Pace is shown per km or per mile to match.
 
 ### Developer tooling
 
 - **Debug visualiser.** Replays a search on the map: BFS rounds and candidate seed paths (flat, per-hop or depth coloured) and RAPTOR route-checks one at a time. The mounts in `index.tsx` are currently commented out, so it is not reachable in the app.
-- **Tests.** `npm test` runs 23 tests on Node's built-in runner, including the departures query against the real schema in in-memory SQLite.
+- **Tests.** `npm test` runs 29 tests on Node's built-in runner, including the departures query against the real schema in in-memory SQLite.
 
 ## Future features
 
@@ -62,8 +64,6 @@ What the app does today, and what could come next. Written from the code as it s
 
 | Feature | What it adds | Notes |
 | --- | --- | --- |
-| Departures from a planned route | Tap a ride's stop dot on the route to open the departures sheet | Reuses the sheet and hook; only the tap handler is new. S |
-| Walk limit control | A setting for how far you will walk | `maxWalkDistanceM` is hardcoded in `gtfsRouterNative.ts`, and a TODO waits for the UI. Add a preference, pass it through the `computeRoute` thunk. S |
 | Saved places and recent searches | Home, Work, favourite stops as one-tap start and end points | A JSON file like `preferencesStore.ts`. Nothing exists yet. S to M |
 | Departure filters | Filter the sheet by line or direction | Data is already in the result. S |
 | Trip splits and speed chart | Per-km splits and speed over time on the trip screen | Timed path samples are already saved. M |
@@ -94,10 +94,9 @@ What the app does today, and what could come next. Written from the code as it s
 
 ### Suggested order
 
-1. Departures from a planned route, then the walk limit control. Both are small and the hooks already exist.
-2. Saved places, which several larger items depend on.
-3. History extras (splits, weekly view, heatmap), since the data is already stored.
-4. Realtime in departures, as its own project, followed by alerts.
+1. Saved places, which several larger items depend on.
+2. History extras (splits, weekly view, heatmap), since the data is already stored.
+3. Realtime in departures, as its own project, followed by alerts.
 
 ## Known limits
 

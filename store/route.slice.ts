@@ -18,13 +18,13 @@ export const computeRoute = createAsyncThunk<
         departureTime?: Date;
         /** Undefined -> computeGtfsRouteNative's own default (1.4 m/s). */
         walkingSpeedMps?: number;
+        /** Undefined -> computeGtfsRouteNative's own default. */
+        maxWalkDistanceM?: number;
     },
     { rejectValue: string }
->('route/compute', async ({ origin, destination, debugMode = false, departureTime, walkingSpeedMps }, { rejectWithValue, dispatch }) => {
+>('route/compute', async ({ origin, destination, debugMode = false, departureTime, walkingSpeedMps, maxWalkDistanceM }, { rejectWithValue, dispatch }) => {
     try {
-        // maxWalkDistanceM (undefined -> computeGtfsRouteNative's hardcoded default) is not exposed on this thunk yet, see the TODO
-        // in gtfsRouterNative.ts.
-        const result = await computeGtfsRouteNative(origin, destination, departureTime, walkingSpeedMps, undefined, debugMode);
+        const result = await computeGtfsRouteNative(origin, destination, departureTime, walkingSpeedMps, maxWalkDistanceM, debugMode);
         // Dispatched inside the thunk because debug data belongs in debug.slice, not route state. The big payload goes to the
         // module-level store and only its small meta enters Redux. Don't return `result` as-is: a thunk's return value becomes the
         // `fulfilled` payload, which RTK's dev middleware deep-walks, so strip `debug` from it.

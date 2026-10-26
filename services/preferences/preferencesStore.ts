@@ -5,6 +5,7 @@
  */
 
 import * as FileSystem from 'expo-file-system/legacy';
+import { clampWalkDistance, DEFAULT_MAX_WALK_DISTANCE_M } from '@/constants/walkLimit';
 
 export type ThemeMode = 'system' | 'light' | 'dark';
 
@@ -21,6 +22,8 @@ export type StoredPreferences = {
     themeMode: ThemeMode;
     walkingSpeeds: WalkingSpeedOption[];
     speedUnit: SpeedUnit;
+    /** Farthest the router may send you on foot, in meters. */
+    maxWalkDistanceM: number;
 };
 
 export const DEFAULT_THEME_MODE: ThemeMode = 'system';
@@ -43,10 +46,18 @@ export async function loadStoredPreferences(): Promise<StoredPreferences> {
             themeMode: parsed.themeMode ?? DEFAULT_THEME_MODE,
             walkingSpeeds: parsed.walkingSpeeds?.length ? parsed.walkingSpeeds : DEFAULT_WALKING_SPEEDS,
             speedUnit: parsed.speedUnit ?? DEFAULT_SPEED_UNIT,
+            maxWalkDistanceM: Number.isFinite(parsed.maxWalkDistanceM)
+                ? clampWalkDistance(parsed.maxWalkDistanceM as number)
+                : DEFAULT_MAX_WALK_DISTANCE_M,
         };
     } catch {
         // No file yet (fresh install) — defaults, not an error.
-        return { themeMode: DEFAULT_THEME_MODE, walkingSpeeds: DEFAULT_WALKING_SPEEDS, speedUnit: DEFAULT_SPEED_UNIT };
+        return {
+            themeMode: DEFAULT_THEME_MODE,
+            walkingSpeeds: DEFAULT_WALKING_SPEEDS,
+            speedUnit: DEFAULT_SPEED_UNIT,
+            maxWalkDistanceM: DEFAULT_MAX_WALK_DISTANCE_M,
+        };
     }
 }
 

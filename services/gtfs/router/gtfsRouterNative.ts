@@ -17,6 +17,7 @@ import { createDebugSinkCollector } from '../debug/debugSinkCollector';
 import { formatTimings } from './formatTimings';
 import { getCurrentDbPath } from '@/services/db/sqliteDb';
 import { refreshRealtime } from '../realtime/gtfsRealtime';
+import { DEFAULT_MAX_WALK_DISTANCE_M } from '@/constants/walkLimit';
 
 const { GtfsRouterEngine } = gtfsRouterRust.gtfs_router;
 
@@ -150,8 +151,7 @@ export async function computeGtfsRouteNative(
     destination: LatLng,
     departureTime: Date = new Date(),
     walkingSpeedMps: number = 1.4, // WALK_SPEED_MPS.NORMAL
-    // TODO: hardcoded until the UI has a walk-limit control. Mirrors DEFAULT_MAX_WALK_DISTANCE_M in settings.rs (1.4 m/s for 20 min).
-    maxWalkDistanceM: number = 1.4 * 20 * 60,
+    maxWalkDistanceM: number = DEFAULT_MAX_WALK_DISTANCE_M,
     debugMode: boolean = false,
 ): Promise<GtfsRouteResult> {
     const dbPath = getCurrentDbPath();

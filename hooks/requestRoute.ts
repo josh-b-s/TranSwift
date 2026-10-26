@@ -23,6 +23,7 @@ export function useRequestRoute() {
     const storedDestination = useSelector((s: RootState) => s.search.selected);
     const storedDeparture = useSelector((s: RootState) => s.search.departureTime);
     const storedSpeed = useSelector((s: RootState) => s.search.walkingSpeedMps);
+    const maxWalkDistanceM = useSelector((s: RootState) => s.preferences.maxWalkDistanceM);
 
     return useCallback((overrides: Overrides = {}) => {
         const destination = overrides.destination ?? storedDestination;
@@ -42,6 +43,7 @@ export function useRequestRoute() {
             debugMode:       debugEnabled,
             departureTime:   departureTime ? new Date(departureTime) : undefined,
             walkingSpeedMps: overrides.walkingSpeedMps ?? storedSpeed,
+            maxWalkDistanceM,
         }));
-    }, [dispatch, userLocation, debugEnabled, storedOrigin, storedDestination, storedDeparture, storedSpeed]);
+    }, [dispatch, userLocation, debugEnabled, storedOrigin, storedDestination, storedDeparture, storedSpeed, maxWalkDistanceM]);
 }

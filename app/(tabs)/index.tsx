@@ -30,7 +30,10 @@ import {useFeedSuggestion} from '../../hooks/feedSuggestion';
 import {useTripRecorder} from '@/hooks/tripRecorder';
 import {useTripNotificationTap} from '@/hooks/tripNotificationTap';
 import {useStopsInView} from '@/hooks/stopsInView';
-import type {RepoStop} from '@/services/gtfs/core/stopRepo';
+import {getAllStopsCached, type RepoStop} from '@/services/gtfs/core/stopRepo';
+import {findRepoStop} from '@/services/gtfs/departures/findRepoStop';
+import {getDb} from '@/services/db/sqliteDb';
+import type {RouteStop} from '@/services/gtfs/router/routeTypes';
 import {RIDE_LINE_WIDTH, RideStopMarkers} from '@/components/map/RideStopMarkers';
 
 const EMPTY_COORDS: LatLng[] = [];
@@ -119,6 +122,11 @@ export default function Index() {
         );
     }, [region]);
 
+    const selectRouteStop = useCallback(async (routeStop: RouteStop) => {
+        const stop = findRepoStop(await getAllStopsCached(await getDb()), routeStop);
+        if (stop) selectStop(stop);
+    }, [selectStop]);
+
     useEffect(() => {
         goToUserLocation();
     }, [goToUserLocation]);
@@ -193,7 +201,7 @@ export default function Index() {
                 ) : null)}
 
                 {!debugEnabled && routeSegments.map((segment, index) => segment.type === 'transit' && (
-                    <RideStopMarkers key={index} segment={segment} />
+                    <RideStopMarkers key={index} segment={segment} onSelect={selectRouteStop} />
                 ))}
 
                 <StopDots stops={stopsInView} onSelect={selectStop} />

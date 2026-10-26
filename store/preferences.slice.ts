@@ -1,5 +1,6 @@
 import { createAsyncThunk, createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { colorScheme as nativewindColorScheme } from 'nativewind';
+import { clampWalkDistance, DEFAULT_MAX_WALK_DISTANCE_M } from '@/constants/walkLimit';
 import {
     DEFAULT_SPEED_UNIT,
     DEFAULT_THEME_MODE,
@@ -17,6 +18,7 @@ type State = {
     themeMode: ThemeMode;
     walkingSpeeds: WalkingSpeedOption[];
     speedUnit: SpeedUnit;
+    maxWalkDistanceM: number;
     /** True once loadPreferences() has resolved — screens can use this to
      *  avoid flashing default values before the real ones load. */
     loaded: boolean;
@@ -26,13 +28,19 @@ const initialState: State = {
     themeMode: DEFAULT_THEME_MODE,
     walkingSpeeds: DEFAULT_WALKING_SPEEDS,
     speedUnit: DEFAULT_SPEED_UNIT,
+    maxWalkDistanceM: DEFAULT_MAX_WALK_DISTANCE_M,
     loaded: false,
 };
 
 // Fire and forget: reducers mutate state through Immer, then call this with the plain values. Not awaited, so a failed
 // write doesn't block the UI update. It only logs.
 function persist(state: State) {
-    saveStoredPreferences({ themeMode: state.themeMode, walkingSpeeds: state.walkingSpeeds, speedUnit: state.speedUnit }).catch(err => {
+    saveStoredPreferences({
+        themeMode: state.themeMode,
+        walkingSpeeds: state.walkingSpeeds,
+        speedUnit: state.speedUnit,
+        maxWalkDistanceM: state.maxWalkDistanceM,
+    }).catch(err => {
         console.warn('[preferences] failed to persist:', err);
     });
 }
@@ -56,6 +64,10 @@ const slice = createSlice({
             state.speedUnit = action.payload;
             persist(state);
         },
+        setMaxWalkDistance(state, action: PayloadAction<number>) {
+            state.maxWalkDistanceM = clampWalkDistance(action.payload);
+            persist(state);
+        },
         addWalkingSpeed(state, action: PayloadAction<WalkingSpeedOption>) {
             state.walkingSpeeds.push(action.payload);
             persist(state);
@@ -77,6 +89,7 @@ const slice = createSlice({
             state.themeMode = DEFAULT_THEME_MODE;
             state.walkingSpeeds = DEFAULT_WALKING_SPEEDS.map(o => ({ ...o }));
             state.speedUnit = DEFAULT_SPEED_UNIT;
+            state.maxWalkDistanceM = DEFAULT_MAX_WALK_DISTANCE_M;
             nativewindColorScheme.set(DEFAULT_THEME_MODE);
             persist(state);
         },
@@ -86,6 +99,7 @@ const slice = createSlice({
             state.themeMode = action.payload.themeMode;
             state.walkingSpeeds = action.payload.walkingSpeeds;
             state.speedUnit = action.payload.speedUnit;
+            state.maxWalkDistanceM = action.payload.maxWalkDistanceM;
             state.loaded = true;
             nativewindColorScheme.set(action.payload.themeMode);
         });
@@ -95,6 +109,7 @@ const slice = createSlice({
 export const {
     setThemeMode,
     setSpeedUnit,
+    setMaxWalkDistance,
     addWalkingSpeed,
     updateWalkingSpeed,
     removeWalkingSpeed,
