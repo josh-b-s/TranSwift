@@ -1,7 +1,7 @@
 import { beforeEach, test } from 'node:test';
 import assert from 'node:assert/strict';
 import Database from 'better-sqlite3';
-import { GTFS_INDEXES_SQL, GTFS_SCHEMA_SQL } from '../scripts/gtfsSchema';
+import { REAL_INDEXES_SQL, REAL_SCHEMA_SQL } from './realSchema';
 import { getStopDepartures } from '@/services/gtfs/departures/stopDepartures';
 import type { QueryableDb } from '@/services/db/queryableDb';
 
@@ -16,8 +16,8 @@ let db: QueryableDb;
 
 beforeEach(() => {
     sqlite = new Database(':memory:');
-    sqlite.exec(GTFS_SCHEMA_SQL);
-    sqlite.exec(GTFS_INDEXES_SQL);
+    sqlite.exec(REAL_SCHEMA_SQL);
+    sqlite.exec(REAL_INDEXES_SQL);
     db = {
         getAllAsync: async <T>(sql: string, params: any[] = []) => sqlite.prepare(sql).all(...params) as T[],
         execAsync: async (sql: string) => { sqlite.exec(sql); },
@@ -118,4 +118,16 @@ test('respects the limit', async () => {
     for (let i = 0; i < 5; i++) addTrip(100 + i, 'WK', (10 + i) * 3600);
     const out = await getStopDepartures(db, 1, new Date(at(MON, 9)), 8 * HOUR_MS, 2);
     assert.equal(out.length, 2);
+});
+
+test('a loop trip departs from its first stop but its return there is not a departure', async () => {
+    sqlite.exec(`
+        INSERT INTO patterns (pattern_pk, route_id, agency, direction_id, shape_id, trip_pk) VALUES (11, 'R1', 1, 0, NULL, 200);
+        INSERT INTO pattern_stops (pattern_pk, stop_pk, stop_sequence) VALUES (11, 1, 1), (11, 2, 2), (11, 1, 3);
+        INSERT INTO trips (trip_pk, trip_id, agency, pattern_pk, service_id) VALUES (200, 'loop', 1, 11, 'WK');
+        INSERT INTO stop_times (trip_pk, stop_sequence, stop_pk, arrival_sec, departure_sec) VALUES
+            (200, 1, 1, 36000, 36000), (200, 2, 2, 36300, 36300), (200, 3, 1, 36600, 36600);
+    `);
+    const out = await getStopDepartures(db, 1, new Date(at(MON, 9)), 3 * HOUR_MS, 10);
+    assert.deepEqual(out.map(d => d.timeMs), [at(MON, 10)]);
 });

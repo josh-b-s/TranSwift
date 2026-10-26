@@ -1,6 +1,6 @@
 import type { QueryableDb } from '@/services/db/queryableDb';
 import { makeKey, parseKey } from '@/services/gtfs/core/gtfsKeyUtil';
-import { fallbackRouteColor } from '@/services/gtfs/core/routeTypeUtil';
+import { fallbackRouteColor, hexColor } from '@/services/gtfs/core/routeTypeUtil';
 import { getActiveServiceKeys } from './activeServices';
 
 const HOUR_MS = 3_600_000;
@@ -31,13 +31,11 @@ function serviceDayStartMs(day: Date): number {
     return new Date(day.getFullYear(), day.getMonth(), day.getDate(), 12).getTime() - 12 * HOUR_MS;
 }
 
-function hexColor(value: string | null, fallback: string): string {
-    return value && /^#?[0-9a-f]{6}$/i.test(value) ? `#${value.replace('#', '')}` : fallback;
-}
-
 /**
  * Scheduled departures from one stop between `from` and `from + windowMs`, soonest first.
- * Trips that end at the stop are left out, since nobody can board them there.
+ * Trips that end at the stop are left out, since nobody can board them there: that is a row at the pattern's last
+ * stop with the last sequence. The check reads the pattern, not the trip's other stop_times, because that table has
+ * no trip_pk index and the lookup scanned all of it for every row.
  */
 export async function getStopDepartures(
     db: QueryableDb,
@@ -77,7 +75,7 @@ export async function getStopDepartures(
              WHERE st.stop_pk = ?
                AND st.departure_sec BETWEEN ? AND ?
                AND t.service_id IN (SELECT value FROM json_each(?))
-               AND st.stop_sequence < (SELECT MAX(stop_sequence) FROM stop_times WHERE trip_pk = st.trip_pk)
+               AND NOT (st.stop_pk = ps.stop_pk AND st.stop_sequence >= ps.stop_sequence)
              ORDER BY st.departure_sec`,
             [stopPk, fromSec, toSec, JSON.stringify(serviceIds)],
         );

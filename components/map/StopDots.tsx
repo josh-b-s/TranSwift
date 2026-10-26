@@ -1,28 +1,28 @@
-import { Polyline } from 'react-native-maps';
+import { memo } from 'react';
 import { ACCENT } from '@/constants/themes';
 import type { RepoStop } from '@/services/gtfs/core/stopRepo';
-import { HALF_LENGTH_DEG } from '@/components/map/RideStopMarkers';
+import { StopCircle } from '@/components/map/StopCircle';
 
-const DOT_WIDTH = 10;
+// Memoised per stop: every pan produces a new list, and without this each of the (up to 150) circles is updated again.
+const StopDot = memo(function StopDot({ stop, color, halfLength, onSelect }: {
+    stop: RepoStop;
+    color: string;
+    halfLength: number;
+    onSelect: (stop: RepoStop) => void;
+}) {
+    return <StopCircle latitude={stop.stop_lat} longitude={stop.stop_lon} color={color} halfLength={halfLength} onPress={() => onSelect(stop)} />;
+});
 
-/** A tappable dot on each stop, drawn the same way as the ride stop dots. */
-export function StopDots({ stops, onSelect }: { stops: RepoStop[]; onSelect: (stop: RepoStop) => void }) {
+/** A tappable circle on each stop, in the colour of the route that serves it most. */
+export function StopDots({ stops, colors, halfLength, onSelect }: {
+    stops: RepoStop[];
+    colors: Map<number, string>;
+    halfLength: number;
+    onSelect: (stop: RepoStop) => void;
+}) {
     return (
         <>
-            {stops.map(stop => (
-                <Polyline
-                    key={stop.stop_pk}
-                    coordinates={[
-                        { latitude: stop.stop_lat - HALF_LENGTH_DEG, longitude: stop.stop_lon },
-                        { latitude: stop.stop_lat + HALF_LENGTH_DEG, longitude: stop.stop_lon },
-                    ]}
-                    strokeColor={ACCENT}
-                    strokeWidth={DOT_WIDTH}
-                    lineCap="round"
-                    tappable
-                    onPress={() => onSelect(stop)}
-                />
-            ))}
+            {stops.map(stop => <StopDot key={stop.stop_pk} stop={stop} color={colors.get(stop.stop_pk) ?? ACCENT} halfLength={halfLength} onSelect={onSelect} />)}
         </>
     );
 }

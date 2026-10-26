@@ -94,3 +94,7 @@ export function fallbackRouteColor(routeType: number, routeName: string): string
             return '#2563EB';
     }
 }
+/** A GTFS colour column as `#rrggbb`, or the fallback when it is missing or malformed. */
+export function hexColor(value: string | null, fallback: string): string {
+    return value && /^#?[0-9a-f]{6}$/i.test(value) ? `#${value.replace('#', '')}` : fallback;
+}

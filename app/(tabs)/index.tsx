@@ -30,6 +30,8 @@ import {useFeedSuggestion} from '../../hooks/feedSuggestion';
 import {useTripRecorder} from '@/hooks/tripRecorder';
 import {useTripNotificationTap} from '@/hooks/tripNotificationTap';
 import {useStopsInView} from '@/hooks/stopsInView';
+import {useStopColors} from '@/hooks/stopColors';
+import {dotHalfLengthDeg} from '@/services/geo/dotLength';
 import {getAllStopsCached, type RepoStop} from '@/services/gtfs/core/stopRepo';
 import {findRepoStop} from '@/services/gtfs/departures/findRepoStop';
 import {getDb} from '@/services/db/sqliteDb';
@@ -64,6 +66,8 @@ export default function Index() {
     const debugEnabled = useSelector((s: RootState) => s.debug.enabled);
 
     const [region, setRegion] = useState<Region | null>(null);
+    // Read by selectStop, which must keep one identity so the stop dots don't re-render on every pan.
+    const regionRef = useRef<Region | null>(null);
     const [departureStop, setDepartureStop] = useState<RepoStop | null>(null);
 
     const goToUserLocation = useGoToUserLocation(mapRef);
@@ -98,6 +102,8 @@ export default function Index() {
     // Stop dots give way to the route once a place is chosen, and so does the departures sheet.
     const stopsTappable = isFocused && selectedPlace === null && pickingField === null && !debugEnabled;
     const stopsInView = useStopsInView(region, stopsTappable);
+    const stopColors = useStopColors(stopsInView);
+    const dotHalfLength = dotHalfLengthDeg(region?.latitudeDelta ?? STOP_FOCUS_DELTA);
     useEffect(() => {
         if (selectedPlace !== null) setDepartureStop(null);
     }, [selectedPlace]);
@@ -115,12 +121,12 @@ export default function Index() {
     const selectStop = useCallback((stop: RepoStop) => {
         setDepartureStop(stop);
         // Aim a little south of the stop so the sheet doesn't cover it.
-        const delta = Math.min(region?.latitudeDelta ?? STOP_FOCUS_DELTA, STOP_FOCUS_DELTA);
+        const delta = Math.min(regionRef.current?.latitudeDelta ?? STOP_FOCUS_DELTA, STOP_FOCUS_DELTA);
         mapRef.current?.animateToRegion(
             { latitude: stop.stop_lat - delta * 0.25, longitude: stop.stop_lon, latitudeDelta: delta, longitudeDelta: delta },
             400,
         );
-    }, [region]);
+    }, []);
 
     const selectRouteStop = useCallback(async (routeStop: RouteStop) => {
         const stop = findRepoStop(await getAllStopsCached(await getDb()), routeStop);
@@ -177,7 +183,10 @@ export default function Index() {
                     }
                 }}
                 onPress={() => Keyboard.dismiss()}
-                onRegionChangeComplete={setRegion}
+                onRegionChangeComplete={r => {
+                    regionRef.current = r;
+                    setRegion(r);
+                }}
             >
                 {!debugEnabled && (routeSegments.length > 0 ? (
                     routeSegments.map((segment, index) => (
@@ -201,10 +210,10 @@ export default function Index() {
                 ) : null)}
 
                 {!debugEnabled && routeSegments.map((segment, index) => segment.type === 'transit' && (
-                    <RideStopMarkers key={index} segment={segment} onSelect={selectRouteStop} />
+                    <RideStopMarkers key={index} segment={segment} color={segment.routeColor ?? routeColor ?? '#2563eb'} halfLength={dotHalfLength} onSelect={selectRouteStop} />
                 ))}
 
-                <StopDots stops={stopsInView} onSelect={selectStop} />
+                <StopDots stops={stopsInView} colors={stopColors} halfLength={dotHalfLength} onSelect={selectStop} />
 
                 {!isCurrentLocation(origin) && (
                     <Marker

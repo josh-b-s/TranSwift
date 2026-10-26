@@ -19,7 +19,9 @@ export function useStopDepartures(stop: RepoStop | null): State {
 
         const load = async () => {
             try {
+                const started = Date.now();
                 const departures = await getStopDepartures(await getDb(), stop.stop_pk, new Date(), WINDOW_MS, MAX_DEPARTURES);
+                console.log(`[stopDepartures] stop ${stop.stop_pk}: ${departures.length} rows in ${Date.now() - started} ms`);
                 if (!cancelled) setState({ departures, loading: false, error: null });
             } catch (e) {
                 if (!cancelled) setState({ departures: [], loading: false, error: e instanceof Error ? e.message : String(e) });

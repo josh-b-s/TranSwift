@@ -8,6 +8,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { setActiveDbPath, clearActiveDbPath } from '@/services/db/sqliteDb';
 import { invalidateNativeRouter } from '../router/gtfsRouterNative';
 import { invalidateStopCache } from '../core/stopRepo';
+import { invalidateStopColors } from '../departures/stopColors';
 import { computeFeedStats, type FeedStats } from './gtfsFeedStats';
 
 /** Where a feed was downloaded from, kept for licence credit and later update checks. */
@@ -132,6 +133,7 @@ function dedupeName(candidate: string, existingNames: string[]): string {
 function invalidateDatabaseCaches(): void {
     invalidateNativeRouter();
     invalidateStopCache();
+    invalidateStopColors();
 }
 
 /**

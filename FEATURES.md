@@ -13,13 +13,13 @@ What the app does today, and what could come next. Written from the code as it s
 - **Walking speed.** A pill on the search bar cycles through your walking speed presets, and the router uses the one selected.
 - **Walk limit.** A setting for the farthest the router may send you on foot (200 m to 5 km, default 1.68 km). It applies to the next search.
 - **Routing.** On-device RAPTOR in Rust, offline, against the GTFS database you imported. It returns several journeys at once, a Pareto set over arrival time, walking distance and transfers.
-- **Route sheet.** Lists the journeys with times, duration and walking distance. You can sort by arrival, least walking or fewest transfers. Selecting a journey draws it on the map, with every stop of each ride shown as a dot.
+- **Route sheet.** Lists the journeys with times, duration and walking distance. You can sort by arrival, least walking or fewest transfers. Selecting a journey draws it on the map, with every stop of each ride shown as a white circle ringed in the route colour.
 - **Realtime delays.** If a feed has GTFS-Realtime TripUpdates URLs configured, delays are fetched at search time and applied inside the engine. Legs carry a `departureDelaySec`. Failures on one URL don't drop the others.
 - **Friendly errors.** Search failures such as no service in the window are mapped to readable messages.
 
 ### Stop departures
 
-- **Stop dots.** Zoom in to about 2 km tall and every stop in view gets a tappable dot (up to 150, nearest the centre first). They hide while a route is shown, while picking on the map and in debug mode.
+- **Stop dots.** Zoom in to about 2 km tall and every stop in view gets a tappable circle (up to 150, nearest the centre first), ringed in the colour of the route that serves it most. They hide while a route is shown, while picking on the map and in debug mode.
 - **Departures sheet.** Tapping a dot opens a sheet with the next 3 hours of scheduled departures: line badge in the route colour, "to <last stop>", minutes away or clock time, and a header listing the lines that serve the stop.
 - **From a planned route.** Tapping a stop dot on a selected route opens the same sheet. The route stop is matched back to the database by position (nearest within 50 m, same name preferred).
 - **Behaviour.** Works offline from the timetable. Reloads every minute, honours `calendar` and `calendar_dates` exceptions, includes yesterday's trips that run past midnight, and leaves out trips that end at the stop. Times are scheduled, not live, and the sheet says so.
@@ -63,7 +63,7 @@ What the app does today, and what could come next. Written from the code as it s
 ### Developer tooling
 
 - **Debug visualiser.** Replays a search on the map: BFS rounds and candidate seed paths (flat, per-hop or depth coloured) and RAPTOR route-checks one at a time. The mounts in `index.tsx` are currently commented out, so it is not reachable in the app.
-- **Tests.** `npm test` runs 38 tests on Node's built-in runner, including the departures query against the real schema in in-memory SQLite.
+- **Tests.** `npm test` runs 44 tests on Node's built-in runner, including the departures query against the real schema in in-memory SQLite.
 
 ## Future features
 
