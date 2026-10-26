@@ -37,6 +37,7 @@ import {findRepoStop} from '@/services/gtfs/departures/findRepoStop';
 import {getDb} from '@/services/db/sqliteDb';
 import type {RouteStop} from '@/services/gtfs/router/routeTypes';
 import {RIDE_LINE_WIDTH, RideStopMarkers} from '@/components/map/RideStopMarkers';
+import {HIDE_GOOGLE_TRANSIT} from '@/constants/mapStyle';
 
 const EMPTY_COORDS: LatLng[] = [];
 // Latitude span the map zooms in to when a stop is tapped, at most.
@@ -193,6 +194,10 @@ export default function Index() {
                 showsMyLocationButton={false}
                 showsCompass={false}
                 userInterfaceStyle={colorScheme ?? 'light'}
+                customMapStyle={HIDE_GOOGLE_TRANSIT}
+                showsPointsOfInterest={false}
+                // With the POI listener on, Android sends taps on a Google icon to onPoiClick and never calls onPress.
+                poiClickEnabled={false}
                 onMapReady={() => {
                     if (userLocation) {
                         mapRef.current?.animateToRegion(
