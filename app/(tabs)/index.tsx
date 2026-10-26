@@ -1,6 +1,6 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import MapView, { LatLng, Marker, Polyline, PROVIDER_GOOGLE, Region} from 'react-native-maps';
-import {ActivityIndicator, Keyboard, StyleSheet, Text, View} from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import MapView, { LatLng, MapPressEvent, Marker, Polyline, PROVIDER_GOOGLE, Region} from 'react-native-maps';
+import {ActivityIndicator, Keyboard, StyleSheet, Text, useWindowDimensions, View} from 'react-native';
 import * as Location from 'expo-location';
 import {useSelector} from 'react-redux';
 import {RootState} from '@/store/store';
@@ -31,7 +31,7 @@ import {useTripRecorder} from '@/hooks/tripRecorder';
 import {useTripNotificationTap} from '@/hooks/tripNotificationTap';
 import {useStopsInView} from '@/hooks/stopsInView';
 import {useStopColors} from '@/hooks/stopColors';
-import {dotHalfLengthDeg} from '@/services/geo/dotLength';
+import {nearestWithin} from '@/services/geo/nearestPoint';
 import {getAllStopsCached, type RepoStop} from '@/services/gtfs/core/stopRepo';
 import {findRepoStop} from '@/services/gtfs/departures/findRepoStop';
 import {getDb} from '@/services/db/sqliteDb';
@@ -41,6 +41,8 @@ import {RIDE_LINE_WIDTH, RideStopMarkers} from '@/components/map/RideStopMarkers
 const EMPTY_COORDS: LatLng[] = [];
 // Latitude span the map zooms in to when a stop is tapped, at most.
 const STOP_FOCUS_DELTA = 0.008;
+// How close to a stop circle a tap counts as hitting it.
+const STOP_TAP_RADIUS_DP = 22;
 const EMPTY_SEGMENTS: NonNullable<ReturnType<typeof selectDisplayedJourney>>['segments'] = [];
 
 export default function Index() {
@@ -51,6 +53,7 @@ export default function Index() {
     const {colorScheme} = useColorScheme();
     const theme = useThemeStyle();
     const insets = useSafeAreaInsets();
+    const windowHeight = useWindowDimensions().height;
 
     const userLocation = useSelector((s: RootState) => s.location.userLocation);
     const displayedJourney = useSelector(selectDisplayedJourney);
@@ -103,7 +106,6 @@ export default function Index() {
     const stopsTappable = isFocused && selectedPlace === null && pickingField === null && !debugEnabled;
     const stopsInView = useStopsInView(region, stopsTappable);
     const stopColors = useStopColors(stopsInView);
-    const dotHalfLength = dotHalfLengthDeg(region?.latitudeDelta ?? STOP_FOCUS_DELTA);
     useEffect(() => {
         if (selectedPlace !== null) setDepartureStop(null);
     }, [selectedPlace]);
@@ -132,6 +134,27 @@ export default function Index() {
         const stop = findRepoStop(await getAllStopsCached(await getDb()), routeStop);
         if (stop) selectStop(stop);
     }, [selectStop]);
+
+    const routeStops = useMemo(
+        () => (debugEnabled ? [] : routeSegments.flatMap(s => (s.type === 'transit' ? s.stops ?? [] : []))),
+        [routeSegments, debugEnabled],
+    );
+
+    // Stop circles are not tappable themselves, so a tap on the map opens the nearest one within reach.
+    const handleMapPress = (e: MapPressEvent) => {
+        Keyboard.dismiss();
+        const latitudeDelta = regionRef.current?.latitudeDelta;
+        if (!latitudeDelta) return;
+        const point = e.nativeEvent.coordinate;
+        const reach = (latitudeDelta * STOP_TAP_RADIUS_DP) / windowHeight;
+        const routeStop = nearestWithin(routeStops, point, reach, s => s);
+        if (routeStop) {
+            selectRouteStop(routeStop);
+            return;
+        }
+        const stop = nearestWithin(stopsInView, point, reach, s => ({latitude: s.stop_lat, longitude: s.stop_lon}));
+        if (stop) selectStop(stop);
+    };
 
     useEffect(() => {
         goToUserLocation();
@@ -182,7 +205,7 @@ export default function Index() {
                         );
                     }
                 }}
-                onPress={() => Keyboard.dismiss()}
+                onPress={handleMapPress}
                 onRegionChangeComplete={r => {
                     regionRef.current = r;
                     setRegion(r);
@@ -210,10 +233,10 @@ export default function Index() {
                 ) : null)}
 
                 {!debugEnabled && routeSegments.map((segment, index) => segment.type === 'transit' && (
-                    <RideStopMarkers key={index} segment={segment} color={segment.routeColor ?? routeColor ?? '#2563eb'} halfLength={dotHalfLength} onSelect={selectRouteStop} />
+                    <RideStopMarkers key={index} segment={segment} color={segment.routeColor ?? routeColor ?? '#2563eb'} />
                 ))}
 
-                <StopDots stops={stopsInView} colors={stopColors} halfLength={dotHalfLength} onSelect={selectStop} />
+                <StopDots stops={stopsInView} colors={stopColors} />
 
                 {!isCurrentLocation(origin) && (
                     <Marker

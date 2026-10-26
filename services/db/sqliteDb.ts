@@ -1,5 +1,6 @@
 import {type DB as OPSQLiteDB, open} from '@op-engineering/op-sqlite';
 import * as FileSystem from 'expo-file-system/legacy';
+import {notifyActiveDbChange} from '@/services/db/activeDbChange';
 
 // The database file op-sqlite and the Rust engine use. null means none is selected.
 // There is no default file on purpose: querying a stale default after a restart was a past
@@ -18,12 +19,14 @@ export function setActiveDbPath(path: string): void {
     if (path === currentDbPath) return;
     currentDbPath = path;
     dbPromise = null;
+    notifyActiveDbChange();
 }
 
 /** Back to "nothing selected". A separate function because setActiveDbPath ignores unchanged paths. */
 export function clearActiveDbPath(): void {
     currentDbPath = null;
     dbPromise = null;
+    notifyActiveDbChange();
 }
 
 export async function isDbReady(): Promise<boolean> {

@@ -19,7 +19,7 @@ What the app does today, and what could come next. Written from the code as it s
 
 ### Stop departures
 
-- **Stop dots.** Zoom in to about 2 km tall and every stop in view gets a tappable circle (up to 150, nearest the centre first), ringed in the colour of the route that serves it most. They hide while a route is shown, while picking on the map and in debug mode.
+- **Stop dots.** Zoom in to about 2 km tall and every stop in view gets a circle (up to 150, nearest the centre first), ringed in the colour of the route that serves it most. Circles are not tappable in react-native-maps, so a tap on the map opens the nearest stop within about 22 dp. They hide while a route is shown, while picking on the map and in debug mode.
 - **Departures sheet.** Tapping a dot opens a sheet with the next 3 hours of scheduled departures: line badge in the route colour, "to <last stop>", minutes away or clock time, and a header listing the lines that serve the stop.
 - **From a planned route.** Tapping a stop dot on a selected route opens the same sheet. The route stop is matched back to the database by position (nearest within 50 m, same name preferred).
 - **Behaviour.** Works offline from the timetable. Reloads every minute, honours `calendar` and `calendar_dates` exceptions, includes yesterday's trips that run past midnight, and leaves out trips that end at the stop. Times are scheduled, not live, and the sheet says so.
@@ -63,7 +63,7 @@ What the app does today, and what could come next. Written from the code as it s
 ### Developer tooling
 
 - **Debug visualiser.** Replays a search on the map: BFS rounds and candidate seed paths (flat, per-hop or depth coloured) and RAPTOR route-checks one at a time. The mounts in `index.tsx` are currently commented out, so it is not reachable in the app.
-- **Tests.** `npm test` runs 44 tests on Node's built-in runner, including the departures query against the real schema in in-memory SQLite.
+- **Tests.** `npm test` runs 45 tests on Node's built-in runner, including the departures query against the real schema in in-memory SQLite.
 
 ## Future features
 
