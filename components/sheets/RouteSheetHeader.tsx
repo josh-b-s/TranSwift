@@ -1,16 +1,18 @@
 import React from 'react';
 import { Pressable, Text, View } from 'react-native';
-import { MapPin, X } from 'lucide-react-native';
+import { MapPin, Star, X } from 'lucide-react-native';
 import { ACCENT, useThemeStyle } from '@/constants/themes';
 
 type Props = {
     name: string;
     address?: string;
     closeLabel?: string;
+    /** When given, a star button saves or unsaves the place. */
+    saved?: { active: boolean; onToggle: () => void };
     onClose: () => void;
 };
 
-export default function RouteSheetHeader({ name, address, closeLabel = 'Close route', onClose }: Props) {
+export default function RouteSheetHeader({ name, address, closeLabel = 'Close route', saved, onClose }: Props) {
     const theme = useThemeStyle();
 
     return (
@@ -32,6 +34,17 @@ export default function RouteSheetHeader({ name, address, closeLabel = 'Close ro
                     </Text>
                 )}
             </View>
+            {saved && (
+                <Pressable
+                    onPress={saved.onToggle}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel={saved.active ? 'Remove from saved places' : 'Save place'}
+                    style={{ padding: 4 }}
+                >
+                    <Star size={22} color={ACCENT} fill={saved.active ? ACCENT : 'none'} />
+                </Pressable>
+            )}
             <Pressable
                 onPress={onClose}
                 hitSlop={8}

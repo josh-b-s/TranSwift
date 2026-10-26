@@ -1,6 +1,6 @@
 import React from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
-import { Bus, ChevronRight, type LucideIcon, SlidersHorizontal } from 'lucide-react-native';
+import { Bus, ChevronRight, type LucideIcon, SlidersHorizontal, Star } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useThemeStyle } from '@/constants/themes';
 
@@ -8,7 +8,7 @@ type MenuItem = {
     icon: LucideIcon;
     title: string;
     subtitle: string;
-    route: '/settings/preferences' | '/settings/gtfs';
+    route: '/settings/preferences' | '/settings/saved-places' | '/settings/gtfs';
 };
 
 const ITEMS: MenuItem[] = [
@@ -17,6 +17,12 @@ const ITEMS: MenuItem[] = [
         title: 'Preferences',
         subtitle: 'Theme, default walking speed, units',
         route: '/settings/preferences',
+    },
+    {
+        icon: Star,
+        title: 'Saved places',
+        subtitle: 'Rename or remove your starred places and stops',
+        route: '/settings/saved-places',
     },
     {
         icon: Bus,

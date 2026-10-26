@@ -1,4 +1,4 @@
-import React, { forwardRef } from 'react';
+import React, { forwardRef, useMemo } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 import { BottomSheetModal, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { SharedValue } from 'react-native-reanimated';
@@ -7,6 +7,8 @@ import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { ACCENT, SHADOW, TOP_SAFE, useThemeStyle } from '@/constants/themes';
 import RouteSheetHeader from '@/components/sheets/RouteSheetHeader';
 import { useStopDepartures } from '@/hooks/stopDepartures';
+import { useSavedPlace } from '@/hooks/savedPlace';
+import { stopToPlace } from '@/services/places/endpoints';
 import type { RepoStop } from '@/services/gtfs/core/stopRepo';
 import { formatClock, formatDepartureIn } from '@/services/gtfs/departures/departureFormat';
 
@@ -20,6 +22,7 @@ const StopDeparturesSheet = forwardRef<BottomSheetModal, Props>(({ stop, animate
     const theme = useThemeStyle();
     const tabBarHeight = useBottomTabBarHeight();
     const { departures, loading, error } = useStopDepartures(stop);
+    const savedStop = useSavedPlace(useMemo(() => (stop ? stopToPlace(stop) : null), [stop]));
 
     const lines = [...new Set(departures.map(d => d.routeName))];
     const now = Date.now();
@@ -50,6 +53,7 @@ const StopDeparturesSheet = forwardRef<BottomSheetModal, Props>(({ stop, animate
                             name={stop.stop_name}
                             address={lines.length > 0 ? lines.join(' · ') : undefined}
                             closeLabel="Close departures"
+                            saved={savedStop}
                             onClose={onClose}
                         />
                     )}

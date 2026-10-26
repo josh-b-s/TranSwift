@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { FlatList, Keyboard, Pressable, Text, TouchableOpacity, View } from 'react-native';
-import { ArrowUpDown, MapPin, Navigation } from 'lucide-react-native';
+import { ArrowUpDown, Clock, MapPin, Navigation, Star } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch, RootState } from '@/store/store';
@@ -15,6 +15,8 @@ import { useRequestRoute } from '@/hooks/requestRoute';
 import { CURRENT_LOCATION, isCurrentLocation } from '@/services/places/endpoints';
 import type { SearchPlace } from '@/services/places/places';
 import EndpointField from '@/components/search/EndpointField';
+import { addRecentPlace } from '@/store/savedPlaces.slice';
+import { buildSuggestions, isRecent, isSaved, matchPlaces, mergeResults } from '@/services/places/savedPlaces';
 
 const GOOGLE_MAPS_APIKEY = process.env.EXPO_PUBLIC_API_KEY ?? '';
 
@@ -22,6 +24,7 @@ export default function Search() {
     const dispatch = useDispatch<AppDispatch>();
     const { query, results, showResults, loading, origin, selected: destination } = useSelector((s: RootState) => s.search);
     const userLocation = useSelector((s: RootState) => s.location.userLocation);
+    const { saved, recents } = useSelector((s: RootState) => s.savedPlaces);
     const requestRoute = useRequestRoute();
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const theme = useThemeStyle();
@@ -85,6 +88,7 @@ export default function Search() {
         Keyboard.dismiss();
         setActiveField(null);
         resetTyping();
+        if (!isCurrentLocation(place)) dispatch(addRecentPlace(place));
         if (field === 'origin') {
             dispatch(setOrigin(place));
             requestRoute({ origin: place });
@@ -94,17 +98,20 @@ export default function Search() {
         }
     }, [dispatch, requestRoute, resetTyping, activeField]);
 
-    // "Current location" is offered on an empty field, unless it would put the
-    // same point at both ends.
+    // An empty field offers "Current location", saved places and recent searches. Neither end is offered if it
+    // would put the same point at both.
     const ownPlace = activeField === 'origin' ? origin : destination;
     const otherPlace = activeField === 'origin' ? destination : origin;
-    const offerCurrent = activeField !== null
-        && query.trim() === ''
+    const emptyField = activeField !== null && query.trim() === '';
+    const offerCurrent = emptyField
         && !(ownPlace && isCurrentLocation(ownPlace))
         && !(otherPlace && isCurrentLocation(otherPlace));
-    const dropdownData: SearchPlace[] = offerCurrent
-        ? [CURRENT_LOCATION]
-        : (activeField && showResults ? results : []);
+    const dropdownData: SearchPlace[] = emptyField
+        ? [
+            ...(offerCurrent ? [CURRENT_LOCATION] : []),
+            ...buildSuggestions(saved, recents, otherPlace?.place_id),
+        ]
+        : activeField ? mergeResults(matchPlaces(saved, recents, query), showResults ? results : []) : [];
 
     return (
         <View className="absolute left-4 right-4 z-[9999]" style={{ top: topInset }}>
@@ -152,7 +159,7 @@ export default function Search() {
                         keyboardShouldPersistTaps="handled"
                         renderItem={({ item, index }) => {
                             const current = isCurrentLocation(item);
-                            const Icon = current ? Navigation : MapPin;
+                            const Icon = current ? Navigation : isSaved(saved, item.place_id) ? Star : emptyField || isRecent(recents, item.place_id) ? Clock : MapPin;
                             return (
                                 <TouchableOpacity
                                     onPress={() => onSelect(item)}
@@ -169,7 +176,7 @@ export default function Search() {
                                     </View>
                                     <View className="flex-1">
                                         <Text className="text-base font-semibold" numberOfLines={1} style={{ color: theme.color }}>{item.name}</Text>
-                                        {!current && (
+                                        {!current && !!item.address && (
                                             <Text className="text-sm mt-0.5" numberOfLines={1} style={{ color: theme.color, opacity: 0.55 }}>{item.address}</Text>
                                         )}
                                     </View>

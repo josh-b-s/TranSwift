@@ -9,6 +9,7 @@ import { store } from '@/store/store';
 import '@/global.css';
 import { warmUpGtfsEngine } from '@/services/gtfs/router/gtfsWarmup';
 import { loadPreferences } from '@/store/preferences.slice';
+import { loadSavedPlaces } from '@/store/savedPlaces.slice';
 import { restoreActiveDatabase } from '@/services/gtfs/import/gtfsDbRegistry';
 import '@/services/trips/locationTracking';
 
@@ -22,6 +23,7 @@ export default function Layout() {
             await restoreActiveDatabase();
             warmUpGtfsEngine(); // deliberately not awaited from here on — shouldn't block first paint
         })();
+        store.dispatch(loadSavedPlaces());
         store.dispatch(loadPreferences()); // applies the saved theme mode via nativewind as soon as it resolves
     }, []);
 

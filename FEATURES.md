@@ -24,6 +24,13 @@ What the app does today, and what could come next. Written from the code as it s
 - **From a planned route.** Tapping a stop dot on a selected route opens the same sheet. The route stop is matched back to the database by position (nearest within 50 m, same name preferred).
 - **Behaviour.** Works offline from the timetable. Reloads every minute, honours `calendar` and `calendar_dates` exceptions, includes yesterday's trips that run past midnight, and leaves out trips that end at the stop. Times are scheduled, not live, and the sheet says so.
 
+### Saved places
+
+- **Star a place.** A star on the route sheet header saves the destination, and a star on the departures sheet saves a stop. Both are stored in `saved-places.json`.
+- **One-tap endpoints.** Tapping an empty start or destination field lists Current location, your saved places under their own labels, then the last 8 places you searched. Picking one sets that end and re-routes.
+- **Typing.** Saved places and recents that match the query show first, instantly and offline, followed by the Google results. When a result has the same place id as a stored place, the stored name and coordinates are refreshed; saved labels are kept.
+- **Rename and remove.** Settings has a Saved places screen. Rename a place to "Home" or "Work" there; there are no special Home and Work slots.
+
 ### Recording a trip
 
 - **Start trip.** Turns the selected journey into steps (walk to X, ride to Y). A button on the map shows the current step and, on walks, your previous best.
@@ -56,7 +63,7 @@ What the app does today, and what could come next. Written from the code as it s
 ### Developer tooling
 
 - **Debug visualiser.** Replays a search on the map: BFS rounds and candidate seed paths (flat, per-hop or depth coloured) and RAPTOR route-checks one at a time. The mounts in `index.tsx` are currently commented out, so it is not reachable in the app.
-- **Tests.** `npm test` runs 29 tests on Node's built-in runner, including the departures query against the real schema in in-memory SQLite.
+- **Tests.** `npm test` runs 38 tests on Node's built-in runner, including the departures query against the real schema in in-memory SQLite.
 
 ## Future features
 
@@ -64,7 +71,6 @@ What the app does today, and what could come next. Written from the code as it s
 
 | Feature | What it adds | Notes |
 | --- | --- | --- |
-| Saved places and recent searches | Home, Work, favourite stops as one-tap start and end points | A JSON file like `preferencesStore.ts`. Nothing exists yet. S to M |
 | Departure filters | Filter the sheet by line or direction | Data is already in the result. S |
 | Trip splits and speed chart | Per-km splits and speed over time on the trip screen | Timed path samples are already saved. M |
 | Weekly and monthly history | A toggle on the History charts, plus streaks and goals such as "walk 10 km this week" | Computed from saved trips. M |
@@ -80,7 +86,7 @@ What the app does today, and what could come next. Written from the code as it s
 | Realtime in departures | Delays and cancellations on the departures sheet | Delays are applied inside the Rust engine only. Needs a new engine call that returns delay by trip, not a JS protobuf decoder. L |
 | Service alerts | Disruption banners and alerts for saved places | Needs an alerts feed in the same per-feed config as TripUpdates. Pairs with saved places. L |
 | Lock-screen trip card | Next step and time remaining on the lock screen | Live Notification on Android is moderate, a Live Activity on iOS is a bigger piece of native work. L |
-| Home screen widget or shortcut | "Home to Work" in one tap | Depends on saved places. M to L |
+| Home screen widget or shortcut | "Home to Work" in one tap | Depends on saved places, which now exist. M to L |
 | Step-free routing | Avoid stairs, prefer accessible stops | The imported schema has no `wheelchair_boarding`, so the importer and schema change first. L |
 | Crowding | Show how full a service is | Needs a realtime occupancy feed. Leave until live data is in. L |
 | Station detail | Which side to board, which exit to take | GTFS `pathways` and levels would need importing. L |
@@ -94,9 +100,8 @@ What the app does today, and what could come next. Written from the code as it s
 
 ### Suggested order
 
-1. Saved places, which several larger items depend on.
-2. History extras (splits, weekly view, heatmap), since the data is already stored.
-3. Realtime in departures, as its own project, followed by alerts.
+1. History extras (splits, weekly view, heatmap), since the data is already stored.
+2. Realtime in departures, as its own project, followed by alerts.
 
 ## Known limits
 

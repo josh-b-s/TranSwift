@@ -15,6 +15,7 @@ export default function SettingsLayout() {
         >
             <Stack.Screen name="index" options={{ title: 'Settings' }} />
             <Stack.Screen name="preferences" options={{ title: 'Preferences' }} />
+            <Stack.Screen name="saved-places" options={{ title: 'Saved places' }} />
             <Stack.Screen name="gtfs" options={{ title: 'GTFS Data' }} />
             <Stack.Screen name="browse-feeds" options={{ title: 'Browse Feeds' }} />
         </Stack>

@@ -7,6 +7,8 @@ import { RootState, AppDispatch } from '@/store/store';
 import { ACCENT, SHADOW, TOP_SAFE, useThemeStyle } from '@/constants/themes';
 import { modeIcon } from '@/constants/modeIcons';
 import RouteSheetHeader from '@/components/sheets/RouteSheetHeader';
+import { useSavedPlace } from '@/hooks/savedPlace';
+import { isCurrentLocation } from '@/services/places/endpoints';
 import RouteOptionPills from '@/components/search/RouteOptionPills';
 import TripButton from '@/components/trip/TripButton';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -66,6 +68,7 @@ const RouteBottomSheetModal = forwardRef<BottomSheetModal, Props>(
         const dispatch = useDispatch<AppDispatch>();
         const { journeys = [], selectedJourneyIndex, error, loading } = useSelector((s: RootState) => s.route);
         const selectedPlace = useSelector((s: RootState) => s.search.selected);
+        const savedPlace = useSavedPlace(selectedPlace && !isCurrentLocation(selectedPlace) ? selectedPlace : null);
         const [sortKey, setSortKey] = useState<SortKey>('arrival');
         const tabBarHeight = useBottomTabBarHeight();
 
@@ -122,6 +125,7 @@ const RouteBottomSheetModal = forwardRef<BottomSheetModal, Props>(
                         <RouteSheetHeader
                             name={selectedPlace.name}
                             address={selectedPlace.address}
+                            saved={savedPlace}
                             onClose={closeRoute}
                         />
                     )}
