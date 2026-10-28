@@ -51,6 +51,14 @@ export async function getNativeEngine(dbPath?: string | null) {
     return engine;
 }
 
+/**
+ * The engine once it has finished warming up for the current database, otherwise null. Callers that only want
+ * to read it, such as the departures sheet, use this so they never start the 12 s warm-up themselves.
+ */
+export function getWarmNativeEngine() {
+    return engine && warmedUpPath !== null && warmedUpPath === getCurrentDbPath() ? engine : null;
+}
+
 // Call this once after any GTFS re-import (mirrors your old invalidate flow)
 export function invalidateNativeRouter() {
     engine?.invalidate();

@@ -192,3 +192,55 @@ CREATE TABLE pattern_headway (
                                  sample_trips    INTEGER NOT NULL,
                                  PRIMARY KEY (pattern_pk, time_bucket)
 ) WITHOUT ROWID;
+
+-- Station detail, from stops.txt, pathways.txt and levels.txt. Kept apart from `stops` so the router's table is
+-- unchanged. Feeds without this data leave the tables empty, and a database imported before they existed does not
+-- have them at all, which is how the app tells the two apart.
+
+-- Where a boarding stop sits: only stops that name a parent station, a platform code or a level get a row.
+CREATE TABLE stop_platforms (
+                                stop_pk        INTEGER PRIMARY KEY,
+                                parent_station TEXT,
+                                platform_code  TEXT,
+                                level_id       TEXT
+);
+
+-- Everything in stops.txt that is not a boarding stop: stations (1), entrances and exits (2), generic nodes (3)
+-- and boarding areas (4). Coordinates are in the same scaled-integer units as stops.stop_lat and may be NULL.
+CREATE TABLE station_nodes (
+                               node_id        TEXT    NOT NULL,
+                               agency         INTEGER NOT NULL,
+                               node_name      TEXT,
+                               location_type  INTEGER NOT NULL,
+                               parent_station TEXT,
+                               level_id       TEXT,
+                               platform_code  TEXT,
+                               node_lat       INTEGER,
+                               node_lon       INTEGER,
+                               PRIMARY KEY (node_id, agency)
+);
+
+-- One edge between two nodes. from_id and to_id are stop_ids of any location type. mode: 1 walkway, 2 stairs,
+-- 3 moving walkway, 4 escalator, 5 elevator, 6 fare gate, 7 exit gate.
+CREATE TABLE pathways (
+                          pathway_id            TEXT    NOT NULL,
+                          agency                INTEGER NOT NULL,
+                          from_id               TEXT    NOT NULL,
+                          to_id                 TEXT    NOT NULL,
+                          mode                  INTEGER NOT NULL,
+                          is_bidirectional      INTEGER NOT NULL DEFAULT 0,
+                          length_m              REAL,
+                          traversal_sec         INTEGER,
+                          stair_count           INTEGER,
+                          signposted_as         TEXT,
+                          reversed_signposted_as TEXT,
+                          PRIMARY KEY (pathway_id, agency)
+);
+
+CREATE TABLE levels (
+                        level_id    TEXT    NOT NULL,
+                        agency      INTEGER NOT NULL,
+                        level_index REAL,
+                        level_name  TEXT,
+                        PRIMARY KEY (level_id, agency)
+);

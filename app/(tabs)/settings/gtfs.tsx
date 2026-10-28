@@ -54,6 +54,7 @@ export default function GtfsData() {
     const [draftName, setDraftName] = useState('');
     const [draftRealtimeUrls, setDraftRealtimeUrls] = useState('');
     const [draftRealtimeHeader, setDraftRealtimeHeader] = useState('');
+    const [draftVehicleUrls, setDraftVehicleUrls] = useState('');
 
     const refresh = useCallback(async () => {
         const [dbs, active] = await Promise.all([listDatabases(), getActiveDatabaseId()]);
@@ -141,6 +142,7 @@ export default function GtfsData() {
         setDraftName(db.name);
         setDraftRealtimeUrls((db.realtimeUrls ?? []).join('\n'));
         setDraftRealtimeHeader(db.realtimeHeader ?? '');
+        setDraftVehicleUrls((db.vehicleUrls ?? []).join('\n'));
     }
 
     function cancelRename() {
@@ -156,7 +158,7 @@ export default function GtfsData() {
         }
         try {
             await renameDatabase(editingId, trimmed);
-            await setRealtimeConfig(editingId, draftRealtimeUrls.split('\n'), draftRealtimeHeader);
+            await setRealtimeConfig(editingId, draftRealtimeUrls.split('\n'), draftRealtimeHeader, draftVehicleUrls.split('\n'));
             setEditingId(null);
             await refresh();
         } catch (err) {
@@ -307,6 +309,16 @@ export default function GtfsData() {
                                 onChangeText={setDraftRealtimeUrls}
                                 multiline
                                 placeholder="Realtime TripUpdates URLs, one per line (optional)"
+                                placeholderTextColor={theme.color + '66'}
+                                autoCapitalize="none"
+                                autoCorrect={false}
+                                style={{ color: theme.color, fontSize: 14, borderBottomWidth: 1, borderBottomColor: theme.color + '33', paddingVertical: 2 }}
+                            />
+                            <TextInput
+                                value={draftVehicleUrls}
+                                onChangeText={setDraftVehicleUrls}
+                                multiline
+                                placeholder="Vehicle positions URLs, one per line (optional)"
                                 placeholderTextColor={theme.color + '66'}
                                 autoCapitalize="none"
                                 autoCorrect={false}

@@ -36,6 +36,8 @@ export type GtfsDatabaseEntry = {
     stats?: FeedStats;
     /** GTFS-realtime TripUpdates URLs, e.g. one per transport mode. Set by hand; realtime is off without any. */
     realtimeUrls?: string[];
+    /** GTFS-realtime VehiclePositions URLs. Vehicles are not drawn on the map without any. */
+    vehicleUrls?: string[];
     /** Optional auth header sent with every realtime URL, written "Name: value". */
     realtimeHeader?: string;
     /** Set when most of a realtime feed's trip ids matched no trip here, which suggests an older timetable. */
@@ -230,12 +232,14 @@ export async function setRealtimeMismatch(id: string, mismatch: boolean): Promis
 }
 
 /** Empty values clear the setting. */
-export async function setRealtimeConfig(id: string, urls: string[], header: string): Promise<void> {
+export async function setRealtimeConfig(id: string, urls: string[], header: string, vehicleUrls: string[]): Promise<void> {
     const reg = await readRegistry();
     const entry = reg.databases.find(d => d.id === id);
     if (!entry) throw new Error(`Unknown GTFS database id: ${id}`);
     const cleaned = urls.map(u => u.trim()).filter(Boolean);
     entry.realtimeUrls = cleaned.length > 0 ? cleaned : undefined;
+    const cleanedVehicles = vehicleUrls.map(u => u.trim()).filter(Boolean);
+    entry.vehicleUrls = cleanedVehicles.length > 0 ? cleanedVehicles : undefined;
     entry.realtimeHeader = header.trim() || undefined;
     await writeRegistry(reg);
 }

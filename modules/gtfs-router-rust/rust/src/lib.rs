@@ -179,6 +179,45 @@ pub struct RealtimeFeedStats {
     pub sample_unmatched_trip_id: Option<String>,
 }
 
+/// Where one vehicle is, from a VehiclePositions feed. Not matched to the timetable: `route_id` and `trip_id`
+/// are the feed's own ids.
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct VehiclePositionInfo {
+    /// Tells two vehicles apart: the vehicle id, else its label, else the trip id.
+    pub key: String,
+    pub label: Option<String>,
+    pub trip_id: Option<String>,
+    pub route_id: Option<String>,
+    pub latitude: f64,
+    pub longitude: f64,
+    /// Degrees clockwise from north.
+    pub bearing: Option<f32>,
+    pub speed_mps: Option<f32>,
+    /// Seconds since the epoch when the position was measured.
+    pub timestamp_sec: Option<u32>,
+}
+
+/// One stop of one trip to look up realtime status for.
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct TripStopRef {
+    pub trip_pk: i32,
+    pub stop_sequence: i32,
+}
+
+/// What the latest realtime feeds say about one stop of one trip.
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct TripStopRealtime {
+    pub trip_pk: i32,
+    pub stop_sequence: i32,
+    /// The whole trip is cancelled.
+    pub cancelled: bool,
+    /// The vehicle will not stop here.
+    pub skipped: bool,
+    /// Seconds late leaving this stop (negative when early). None when the feeds have nothing for it,
+    /// which is different from Some(0), on time.
+    pub departure_delay_sec: Option<i32>,
+}
+
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct TimingEntry {
     pub label: String,
@@ -332,6 +371,21 @@ pub struct GtfsRouterEngine {
     realtime: RwLock<Arc<realtime::overlay::Overlay>>,
 }
 
+/// Decodes raw GTFS-realtime VehiclePositions feeds and returns every vehicle that has a usable position.
+/// Needs no engine or database: it only reads the bytes.
+#[uniffi::export]
+pub fn decode_vehicle_positions(feeds: Vec<Vec<u8>>) -> Result<Vec<VehiclePositionInfo>, RouterError> {
+    let mut out = Vec::new();
+    for bytes in &feeds {
+        let vehicles = realtime::vehicles::decode(bytes).map_err(|e| RouterError::Realtime(format!("could not decode vehicle feed: {e}")))?;
+        out.extend(vehicles.into_iter().map(|v| VehiclePositionInfo {
+            key: v.key, label: v.label, trip_id: v.trip_id, route_id: v.route_id,
+            latitude: v.latitude, longitude: v.longitude, bearing: v.bearing, speed_mps: v.speed_mps, timestamp_sec: v.timestamp_sec,
+        }));
+    }
+    Ok(out)
+}
+
 #[uniffi::export]
 impl GtfsRouterEngine {
     #[uniffi::constructor]
@@ -433,6 +487,23 @@ impl GtfsRouterEngine {
     /// Drops all realtime data so searches use the static timetable only.
     pub fn clear_realtime(&self) {
         *self.realtime.write().unwrap() = Arc::new(realtime::overlay::Overlay::default());
+    }
+
+    /// Looks up the latest realtime status of the given trip stops, for showing live times on a departures list.
+    /// Answers in input order. Needs no warm-up: it only reads the overlay `set_realtime` last stored.
+    pub fn trip_realtime(&self, stops: Vec<TripStopRef>) -> Vec<TripStopRealtime> {
+        let overlay = Arc::clone(&self.realtime.read().unwrap());
+        stops.into_iter().map(|s| {
+            let trip_pk = i64::from(s.trip_pk);
+            let stop_sequence = i64::from(s.stop_sequence);
+            TripStopRealtime {
+                trip_pk: s.trip_pk,
+                stop_sequence: s.stop_sequence,
+                cancelled: overlay.is_cancelled(trip_pk),
+                skipped: overlay.is_skipped(trip_pk, stop_sequence),
+                departure_delay_sec: overlay.departure_delay(trip_pk, stop_sequence).map(|d| d as i32),
+            }
+        }).collect()
     }
 }
 
@@ -1279,5 +1350,55 @@ fn leg_to_ffi(l: raptor::Leg) -> Leg {
         departure_time_sec: l.departure_time_sec.map(|v| v as i32),
         arrival_time_sec: l.arrival_time_sec.map(|v| v as i32),
         departure_delay_sec: l.departure_delay_sec as i32,
+    }
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use prost::Message;
+    use realtime::feed::*;
+
+    #[test]
+    fn trip_realtime_reports_each_stop_in_input_order() {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE trips (trip_pk INTEGER PRIMARY KEY, trip_id TEXT, agency INTEGER, pattern_pk INTEGER);
+             CREATE TABLE stops (stop_pk INTEGER PRIMARY KEY, stop_id TEXT, agency INTEGER);
+             CREATE TABLE pattern_stops (pattern_pk INTEGER, stop_pk INTEGER, stop_sequence INTEGER);
+             INSERT INTO trips VALUES (1, 'T1', 1, 10), (2, 'T2', 1, 10);",
+        ).unwrap();
+        let trip = |id: &str, relationship: Option<i32>| Some(TripDescriptor { trip_id: Some(id.into()), route_id: None, schedule_relationship: relationship });
+        let feed = FeedMessage {
+            entity: vec![
+                FeedEntity { vehicle: None, trip_update: Some(TripUpdate {
+                    trip: trip("T1", None),
+                    stop_time_update: vec![StopTimeUpdate {
+                        stop_sequence: Some(2), stop_id: None, arrival: None,
+                        departure: Some(StopTimeEvent { delay: Some(120), time: None }), schedule_relationship: None,
+                    }],
+                }) },
+                FeedEntity { vehicle: None, trip_update: Some(TripUpdate { trip: trip("T2", Some(TRIP_CANCELED)), stop_time_update: vec![] }) },
+            ],
+        }.encode_to_vec();
+        let (overlay, _) = realtime::overlay::Overlay::from_feeds(&[feed], 0, &conn).unwrap();
+
+        let engine = GtfsRouterEngine::new();
+        *engine.realtime.write().unwrap() = Arc::new(overlay);
+        let at = |trip_pk, stop_sequence| TripStopRef { trip_pk, stop_sequence };
+        let out = engine.trip_realtime(vec![at(1, 1), at(1, 2), at(1, 3), at(2, 1), at(3, 1)]);
+
+        let summary: Vec<(i32, i32, bool, Option<i32>)> =
+            out.iter().map(|r| (r.trip_pk, r.stop_sequence, r.cancelled, r.departure_delay_sec)).collect();
+        assert_eq!(summary, vec![
+            (1, 1, false, None),      // before the trip's first update
+            (1, 2, false, Some(120)),
+            (1, 3, false, Some(120)), // carried forward
+            (2, 1, true, None),
+            (3, 1, false, None),      // trip the feed does not mention
+        ]);
+        assert!(out.iter().all(|r| !r.skipped));
+
+        engine.clear_realtime();
+        assert!(engine.trip_realtime(vec![at(1, 2)])[0].departure_delay_sec.is_none());
     }
 }

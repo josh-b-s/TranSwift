@@ -1,4 +1,4 @@
-import { decodePath } from './pathCodec';
+import { decodePath, type Sample } from './pathCodec';
 import { pathStats, type PathStats } from './pathStats';
 import type { RideLeg, SavedTrip, WalkLeg, WalkTotals } from './tripStore';
 
@@ -37,3 +37,7 @@ export function walkTotals(trip: SavedTrip): WalkTotals {
     const { distanceM, durationS, topSpeedMps } = summarizeTrip(trip);
     return { distanceM, durationS, topSpeedMps };
 }
+
+/** The recorded path of each walk, in trip order. */
+export const walkPaths = (trip: SavedTrip): Sample[][] =>
+    trip.legs.flatMap(leg => (leg.kind === 'walk' ? [decodePath(leg.path)] : []));

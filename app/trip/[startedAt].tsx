@@ -7,12 +7,23 @@ import { useSelector } from 'react-redux';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootState } from '@/store/store';
 import { ACCENT, MAP_STYLE_DARK, TOP_SAFE, useThemeStyle } from '@/constants/themes';
+import { SPEED_UNITS } from '@/constants/speedUnits';
 import TripStats from '@/components/trip/TripStats';
 import TripLegList from '@/components/trip/TripLegList';
+import TripBarChart from '@/components/trip/TripBarChart';
+import TripSplits from '@/components/trip/TripSplits';
+import MatchedTrips from '@/components/trip/MatchedTrips';
+import TripShare from '@/components/trip/TripShare';
 import { loadTrip, type SavedTrip } from '@/services/trips/tripStore';
-import { summarizeTrip } from '@/services/trips/tripSummary';
+import { summarizeTrip, walkPaths } from '@/services/trips/tripSummary';
+import { walkSplits } from '@/services/trips/tripSplits';
+import { speedProfile } from '@/services/trips/speedProfile';
+import { loadHistory, type HistoryTrip } from '@/services/trips/tripHistory';
+import { matchTrips } from '@/services/trips/matchedTrips';
 import { tripLines } from '@/services/trips/tripLines';
-import { recordLines } from '@/services/trips/tripFormat';
+import { formatDuration, formatSpeed, recordLines, splitLengthM } from '@/services/trips/tripFormat';
+
+const SPEED_BARS = 40;
 
 export default function TripSummaryScreen() {
     const { startedAt } = useLocalSearchParams<{ startedAt: string }>();
@@ -23,14 +34,25 @@ export default function TripSummaryScreen() {
     const mapRef = useRef<MapView>(null);
     const [trip, setTrip] = useState<SavedTrip | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [history, setHistory] = useState<HistoryTrip[]>([]);
 
     useEffect(() => {
         loadTrip(Number(startedAt)).then(setTrip).catch(err => setError(String(err)));
     }, [startedAt]);
 
+    useEffect(() => {
+        loadHistory().then(setHistory).catch(err => console.warn('[trip] could not load history for matches:', err));
+    }, [startedAt]);
+
     const summary = useMemo(() => (trip ? summarizeTrip(trip) : null), [trip]);
     const lines = useMemo(() => (trip ? tripLines(trip) : []), [trip]);
     const records = useMemo(() => (trip ? recordLines(trip.records, unit) : []), [trip, unit]);
+    const splits = useMemo(() => (trip ? walkSplits(walkPaths(trip), splitLengthM(unit)) : []), [trip, unit]);
+    const speeds = useMemo(() => (trip ? speedProfile(walkPaths(trip), SPEED_BARS) : []), [trip]);
+    const matches = useMemo(() => {
+        const current = history.find(t => t.startedAt === trip?.startedAt);
+        return current ? matchTrips(history, current) : null;
+    }, [history, trip]);
     const newBestKeys = useMemo(
         () => new Set((trip?.records ?? []).flatMap(r => (r.kind === 'speed' ? [`${r.from}>${r.to}`] : []))),
         [trip],
@@ -107,7 +129,19 @@ export default function TripSummaryScreen() {
                                 ))}
                             </View>
                         )}
+                        {speeds.length > 0 && summary && (
+                            <TripBarChart
+                                title={`Walking speed (${SPEED_UNITS[unit].label})`}
+                                values={speeds}
+                                peakLabel={formatSpeed(Math.max(...speeds), unit)}
+                                startLabel="Start"
+                                endLabel={formatDuration(summary.durationS)}
+                            />
+                        )}
+                        {splits.length > 0 && <TripSplits splits={splits} unit={unit} />}
+                        {matches && <MatchedTrips matches={matches} currentStartedAt={trip.startedAt} unit={unit} />}
                         <TripLegList legs={summary.legs} newBestKeys={newBestKeys} unit={unit} />
+                        <TripShare trip={trip} summary={summary} unit={unit} />
                     </ScrollView>
                 </>
             )}

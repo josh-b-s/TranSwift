@@ -1,4 +1,5 @@
 import { getActiveDatabaseEntry, setRealtimeMismatch } from '../import/gtfsDbRegistry';
+import { authHeaders, fetchFeedBytes } from './realtimeHttp';
 
 const MIN_REFRESH_MS = 30_000;
 const MAX_STALE_MS = 5 * 60_000;
@@ -14,12 +15,6 @@ let lastRefreshAt = 0;
 // Last good bytes per URL, so one failing feed doesn't drop the others' delays.
 const lastGood = new Map<string, { bytes: ArrayBuffer; at: number }>();
 
-function parseHeader(header: string): [string, string] | null {
-    const i = header.indexOf(':');
-    if (i <= 0) return null;
-    return [header.slice(0, i).trim(), header.slice(i + 1).trim()];
-}
-
 /** Local midnight today in POSIX seconds; added trips carry absolute times that the engine turns into seconds since midnight. */
 function localMidnightEpoch(): bigint {
     const d = new Date();
@@ -31,12 +26,6 @@ function localMidnightEpoch(): bigint {
 function feedLabel(url: string): string {
     const parts = url.split('?')[0].split('/').filter(Boolean);
     return parts.length >= 2 ? parts[parts.length - 2] : url;
-}
-
-async function fetchFeed(url: string, headers: Record<string, string>): Promise<ArrayBuffer> {
-    const res = await fetch(url, { headers });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return res.arrayBuffer();
 }
 
 /**
@@ -59,10 +48,9 @@ export async function refreshRealtime(engine: Engine): Promise<void> {
     if (key !== lastKey) lastGood.clear();
     if (key === lastKey && Date.now() - lastRefreshAt < MIN_REFRESH_MS) return;
 
-    const parsed = entry.realtimeHeader ? parseHeader(entry.realtimeHeader) : null;
-    const headers = parsed ? { [parsed[0]]: parsed[1] } : {};
+    const headers = authHeaders(entry.realtimeHeader);
 
-    const results = await Promise.allSettled(urls.map(url => fetchFeed(url, headers)));
+    const results = await Promise.allSettled(urls.map(url => fetchFeedBytes(url, headers)));
     const now = Date.now();
     results.forEach((result, i) => {
         if (result.status === 'fulfilled') {

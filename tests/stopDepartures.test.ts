@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import Database from 'better-sqlite3';
 import { REAL_INDEXES_SQL, REAL_SCHEMA_SQL } from './realSchema';
 import { getStopDepartures } from '@/services/gtfs/departures/stopDepartures';
+import { getTripStops } from '@/services/gtfs/departures/tripStops';
 import type { QueryableDb } from '@/services/db/queryableDb';
 
 const HOUR_MS = 3_600_000;
@@ -130,4 +131,38 @@ test('a loop trip departs from its first stop but its return there is not a depa
     `);
     const out = await getStopDepartures(db, 1, new Date(at(MON, 9)), 3 * HOUR_MS, 10);
     assert.deepEqual(out.map(d => d.timeMs), [at(MON, 10)]);
+});
+
+test('lists the stops a departure calls at from its own stop onward', async () => {
+    addTrip(100, 'WK', 10 * 3600);
+    const [fromAlpha] = await getStopDepartures(db, 1, new Date(at(MON, 9)), 3 * HOUR_MS, 10);
+    const all = await getTripStops(db, fromAlpha);
+    assert.deepEqual(all.map(s => s.stopName), ['Alpha', 'Bravo', 'Charlie']);
+    assert.deepEqual(all.map(s => s.timeMs), [at(MON, 10), at(MON, 10, 5), at(MON, 10, 10)]);
+
+    const [fromBravo] = await getStopDepartures(db, 2, new Date(at(MON, 9)), 3 * HOUR_MS, 10);
+    assert.deepEqual((await getTripStops(db, fromBravo)).map(s => s.stopName), ['Bravo', 'Charlie']);
+});
+
+test('trip stops come only from the chosen trip, and times past midnight keep their service day', async () => {
+    addTrip(100, 'WK', 10 * 3600);
+    addTrip(101, 'WK', 11 * 3600);
+    addTrip(102, 'WK', 24 * 3600 + 1800); // Monday service day, 00:30 on Tuesday
+    const out = await getStopDepartures(db, 1, new Date(at(MON, 10, 30)), 24 * HOUR_MS, 10);
+    const second = out.find(d => d.timeMs === at(MON, 11))!;
+    assert.deepEqual((await getTripStops(db, second)).map(s => s.timeMs), [at(MON, 11), at(MON, 11, 5), at(MON, 11, 10)]);
+    const late = out.find(d => d.timeMs === at(TUE, 0, 30))!;
+    assert.deepEqual((await getTripStops(db, late)).map(s => s.timeMs), [at(TUE, 0, 30), at(TUE, 0, 35), at(TUE, 0, 40)]);
+});
+
+test('a trip tomorrow morning appears when the window runs past midnight', async () => {
+    addTrip(100, 'WK', 6 * 3600);
+    const out = await getStopDepartures(db, 1, new Date(at(MON, 23)), 8 * HOUR_MS, 10);
+    assert.deepEqual(out.map(d => d.timeMs), [at(TUE, 6)]);
+});
+
+test('a service outside its date range does not run', async () => {
+    addTrip(100, 'WK', 10 * 3600);
+    sqlite.exec(`UPDATE calendar SET end_date = '20261025'`);
+    assert.deepEqual(await getStopDepartures(db, 1, new Date(at(MON, 9)), 3 * HOUR_MS, 10), []);
 });

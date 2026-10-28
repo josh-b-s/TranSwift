@@ -16,6 +16,9 @@ import Speedometer from '@/components/trip/Speedometer';
 import RouteBottomSheetModal from '@/components/sheets/RouteBottomSheetModal';
 import StopDeparturesSheet from '@/components/sheets/StopDeparturesSheet';
 import {StopDots} from '@/components/map/StopDots';
+import VehicleMarkers from '@/components/map/VehicleMarkers';
+import {useVehicles} from '@/hooks/vehiclePositions';
+import {routeKey} from '@/services/gtfs/vehicles/vehicleRoutes';
 import MapPickOverlay from '@/components/map/MapPickOverlay';
 import DebugMapOverlay from '@/components/debug/DebugMapOverlay';
 import DebugControls from '@/components/debug/DebugControls';
@@ -73,6 +76,13 @@ export default function Index() {
     // Read by selectStop, which must keep one identity so the stop dots don't re-render on every pan.
     const regionRef = useRef<Region | null>(null);
     const [departureStop, setDepartureStop] = useState<RepoStop | null>(null);
+    const [stopRouteKeys, setStopRouteKeys] = useState<string[]>([]);
+
+    // Vehicles on the routes of the open stop and of the shown journey.
+    const wantedRouteKeys = useMemo(
+        () => [...new Set([...stopRouteKeys, ...(displayedJourney?.legs ?? []).map(l => routeKey(l.routeName, l.routeType))])],
+        [stopRouteKeys, displayedJourney],
+    );
 
     const goToUserLocation = useGoToUserLocation(mapRef);
     useFeedSuggestion();
@@ -106,6 +116,7 @@ export default function Index() {
     // Stop dots give way to the route once a place is chosen, and so does the departures sheet.
     const stopsTappable = isFocused && selectedPlace === null && pickingField === null && !debugEnabled;
     const stopsInView = useStopsInView(region, stopsTappable);
+    const vehicles = useVehicles(wantedRouteKeys, isFocused && !debugEnabled);
     const stopColors = useStopColors(stopsInView);
     useEffect(() => {
         if (selectedPlace !== null) setDepartureStop(null);
@@ -242,6 +253,7 @@ export default function Index() {
                 ))}
 
                 <StopDots stops={stopsInView} colors={stopColors} />
+                <VehicleMarkers vehicles={vehicles} center={region} />
 
                 {!isCurrentLocation(origin) && (
                     <Marker
@@ -310,6 +322,7 @@ export default function Index() {
                 stop={departureStop}
                 animatedPosition={bottomSheetPosition}
                 onClose={() => setDepartureStop(null)}
+                onRoutes={setStopRouteKeys}
             />
         </View>
     );

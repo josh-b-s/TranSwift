@@ -4,3 +4,4 @@ pub mod added;
 pub mod feed;
 pub mod inject;
 pub mod overlay;
+pub mod vehicles;

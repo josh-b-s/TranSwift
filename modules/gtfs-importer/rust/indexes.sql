@@ -14,3 +14,7 @@ CREATE INDEX idx_trips_id        ON trips(trip_id, agency);
 -- storage for zero query benefit.
 CREATE INDEX idx_cal_service     ON calendar(service_id, agency);
 CREATE INDEX idx_caldt_date      ON calendar_dates(date, agency);
+CREATE INDEX idx_stop_platforms_parent ON stop_platforms(parent_station);
+CREATE INDEX idx_station_nodes_parent  ON station_nodes(parent_station, agency);
+CREATE INDEX idx_pathways_from         ON pathways(from_id, agency);
+CREATE INDEX idx_pathways_to           ON pathways(to_id, agency);

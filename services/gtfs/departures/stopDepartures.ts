@@ -8,14 +8,22 @@ const HOUR_MS = 3_600_000;
 export type Departure = {
     timeMs: number;
     routeName: string;
+    routeType: number;
     routeColor: string;
     routeTextColor: string;
     /** Name of the last stop on the trip. */
     terminus: string;
+    /** Which trip this is and where it calls at the stop, to look up its other stops. */
+    tripPk: number;
+    stopSequence: number;
+    /** When the service day the trip belongs to began, which its stop times count from. */
+    dayStartMs: number;
 };
 
 type DepartureRow = {
     sec: number;
+    trip_pk: number;
+    stop_sequence: number;
     service_id: string;
     agency: number;
     route_short_name: string | null;
@@ -61,7 +69,7 @@ export async function getStopDepartures(
         const serviceIds = [...new Set([...services].map(key => parseKey(key).id))];
 
         const rows = await db.getAllAsync<DepartureRow>(
-            `SELECT st.departure_sec AS sec, t.service_id, t.agency,
+            `SELECT st.departure_sec AS sec, st.trip_pk, st.stop_sequence, t.service_id, t.agency,
                     r.route_short_name, r.route_long_name, r.route_type,
                     r.route_color, r.route_text_color,
                     term.stop_name AS terminus
@@ -87,9 +95,13 @@ export async function getStopDepartures(
             out.push({
                 timeMs: dayStartMs + r.sec * 1000,
                 routeName,
+                routeType: r.route_type,
                 routeColor: hexColor(r.route_color, fallbackRouteColor(r.route_type, routeName)),
                 routeTextColor: hexColor(r.route_text_color, '#FFFFFF'),
                 terminus: r.terminus ?? '',
+                tripPk: r.trip_pk,
+                stopSequence: r.stop_sequence,
+                dayStartMs,
             });
         }
     }

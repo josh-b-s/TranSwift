@@ -6,6 +6,7 @@
 
 import * as FileSystem from 'expo-file-system/legacy';
 import { clampWalkDistance, DEFAULT_MAX_WALK_DISTANCE_M } from '@/constants/walkLimit';
+import { clampWeeklyGoal, NO_WEEKLY_GOAL_M } from '@/constants/walkGoal';
 
 export type ThemeMode = 'system' | 'light' | 'dark';
 
@@ -24,6 +25,8 @@ export type StoredPreferences = {
     speedUnit: SpeedUnit;
     /** Farthest the router may send you on foot, in meters. */
     maxWalkDistanceM: number;
+    /** Distance to walk each week, in meters. Zero means no goal. */
+    weeklyGoalM: number;
 };
 
 export const DEFAULT_THEME_MODE: ThemeMode = 'system';
@@ -49,6 +52,7 @@ export async function loadStoredPreferences(): Promise<StoredPreferences> {
             maxWalkDistanceM: Number.isFinite(parsed.maxWalkDistanceM)
                 ? clampWalkDistance(parsed.maxWalkDistanceM as number)
                 : DEFAULT_MAX_WALK_DISTANCE_M,
+            weeklyGoalM: Number.isFinite(parsed.weeklyGoalM) ? clampWeeklyGoal(parsed.weeklyGoalM as number) : NO_WEEKLY_GOAL_M,
         };
     } catch {
         // No file yet (fresh install) — defaults, not an error.
@@ -57,6 +61,7 @@ export async function loadStoredPreferences(): Promise<StoredPreferences> {
             walkingSpeeds: DEFAULT_WALKING_SPEEDS,
             speedUnit: DEFAULT_SPEED_UNIT,
             maxWalkDistanceM: DEFAULT_MAX_WALK_DISTANCE_M,
+            weeklyGoalM: NO_WEEKLY_GOAL_M,
         };
     }
 }

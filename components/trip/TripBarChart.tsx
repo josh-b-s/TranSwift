@@ -6,18 +6,16 @@ const BAR_AREA_HEIGHT = 96;
 
 type Props = {
     title: string;
-    /** One bar per trip, oldest first. */
+    /** One bar per trip or period, oldest first. */
     values: number[];
     /** The tallest bar's value, already formatted. */
     peakLabel: string;
-    /** Start times of the first and last trip shown. */
-    from: number;
-    to: number;
+    /** Captions under the first and last bar. */
+    startLabel: string;
+    endLabel: string;
 };
 
-const shortDate = (ms: number) => new Date(ms).toLocaleDateString([], { day: 'numeric', month: 'short' });
-
-export default function TripBarChart({ title, values, peakLabel, from, to }: Props) {
+export default function TripBarChart({ title, values, peakLabel, startLabel, endLabel }: Props) {
     const theme = useThemeStyle();
     const peak = Math.max(0, ...values);
     const caption = { color: theme.color, opacity: 0.5, fontSize: 12 };
@@ -30,7 +28,7 @@ export default function TripBarChart({ title, values, peakLabel, from, to }: Pro
             </View>
             <View
                 accessible
-                accessibilityLabel={`${title}, last ${values.length} trips, peak ${peakLabel}`}
+                accessibilityLabel={`${title}, ${values.length} bars, peak ${peakLabel}`}
                 style={{ height: BAR_AREA_HEIGHT, flexDirection: 'row', alignItems: 'flex-end', gap: 4 }}
             >
                 {values.map((value, i) => (
@@ -46,8 +44,8 @@ export default function TripBarChart({ title, values, peakLabel, from, to }: Pro
                 ))}
             </View>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                <Text style={caption}>{shortDate(from)}</Text>
-                {values.length > 1 && <Text style={caption}>{shortDate(to)}</Text>}
+                <Text style={caption}>{startLabel}</Text>
+                {values.length > 1 && <Text style={caption}>{endLabel}</Text>}
             </View>
         </View>
     );

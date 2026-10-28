@@ -18,6 +18,8 @@ pub struct FeedMessage {
 pub struct FeedEntity {
     #[prost(message, optional, tag = "3")]
     pub trip_update: Option<TripUpdate>,
+    #[prost(message, optional, tag = "4")]
+    pub vehicle: Option<VehiclePosition>,
 }
 
 #[derive(Clone, PartialEq, Message)]
@@ -59,4 +61,41 @@ pub struct StopTimeEvent {
     /// Absolute POSIX time in seconds.
     #[prost(int64, optional, tag = "2")]
     pub time: Option<i64>,
+}
+
+#[derive(Clone, PartialEq, Message)]
+pub struct VehiclePosition {
+    #[prost(message, optional, tag = "1")]
+    pub trip: Option<TripDescriptor>,
+    #[prost(message, optional, tag = "2")]
+    pub position: Option<Position>,
+    #[prost(uint32, optional, tag = "3")]
+    pub current_stop_sequence: Option<u32>,
+    /// Seconds since the epoch when the position was measured.
+    #[prost(uint64, optional, tag = "5")]
+    pub timestamp: Option<u64>,
+    #[prost(message, optional, tag = "8")]
+    pub vehicle: Option<VehicleDescriptor>,
+}
+
+#[derive(Clone, PartialEq, Message)]
+pub struct Position {
+    #[prost(float, optional, tag = "1")]
+    pub latitude: Option<f32>,
+    #[prost(float, optional, tag = "2")]
+    pub longitude: Option<f32>,
+    /// Degrees clockwise from north.
+    #[prost(float, optional, tag = "3")]
+    pub bearing: Option<f32>,
+    /// Metres per second.
+    #[prost(float, optional, tag = "5")]
+    pub speed: Option<f32>,
+}
+
+#[derive(Clone, PartialEq, Message)]
+pub struct VehicleDescriptor {
+    #[prost(string, optional, tag = "1")]
+    pub id: Option<String>,
+    #[prost(string, optional, tag = "2")]
+    pub label: Option<String>,
 }

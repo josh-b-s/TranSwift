@@ -72,6 +72,16 @@ impl Overlay {
         matches!(self.trips.get(&trip_pk), Some(TripRealtime::Updated { skipped, .. }) if skipped.contains(&stop_sequence))
     }
 
+    /// Seconds the vehicle is late leaving this stop of the trip (negative when early), or None when the
+    /// feed has no update covering it: no update for the trip, or the stop is before its first one.
+    pub fn departure_delay(&self, trip_pk: i64, stop_sequence: i64) -> Option<i64> {
+        let Some(TripRealtime::Updated { delays: points, .. }) = self.trips.get(&trip_pk) else {
+            return None;
+        };
+        let idx = points.partition_point(|p| p.stop_sequence <= stop_sequence);
+        idx.checked_sub(1).map(|i| points[i].departure_delay_sec)
+    }
+
     /// Returns (arrival_sec, departure_sec, departure_delay_sec) with the
     /// trip's delay at this stop applied. Stops before a trip's first
     /// update keep their scheduled times.
@@ -212,7 +222,7 @@ mod tests {
     fn event(delay: i32) -> Option<StopTimeEvent> { Some(StopTimeEvent { delay: Some(delay), time: None }) }
 
     fn encode(updates: Vec<TripUpdate>) -> Vec<u8> {
-        FeedMessage { entity: updates.into_iter().map(|u| FeedEntity { trip_update: Some(u) }).collect() }.encode_to_vec()
+        FeedMessage { entity: updates.into_iter().map(|u| FeedEntity { trip_update: Some(u), vehicle: None }).collect() }.encode_to_vec()
     }
 
     #[test]
@@ -228,6 +238,40 @@ mod tests {
         assert_eq!(overlay.apply(1, 2, 1100, 1110), (1160, 1170, 60));
         assert_eq!(overlay.apply(1, 3, 1200, 1210), (1260, 1270, 60)); // carried forward
         assert_eq!(overlay.apply(2, 2, 1100, 1110), (1100, 1110, 0)); // other trip untouched
+    }
+
+    #[test]
+    fn departure_delay_is_none_until_the_feed_covers_the_stop() {
+        let bytes = encode(vec![TripUpdate {
+            trip: Some(TripDescriptor { trip_id: Some("T1".into()), route_id: None, schedule_relationship: None }),
+            stop_time_update: vec![
+                StopTimeUpdate { stop_sequence: Some(2), stop_id: None, arrival: event(-30), departure: event(90), schedule_relationship: None },
+            ],
+        }]);
+        let overlay = Overlay::from_feed(&bytes, 0, &test_db()).unwrap().0;
+        assert_eq!(overlay.departure_delay(1, 1), None); // before the first update
+        assert_eq!(overlay.departure_delay(1, 2), Some(90));
+        assert_eq!(overlay.departure_delay(1, 3), Some(90)); // carried forward
+        assert_eq!(overlay.departure_delay(2, 2), None); // trip with no update
+        assert_eq!(overlay.departure_delay(99, 2), None); // unknown trip
+    }
+
+    #[test]
+    fn departure_delay_is_none_for_cancelled_trips_and_zero_when_on_time() {
+        let bytes = encode(vec![
+            TripUpdate {
+                trip: Some(TripDescriptor { trip_id: Some("T1".into()), route_id: None, schedule_relationship: None }),
+                stop_time_update: vec![StopTimeUpdate { stop_sequence: Some(1), stop_id: None, arrival: event(0), departure: None, schedule_relationship: None }],
+            },
+            TripUpdate {
+                trip: Some(TripDescriptor { trip_id: Some("T2".into()), route_id: None, schedule_relationship: Some(TRIP_CANCELED) }),
+                stop_time_update: vec![],
+            },
+        ]);
+        let overlay = Overlay::from_feed(&bytes, 0, &test_db()).unwrap().0;
+        assert_eq!(overlay.departure_delay(1, 1), Some(0));
+        assert_eq!(overlay.departure_delay(2, 1), None);
+        assert!(overlay.is_cancelled(2));
     }
 
     #[test]

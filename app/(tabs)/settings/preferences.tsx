@@ -7,6 +7,7 @@ import { AppDispatch, RootState } from '@/store/store';
 import { useThemeStyle } from '@/constants/themes';
 import { SPEED_UNITS } from '@/constants/speedUnits';
 import { MAX_MAX_WALK_DISTANCE_M, MIN_MAX_WALK_DISTANCE_M, WALK_DISTANCE_STEP_M } from '@/constants/walkLimit';
+import { MAX_WEEKLY_GOAL_M, NO_WEEKLY_GOAL_M, WEEKLY_GOAL_STEP_M } from '@/constants/walkGoal';
 import { formatDistance } from '@/services/trips/tripFormat';
 import SegmentedControl from '@/components/ui/SegmentedControl';
 import {
@@ -16,6 +17,7 @@ import {
     setMaxWalkDistance,
     setSpeedUnit,
     setThemeMode,
+    setWeeklyGoal,
     updateWalkingSpeed,
     type SpeedUnit,
     type ThemeMode,
@@ -47,6 +49,7 @@ export default function Preferences() {
     const walkingSpeeds = useSelector((s: RootState) => s.preferences.walkingSpeeds);
     const speedUnit = useSelector((s: RootState) => s.preferences.speedUnit);
     const maxWalkDistanceM = useSelector((s: RootState) => s.preferences.maxWalkDistanceM);
+    const weeklyGoalM = useSelector((s: RootState) => s.preferences.weeklyGoalM);
 
     // Inline-edit state for the walking speed list — editingId names which
     // row is currently showing text inputs instead of static text; the two
@@ -99,7 +102,7 @@ export default function Preferences() {
     function handleReset() {
         Alert.alert(
             'Reset to defaults?',
-            'Theme, speedometer unit, walk limit and walking speeds will be reset to their default values.',
+            'Theme, speedometer unit, walk limit, weekly goal and walking speeds will be reset to their default values.',
             [
                 { text: 'Cancel', style: 'cancel' },
                 { text: 'Reset', style: 'destructive', onPress: () => { setEditingId(null); dispatch(resetPreferences()); } },
@@ -153,6 +156,43 @@ export default function Preferences() {
                     hitSlop={8}
                     accessibilityLabel="Increase maximum walk"
                     style={{ padding: 4, opacity: maxWalkDistanceM >= MAX_MAX_WALK_DISTANCE_M ? 0.3 : 1 }}
+                >
+                    <Plus size={22} color={theme.color} />
+                </Pressable>
+            </View>
+
+            <SectionLabel text="Weekly walking goal" theme={theme} />
+            <Text style={{ color: theme.color, opacity: 0.5, fontSize: 12, marginBottom: 4 }}>
+                Shown with your progress on the History tab. Leave it off for no goal.
+            </Text>
+            <View
+                style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: 14,
+                    borderRadius: 16,
+                    backgroundColor: theme.backgroundColor,
+                }}
+            >
+                <Pressable
+                    onPress={() => dispatch(setWeeklyGoal(weeklyGoalM - WEEKLY_GOAL_STEP_M))}
+                    disabled={weeklyGoalM <= NO_WEEKLY_GOAL_M}
+                    hitSlop={8}
+                    accessibilityLabel="Decrease weekly goal"
+                    style={{ padding: 4, opacity: weeklyGoalM <= NO_WEEKLY_GOAL_M ? 0.3 : 1 }}
+                >
+                    <Minus size={22} color={theme.color} />
+                </Pressable>
+                <Text style={{ color: theme.color, fontSize: 17, fontWeight: '600' }}>
+                    {weeklyGoalM > NO_WEEKLY_GOAL_M ? formatDistance(weeklyGoalM) : 'Off'}
+                </Text>
+                <Pressable
+                    onPress={() => dispatch(setWeeklyGoal(weeklyGoalM + WEEKLY_GOAL_STEP_M))}
+                    disabled={weeklyGoalM >= MAX_WEEKLY_GOAL_M}
+                    hitSlop={8}
+                    accessibilityLabel="Increase weekly goal"
+                    style={{ padding: 4, opacity: weeklyGoalM >= MAX_WEEKLY_GOAL_M ? 0.3 : 1 }}
                 >
                     <Plus size={22} color={theme.color} />
                 </Pressable>

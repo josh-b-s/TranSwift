@@ -2,6 +2,7 @@ mod source;
 mod csv_util;
 mod schema;
 mod import;
+mod station;
 mod background;
 
 use std::sync::atomic::{AtomicBool, Ordering};

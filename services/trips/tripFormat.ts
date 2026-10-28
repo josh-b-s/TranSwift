@@ -1,12 +1,23 @@
 import { SPEED_UNITS } from '@/constants/speedUnits';
 import type { SpeedUnit } from '@/services/preferences/preferencesStore';
 import type { BrokenRecord } from './personalBests';
+import type { HistoryChartMode } from './periodTotals';
 import type { SavedLeg } from './tripStore';
 
 const PACE_BASE: Record<SpeedUnit, { meters: number; label: string }> = {
     kmh: { meters: 1000, label: '/km' },
     mph: { meters: 1609.344, label: '/mi' },
 };
+
+/** Length of one split, and its name, in the unit the rider reads pace in. */
+export const splitLengthM = (unit: SpeedUnit) => PACE_BASE[unit].meters;
+export const splitUnitName = (unit: SpeedUnit) => PACE_BASE[unit].label.slice(1);
+
+export const shortDate = (ms: number) => new Date(ms).toLocaleDateString([], { day: 'numeric', month: 'short' });
+
+/** Caption for a chart bar: the month for monthly bars, otherwise the day the trip or week started. */
+export const formatChartLabel = (ms: number, mode: HistoryChartMode) =>
+    mode === 'months' ? new Date(ms).toLocaleDateString([], { month: 'short' }) : shortDate(ms);
 
 export function formatDistance(meters: number): string {
     return meters < 1000 ? `${Math.round(meters)} m` : `${(meters / 1000).toFixed(2)} km`;

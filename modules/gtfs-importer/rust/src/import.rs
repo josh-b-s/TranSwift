@@ -8,6 +8,7 @@ const ALL_TABLES: &[&str] = &[
     "stops", "stops_rtree", "routes", "calendar", "calendar_dates", "trips", "patterns",
     "pattern_stops", "stop_times", "shape_meta", "shapes",
     "pattern_hops", "pattern_headway",
+    "stop_platforms", "station_nodes", "pathways", "levels",
 ];
 
 /// Fixed clock buckets shared across every pattern, matching schema.sql's
@@ -264,6 +265,7 @@ fn process_agency(
         }
         progress.on_progress(format!("agency {agency_id} · stops"), count, count)?;
     }
+    crate::station::import_station_data(conn, agency_id, source, &stop_id_to_pk, progress)?;
 
     // ── routes / calendar / calendar_dates (low volume, INSERT OR IGNORE) ─
     {

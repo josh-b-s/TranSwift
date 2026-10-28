@@ -1,6 +1,7 @@
 import { createAsyncThunk, createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { colorScheme as nativewindColorScheme } from 'nativewind';
 import { clampWalkDistance, DEFAULT_MAX_WALK_DISTANCE_M } from '@/constants/walkLimit';
+import { clampWeeklyGoal, NO_WEEKLY_GOAL_M } from '@/constants/walkGoal';
 import {
     DEFAULT_SPEED_UNIT,
     DEFAULT_THEME_MODE,
@@ -19,6 +20,7 @@ type State = {
     walkingSpeeds: WalkingSpeedOption[];
     speedUnit: SpeedUnit;
     maxWalkDistanceM: number;
+    weeklyGoalM: number;
     /** True once loadPreferences() has resolved — screens can use this to
      *  avoid flashing default values before the real ones load. */
     loaded: boolean;
@@ -29,6 +31,7 @@ const initialState: State = {
     walkingSpeeds: DEFAULT_WALKING_SPEEDS,
     speedUnit: DEFAULT_SPEED_UNIT,
     maxWalkDistanceM: DEFAULT_MAX_WALK_DISTANCE_M,
+    weeklyGoalM: NO_WEEKLY_GOAL_M,
     loaded: false,
 };
 
@@ -40,6 +43,7 @@ function persist(state: State) {
         walkingSpeeds: state.walkingSpeeds,
         speedUnit: state.speedUnit,
         maxWalkDistanceM: state.maxWalkDistanceM,
+        weeklyGoalM: state.weeklyGoalM,
     }).catch(err => {
         console.warn('[preferences] failed to persist:', err);
     });
@@ -68,6 +72,10 @@ const slice = createSlice({
             state.maxWalkDistanceM = clampWalkDistance(action.payload);
             persist(state);
         },
+        setWeeklyGoal(state, action: PayloadAction<number>) {
+            state.weeklyGoalM = clampWeeklyGoal(action.payload);
+            persist(state);
+        },
         addWalkingSpeed(state, action: PayloadAction<WalkingSpeedOption>) {
             state.walkingSpeeds.push(action.payload);
             persist(state);
@@ -90,6 +98,7 @@ const slice = createSlice({
             state.walkingSpeeds = DEFAULT_WALKING_SPEEDS.map(o => ({ ...o }));
             state.speedUnit = DEFAULT_SPEED_UNIT;
             state.maxWalkDistanceM = DEFAULT_MAX_WALK_DISTANCE_M;
+            state.weeklyGoalM = NO_WEEKLY_GOAL_M;
             nativewindColorScheme.set(DEFAULT_THEME_MODE);
             persist(state);
         },
@@ -100,6 +109,7 @@ const slice = createSlice({
             state.walkingSpeeds = action.payload.walkingSpeeds;
             state.speedUnit = action.payload.speedUnit;
             state.maxWalkDistanceM = action.payload.maxWalkDistanceM;
+            state.weeklyGoalM = action.payload.weeklyGoalM;
             state.loaded = true;
             nativewindColorScheme.set(action.payload.themeMode);
         });
@@ -110,6 +120,7 @@ export const {
     setThemeMode,
     setSpeedUnit,
     setMaxWalkDistance,
+    setWeeklyGoal,
     addWalkingSpeed,
     updateWalkingSpeed,
     removeWalkingSpeed,
