@@ -17,11 +17,21 @@ export type RideStep = StepBase & {
     line: string;
     /** Board to alight, so the alert can tell when the stop before yours is near. */
     stops: RouteStop[];
+    /** When the ride is due at its last stop. Includes the realtime delays known when the journey was planned. */
+    arrivalMs?: number;
 };
 
 export type TripStep = WalkStep | RideStep;
 
-export function stepsFromJourney(journey: GtfsJourney): TripStep[] {
+/** Today at a "HH:MM:SS" time of day. A time hours in the past is taken to be tomorrow, for a trip that crosses midnight. */
+function clockToMs(clock: string, now: Date): number {
+    const [h, m, s] = clock.split(':').map(Number);
+    const d = new Date(now);
+    d.setHours(h, m, s, 0);
+    return d.getTime() < now.getTime() - 6 * 3_600_000 ? d.getTime() + 24 * 3_600_000 : d.getTime();
+}
+
+export function stepsFromJourney(journey: GtfsJourney, now = new Date()): TripStep[] {
     const last = journey.segments.length - 1;
     return journey.segments.map((seg, i): TripStep => {
         const base = { from: seg.originStopName, to: seg.destStopName, end: seg.coords[seg.coords.length - 1] };
@@ -35,6 +45,7 @@ export function stepsFromJourney(journey: GtfsJourney): TripStep[] {
                 routeTextColor: seg.routeTextColor,
                 line: encodeLine(seg.coords),
                 stops: seg.stops ?? [],
+                arrivalMs: seg.arrivalTime ? clockToMs(seg.arrivalTime, now) : undefined,
             };
         }
         // The first and last walks start or end wherever the rider is, so only the ones between stops repeat.

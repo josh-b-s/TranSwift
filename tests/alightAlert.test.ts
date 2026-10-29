@@ -26,13 +26,39 @@ test('alerts once when the rider reaches the stop before the last', () => {
     assert.equal(alerts.length, 1);
 });
 
-test('a ride with no stop in between waits until the vehicle has left the boarding stop', () => {
+test('a one-stop ride does not alert while still at the boarding stop', () => {
     const alerts: RideStep[] = [];
     const check = createAlightAlert([ride([-37.80, -37.84])], r => alerts.push(r));
-
-    check(0, at(-37.8002)); // still at the boarding stop
+    check(0, { ...at(-37.8002), speed: 20 }, 0); // 4 km out at 20 m/s is far over a minute, and this is the boarding stop anyway
     assert.equal(alerts.length, 0);
-    check(0, at(-37.82));   // on the way
+});
+
+test('a one-stop ride alerts when distance over speed drops to a minute', () => {
+    const alerts: RideStep[] = [];
+    const check = createAlightAlert([ride([-37.80, -37.84])], r => alerts.push(r));
+    check(0, { ...at(-37.82), speed: 10 }, 0);   // about 2.2 km left at 10 m/s
+    assert.equal(alerts.length, 0);
+    check(0, { ...at(-37.8365), speed: 10 }, 0); // about 400 m left at 10 m/s, 40 s
+    check(0, { ...at(-37.8375), speed: 10 }, 0);
+    assert.equal(alerts.length, 1);
+});
+
+test('a one-stop ride uses the arrival time when the vehicle is not moving', () => {
+    const alerts: RideStep[] = [];
+    const due = { ...ride([-37.80, -37.84]), arrivalMs: 1_000_000 };
+    const check = createAlightAlert([due], r => alerts.push(r));
+    check(0, { ...at(-37.82), speed: 0 }, 900_000);  // 100 s to go
+    assert.equal(alerts.length, 0);
+    check(0, { ...at(-37.82), speed: null }, 945_000); // 55 s to go
+    assert.equal(alerts.length, 1);
+});
+
+test('a one-stop ride with no speed or arrival time alerts only within 100 m of the stop', () => {
+    const alerts: RideStep[] = [];
+    const check = createAlightAlert([ride([-37.80, -37.84])], r => alerts.push(r));
+    check(0, at(-37.82));
+    assert.equal(alerts.length, 0);
+    check(0, at(-37.8395));
     assert.equal(alerts.length, 1);
 });
 
