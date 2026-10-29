@@ -11,8 +11,22 @@ export function authHeaders(header: string | undefined): Record<string, string> 
     return parsed ? { [parsed[0]]: parsed[1] } : {};
 }
 
+export class RealtimeHttpError extends Error {
+    readonly status: number;
+
+    constructor(status: number) {
+        super(`HTTP ${status}`);
+        this.status = status;
+    }
+}
+
+/** True for a 401 or 403 response, which usually means the producer wants a key. */
+export function isAuthFailure(reason: unknown): boolean {
+    return reason instanceof RealtimeHttpError && (reason.status === 401 || reason.status === 403);
+}
+
 export async function fetchFeedBytes(url: string, headers: Record<string, string>): Promise<ArrayBuffer> {
     const res = await fetch(url, { headers });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    if (!res.ok) throw new RealtimeHttpError(res.status);
     return res.arrayBuffer();
 }

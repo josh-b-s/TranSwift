@@ -10,6 +10,7 @@ import { invalidateNativeRouter } from '../router/gtfsRouterNative';
 import { invalidateStopCache } from '../core/stopRepo';
 import { invalidateStopColors } from '../departures/stopColors';
 import { computeFeedStats, type FeedStats } from './gtfsFeedStats';
+import type { RealtimeAuth } from '../catalog/realtimeParse';
 
 /** Where a feed was downloaded from, kept for licence credit and later update checks. */
 export type FeedSource = {
@@ -40,6 +41,8 @@ export type GtfsDatabaseEntry = {
     vehicleUrls?: string[];
     /** Optional auth header sent with every realtime URL, written "Name: value". */
     realtimeHeader?: string;
+    /** How the catalog says the realtime producer wants a key. Only a hint: the key itself is never stored here. */
+    realtimeAuth?: RealtimeAuth;
     /** Set when most of a realtime feed's trip ids matched no trip here, which suggests an older timetable. */
     realtimeMismatch?: boolean;
 };
@@ -241,6 +244,14 @@ export async function setRealtimeConfig(id: string, urls: string[], header: stri
     const cleanedVehicles = vehicleUrls.map(u => u.trim()).filter(Boolean);
     entry.vehicleUrls = cleanedVehicles.length > 0 ? cleanedVehicles : undefined;
     entry.realtimeHeader = header.trim() || undefined;
+    await writeRegistry(reg);
+}
+
+export async function setRealtimeAuthHint(id: string, auth: RealtimeAuth | undefined): Promise<void> {
+    const reg = await readRegistry();
+    const entry = reg.databases.find(d => d.id === id);
+    if (!entry) throw new Error(`Unknown GTFS database id: ${id}`);
+    entry.realtimeAuth = auth;
     await writeRegistry(reg);
 }
 

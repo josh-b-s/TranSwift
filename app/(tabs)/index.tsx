@@ -30,6 +30,7 @@ import {selectDisplayedJourney} from '@/store/route.slice';
 import {isCurrentLocation} from '@/services/places/endpoints';
 import {useGoToUserLocation} from '../../hooks/goToUserLocation';
 import {useFeedSuggestion} from '../../hooks/feedSuggestion';
+import {useRealtimeAuthAlert} from '@/hooks/realtimeAuthAlert';
 import {useTripRecorder} from '@/hooks/tripRecorder';
 import {useTripNotificationTap} from '@/hooks/tripNotificationTap';
 import {useStopsInView} from '@/hooks/stopsInView';
@@ -86,6 +87,7 @@ export default function Index() {
 
     const goToUserLocation = useGoToUserLocation(mapRef);
     useFeedSuggestion();
+    useRealtimeAuthAlert();
     useTripRecorder();
     useTripNotificationTap();
 

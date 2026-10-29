@@ -1,9 +1,12 @@
 import React, { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { Bus, CircleCheck, CirclePlus, CircleX, Globe, Pencil, Trash2 } from 'lucide-react-native';
+import { Bus, CircleCheck, CirclePlus, CircleX, Download, Globe, Pencil, Trash2 } from 'lucide-react-native';
 import { useThemeStyle } from '@/constants/themes';
 import ImportProgressCard from '@/components/ui/ImportProgressCard';
+import UrlListInput from '@/components/ui/UrlListInput';
+import { loadRealtimeEndpoints } from '@/services/gtfs/catalog/feedCatalog';
+import { describeAuth } from '@/services/gtfs/realtime/authFailure';
 import { createProgressTracker, type ImportProgress } from '@/services/gtfs/import/importProgress';
 import { CancelledError } from '@/services/gtfs/import/cancelledError';
 import { pickGtfsZip, importZipAsNewDatabase } from '@/services/gtfs/import/gtfsDbImport';
@@ -15,6 +18,7 @@ import {
     listDatabases,
     renameDatabase,
     setActiveDatabase,
+    setRealtimeAuthHint,
     setRealtimeConfig,
     type GtfsDatabaseEntry,
 } from '@/services/gtfs/import/gtfsDbRegistry';
@@ -52,9 +56,11 @@ export default function GtfsData() {
     // walking-speed edit pattern.
     const [editingId, setEditingId] = useState<string | null>(null);
     const [draftName, setDraftName] = useState('');
-    const [draftRealtimeUrls, setDraftRealtimeUrls] = useState('');
+    const [draftRealtimeUrls, setDraftRealtimeUrls] = useState<string[]>([]);
     const [draftRealtimeHeader, setDraftRealtimeHeader] = useState('');
-    const [draftVehicleUrls, setDraftVehicleUrls] = useState('');
+    const [draftVehicleUrls, setDraftVehicleUrls] = useState<string[]>([]);
+    const [fillingId, setFillingId] = useState<string | null>(null);
+    const [fillNote, setFillNote] = useState('');
 
     const refresh = useCallback(async () => {
         const [dbs, active] = await Promise.all([listDatabases(), getActiveDatabaseId()]);
@@ -140,9 +146,38 @@ export default function GtfsData() {
         setError('');
         setEditingId(db.id);
         setDraftName(db.name);
-        setDraftRealtimeUrls((db.realtimeUrls ?? []).join('\n'));
+        setDraftRealtimeUrls(db.realtimeUrls ?? []);
         setDraftRealtimeHeader(db.realtimeHeader ?? '');
-        setDraftVehicleUrls((db.vehicleUrls ?? []).join('\n'));
+        setDraftVehicleUrls(db.vehicleUrls ?? []);
+        setFillNote('');
+    }
+
+    async function handleFillFromCatalog(db: GtfsDatabaseEntry) {
+        if (!db.source) return;
+        setFillingId(db.id);
+        setFillNote('');
+        try {
+            const found = await loadRealtimeEndpoints(db.source.id);
+            if (found.tripUpdates.length === 0 && found.vehiclePositions.length === 0) {
+                setFillNote('The Mobility Database lists no realtime feeds for this one.');
+                return;
+            }
+            const merge = (current: string[], extra: string[]) =>
+                [...new Set([...current.map((u) => u.trim()).filter(Boolean), ...extra])];
+            setDraftRealtimeUrls((cur) => merge(cur, found.tripUpdates));
+            setDraftVehicleUrls((cur) => merge(cur, found.vehiclePositions));
+            if (found.auth) {
+                const { auth } = found;
+                if (auth.kind === 'header') setDraftRealtimeHeader((cur) => cur || `${auth.name}: `);
+                setFillNote(describeAuth(auth));
+                await setRealtimeAuthHint(db.id, auth);
+                await refresh();
+            }
+        } catch (err) {
+            setFillNote(`Couldn't load the catalog: ${String(err)}`);
+        } finally {
+            setFillingId(null);
+        }
     }
 
     function cancelRename() {
@@ -158,7 +193,7 @@ export default function GtfsData() {
         }
         try {
             await renameDatabase(editingId, trimmed);
-            await setRealtimeConfig(editingId, draftRealtimeUrls.split('\n'), draftRealtimeHeader, draftVehicleUrls.split('\n'));
+            await setRealtimeConfig(editingId, draftRealtimeUrls, draftRealtimeHeader, draftVehicleUrls);
             setEditingId(null);
             await refresh();
         } catch (err) {
@@ -304,25 +339,31 @@ export default function GtfsData() {
                     </View>
                     {isEditing && (
                         <View style={{ gap: 8, paddingHorizontal: 16 }}>
-                            <TextInput
-                                value={draftRealtimeUrls}
-                                onChangeText={setDraftRealtimeUrls}
-                                multiline
-                                placeholder="Realtime TripUpdates URLs, one per line (optional)"
-                                placeholderTextColor={theme.color + '66'}
-                                autoCapitalize="none"
-                                autoCorrect={false}
-                                style={{ color: theme.color, fontSize: 14, borderBottomWidth: 1, borderBottomColor: theme.color + '33', paddingVertical: 2 }}
+                            {db.source && (
+                                <Pressable
+                                    onPress={() => handleFillFromCatalog(db)}
+                                    disabled={fillingId !== null}
+                                    style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 4, opacity: fillingId ? 0.5 : 1 }}
+                                >
+                                    {fillingId === db.id
+                                        ? <ActivityIndicator size="small" color="#2563eb" />
+                                        : <Download size={16} color="#2563eb" />}
+                                    <Text style={{ color: '#2563eb', fontSize: 14, fontWeight: '600' }}>Fill from Mobility Database</Text>
+                                </Pressable>
+                            )}
+                            {!fillNote && db.realtimeAuth && (
+                                <Text style={{ color: theme.color, opacity: 0.6, fontSize: 12 }}>{describeAuth(db.realtimeAuth)}</Text>
+                            )}
+                            {!!fillNote && <Text style={{ color: theme.color, opacity: 0.6, fontSize: 12 }}>{fillNote}</Text>}
+                            <UrlListInput
+                                values={draftRealtimeUrls}
+                                onChange={setDraftRealtimeUrls}
+                                placeholder="Realtime TripUpdates URL (optional)"
                             />
-                            <TextInput
-                                value={draftVehicleUrls}
-                                onChangeText={setDraftVehicleUrls}
-                                multiline
-                                placeholder="Vehicle positions URLs, one per line (optional)"
-                                placeholderTextColor={theme.color + '66'}
-                                autoCapitalize="none"
-                                autoCorrect={false}
-                                style={{ color: theme.color, fontSize: 14, borderBottomWidth: 1, borderBottomColor: theme.color + '33', paddingVertical: 2 }}
+                            <UrlListInput
+                                values={draftVehicleUrls}
+                                onChange={setDraftVehicleUrls}
+                                placeholder="Vehicle positions URL (optional)"
                             />
                             <TextInput
                                 value={draftRealtimeHeader}

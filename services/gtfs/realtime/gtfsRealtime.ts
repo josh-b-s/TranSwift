@@ -1,4 +1,5 @@
 import { getActiveDatabaseEntry, setRealtimeMismatch } from '../import/gtfsDbRegistry';
+import { reportAuthFailure } from './authFailure';
 import { authHeaders, fetchFeedBytes } from './realtimeHttp';
 
 const MIN_REFRESH_MS = 30_000;
@@ -52,6 +53,7 @@ export async function refreshRealtime(engine: Engine): Promise<void> {
 
     const results = await Promise.allSettled(urls.map(url => fetchFeedBytes(url, headers)));
     const now = Date.now();
+    reportAuthFailure(entry, results);
     results.forEach((result, i) => {
         if (result.status === 'fulfilled') {
             lastGood.set(urls[i], { bytes: result.value, at: now });

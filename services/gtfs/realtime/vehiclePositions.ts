@@ -2,6 +2,7 @@ import gtfsRouterRust from '@mapapp/gtfs-router-rust';
 import type { VehiclePositionInfo } from '@mapapp/gtfs-router-rust';
 import { getActiveDatabaseEntry } from '../import/gtfsDbRegistry';
 import type { VehicleFix } from '../vehicles/vehicleFix';
+import { reportAuthFailure } from './authFailure';
 import { authHeaders, fetchFeedBytes } from './realtimeHttp';
 
 const { decodeVehiclePositions } = gtfsRouterRust.gtfs_router;
@@ -17,6 +18,7 @@ export async function fetchVehicleFixes(): Promise<VehicleFix[]> {
 
     const headers = authHeaders(entry.realtimeHeader);
     const results = await Promise.allSettled(urls.map(url => fetchFeedBytes(url, headers)));
+    reportAuthFailure(entry, results);
     const feeds: ArrayBuffer[] = [];
     results.forEach((result, i) => {
         if (result.status === 'fulfilled') feeds.push(result.value);

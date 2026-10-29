@@ -6,6 +6,7 @@
 
 import * as FileSystem from 'expo-file-system/legacy';
 import { parseCatalog, type CatalogFeed } from './catalogParse';
+import { parseRealtimeEndpoints, type RealtimeEndpoints } from './realtimeParse';
 
 // One constant on purpose: MobilityData has moved this file before.
 const CATALOG_URL = 'https://files.mobilitydatabase.org/feeds_v2.csv';
@@ -39,7 +40,8 @@ async function download(): Promise<void> {
     await FileSystem.moveAsync({ from: tmpPath, to: CACHE_PATH });
 }
 
-export async function loadCatalog(force = false): Promise<CatalogResult> {
+/** Returns the cached CSV text, refreshing the cache first when it is missing, old or forced. */
+async function readCatalogText(force: boolean): Promise<{ text: string; fetchedAt: number; stale: boolean }> {
     let cache = await cacheInfo();
     let stale = false;
 
@@ -54,10 +56,20 @@ export async function loadCatalog(force = false): Promise<CatalogResult> {
         }
     }
 
-    const text = await FileSystem.readAsStringAsync(CACHE_PATH);
+    return { text: await FileSystem.readAsStringAsync(CACHE_PATH), fetchedAt: cache.fetchedAt, stale };
+}
+
+export async function loadCatalog(force = false): Promise<CatalogResult> {
+    const { text, fetchedAt, stale } = await readCatalogText(force);
     const feeds = parseCatalog(text);
     if (feeds.length > 0 && feeds.every((f) => !f.box)) {
         console.warn('[feedCatalog] no bounding boxes parsed; check BOX_COLUMNS in catalogParse.ts');
     }
-    return { feeds, fetchedAt: cache.fetchedAt, stale };
+    return { feeds, fetchedAt, stale };
+}
+
+/** TripUpdates and VehiclePositions URLs the catalog lists for one schedule feed. */
+export async function loadRealtimeEndpoints(feedId: string): Promise<RealtimeEndpoints> {
+    const { text } = await readCatalogText(false);
+    return parseRealtimeEndpoints(text, feedId);
 }
