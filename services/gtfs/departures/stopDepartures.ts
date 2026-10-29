@@ -2,6 +2,7 @@ import type { QueryableDb } from '@/services/db/queryableDb';
 import { makeKey, parseKey } from '@/services/gtfs/core/gtfsKeyUtil';
 import { fallbackRouteColor, hexColor } from '@/services/gtfs/core/routeTypeUtil';
 import { getActiveServiceKeys } from './activeServices';
+import { hasTripHeadsign } from './tripHeadsign';
 
 const HOUR_MS = 3_600_000;
 
@@ -11,7 +12,7 @@ export type Departure = {
     routeType: number;
     routeColor: string;
     routeTextColor: string;
-    /** Name of the last stop on the trip. */
+    /** Where the trip is heading: its headsign when the feed has one, otherwise the name of its last stop. */
     terminus: string;
     /** Which trip this is and where it calls at the stop, to look up its other stops. */
     tripPk: number;
@@ -32,6 +33,7 @@ type DepartureRow = {
     route_color: string | null;
     route_text_color: string | null;
     terminus: string | null;
+    headsign: string | null;
 };
 
 /** GTFS times count from noon minus 12 hours, which is not midnight on a daylight saving day. */
@@ -55,6 +57,7 @@ export async function getStopDepartures(
     const fromMs = from.getTime();
     const toMs = fromMs + windowMs;
     const out: Departure[] = [];
+    const headsign = (await hasTripHeadsign(db)) ? "NULLIF(TRIM(t.trip_headsign), '')" : 'NULL';
 
     // Yesterday's trips can run past midnight, and tomorrow's can start inside the window.
     for (const offset of [-1, 0, 1]) {
@@ -72,7 +75,8 @@ export async function getStopDepartures(
             `SELECT st.departure_sec AS sec, st.trip_pk, st.stop_sequence, t.service_id, t.agency,
                     r.route_short_name, r.route_long_name, r.route_type,
                     r.route_color, r.route_text_color,
-                    term.stop_name AS terminus
+                    term.stop_name AS terminus,
+                    ${headsign} AS headsign
              FROM stop_times st
              JOIN trips t ON t.trip_pk = st.trip_pk
              JOIN patterns p ON p.pattern_pk = t.pattern_pk
@@ -98,7 +102,7 @@ export async function getStopDepartures(
                 routeType: r.route_type,
                 routeColor: hexColor(r.route_color, fallbackRouteColor(r.route_type, routeName)),
                 routeTextColor: hexColor(r.route_text_color, '#FFFFFF'),
-                terminus: r.terminus ?? '',
+                terminus: r.headsign ?? r.terminus ?? '',
                 tripPk: r.trip_pk,
                 stopSequence: r.stop_sequence,
                 dayStartMs,

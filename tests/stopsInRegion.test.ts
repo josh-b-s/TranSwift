@@ -9,7 +9,11 @@ const region = (latitudeDelta: number) =>
     ({ latitude: -37.8, longitude: 144.9, latitudeDelta, longitudeDelta: latitudeDelta });
 
 test('returns nothing when zoomed out', () => {
-    assert.deepEqual(stopsInRegion([stop(1, -37.8, 144.9)], region(0.05)), []);
+    assert.deepEqual(stopsInRegion([stop(1, -37.8, 144.9)], region(0.06)), []);
+});
+
+test('still shows stops when the map is exactly 0.05 degrees tall', () => {
+    assert.equal(stopsInRegion([stop(1, -37.8, 144.9)], region(0.05)).length, 1);
 });
 
 test('keeps only stops inside the visible area', () => {

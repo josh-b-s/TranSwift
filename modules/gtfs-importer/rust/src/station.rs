@@ -121,7 +121,7 @@ mod tests {
             w4,GN,,1,1,,,,,\n"),
         ("routes.txt", "route_id,route_short_name,route_long_name,route_type\nR,1,One,1\n"),
         ("calendar.txt", "service_id,monday,tuesday,wednesday,thursday,friday,saturday,sunday,start_date,end_date\nS,1,1,1,1,1,1,1,20260101,20271231\n"),
-        ("trips.txt", "route_id,service_id,trip_id\nR,S,T\n"),
+        ("trips.txt", "route_id,service_id,trip_id,trip_headsign\nR,S,T,Brunswick\n"),
         ("stop_times.txt", "trip_id,arrival_time,departure_time,stop_id,stop_sequence\nT,08:00:00,08:00:00,P1,1\nT,08:10:00,08:10:00,LOOSE,2\n"),
     ];
 
@@ -176,6 +176,13 @@ mod tests {
             .prepare("SELECT level_id, level_index, level_name FROM levels ORDER BY level_id")
             .unwrap().query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?))).unwrap().map(Result::unwrap).collect();
         assert_eq!(levels, vec![("L0".into(), Some(0.0), Some("Concourse".into())), ("L1".into(), Some(-1.0), Some("Platforms".into()))]);
+    }
+
+    #[test]
+    fn keeps_the_trip_headsign() {
+        let conn = import_feed();
+        let headsign: Option<String> = conn.query_row("SELECT trip_headsign FROM trips WHERE trip_id = 'T'", [], |r| r.get(0)).unwrap();
+        assert_eq!(headsign, Some("Brunswick".into()));
     }
 
     #[test]

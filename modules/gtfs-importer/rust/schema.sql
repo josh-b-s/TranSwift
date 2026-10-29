@@ -60,7 +60,9 @@ CREATE TABLE trips (
                        trip_id    TEXT    NOT NULL,
                        agency     INTEGER NOT NULL,
                        pattern_pk INTEGER NOT NULL,
-                       service_id TEXT    NOT NULL DEFAULT ''
+                       service_id TEXT    NOT NULL DEFAULT '',
+                       -- Where the trip says it is heading. NULL when the feed has none, and on databases imported before this column existed.
+                       trip_headsign TEXT
 );
 
 CREATE TABLE patterns (

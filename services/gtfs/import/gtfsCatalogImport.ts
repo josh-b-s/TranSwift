@@ -44,13 +44,13 @@ export async function importCatalogFeed(
         }
 
         if (old && (old.realtimeUrls || old.vehicleUrls || old.alertUrls)) {
-            await setRealtimeConfig(
-                entry.id,
-                old.realtimeUrls ?? [],
-                old.realtimeHeader ?? '',
-                old.vehicleUrls ?? [],
-                old.alertUrls ?? [],
-            );
+            await setRealtimeConfig(entry.id, {
+                tripUrls: old.realtimeUrls ?? [],
+                vehicleUrls: old.vehicleUrls ?? [],
+                alertUrls: old.alertUrls ?? [],
+                header: old.realtimeHeader ?? '',
+                query: old.realtimeQuery ?? '',
+            });
             if (old.realtimeAuth) await setRealtimeAuthHint(entry.id, old.realtimeAuth);
         } else {
             // The import already succeeded; a catalog lookup problem shouldn't undo it.

@@ -166,3 +166,42 @@ test('a service outside its date range does not run', async () => {
     sqlite.exec(`UPDATE calendar SET end_date = '20261025'`);
     assert.deepEqual(await getStopDepartures(db, 1, new Date(at(MON, 9)), 3 * HOUR_MS, 10), []);
 });
+
+test('a trip headsign replaces the last stop name, and a blank one falls back to it', async () => {
+    addTrip(100, 'WK', 10 * 3600);
+    addTrip(101, 'WK', 11 * 3600);
+    addTrip(102, 'WK', 12 * 3600);
+    sqlite.exec(`UPDATE trips SET trip_headsign = 'Brunswick' WHERE trip_pk = 100;
+                 UPDATE trips SET trip_headsign = '   ' WHERE trip_pk = 101;`);
+    const out = await getStopDepartures(db, 1, new Date(at(MON, 9, 30)), 4 * HOUR_MS, 10);
+    assert.deepEqual(out.map(d => d.terminus), ['Brunswick', 'Charlie', 'Charlie']);
+});
+
+test('a database imported before headsigns existed still lists last stops', async () => {
+    const withoutColumn = REAL_SCHEMA_SQL.replace(/,\s*--[^\n]*\n\s*trip_headsign TEXT/, '');
+    assert.notEqual(withoutColumn, REAL_SCHEMA_SQL);
+    sqlite = new Database(':memory:');
+    sqlite.exec(withoutColumn);
+    sqlite.exec(REAL_INDEXES_SQL);
+    sqlite.exec(`
+        INSERT INTO stops (stop_pk, stop_id, stop_name, stop_lat, stop_lon, agency) VALUES
+            (1, 'A', 'Alpha', 0, 0, 1), (2, 'B', 'Bravo', 0, 0, 1), (3, 'C', 'Charlie', 0, 0, 1);
+        INSERT INTO routes (route_id, route_short_name, route_long_name, route_type, route_color, route_text_color, agency)
+            VALUES ('R1', '96', 'Long name', 0, '#FF0000', '#FFFFFF', 1);
+        INSERT INTO patterns (pattern_pk, route_id, agency, direction_id, shape_id, trip_pk) VALUES (10, 'R1', 1, 0, NULL, 100);
+        INSERT INTO pattern_stops (pattern_pk, stop_pk, stop_sequence) VALUES (10, 1, 1), (10, 2, 2), (10, 3, 3);
+        INSERT INTO calendar (service_id, agency, monday, tuesday, wednesday, thursday, friday, saturday, sunday, start_date, end_date)
+            VALUES ('WK', 1, 1, 1, 1, 1, 1, 0, 0, '20260101', '20261231');
+    `);
+    addTrip(100, 'WK', 10 * 3600);
+    const oldDb: QueryableDb = {
+        getAllAsync: async <T>(sql: string, params: any[] = []) => sqlite.prepare(sql).all(...params) as T[],
+        execAsync: async (sql: string) => { sqlite.exec(sql); },
+        runAsync: async (sql: string, params: any[] = []) => {
+            const r = sqlite.prepare(sql).run(...params);
+            return { lastInsertRowId: Number(r.lastInsertRowid), changes: r.changes };
+        },
+    };
+    const out = await getStopDepartures(oldDb, 1, new Date(at(MON, 9, 30)), 3 * HOUR_MS, 10);
+    assert.deepEqual(out.map(d => d.terminus), ['Charlie']);
+});

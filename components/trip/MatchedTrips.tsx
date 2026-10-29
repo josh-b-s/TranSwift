@@ -16,9 +16,13 @@ export default function MatchedTrips({ matches, currentStartedAt, unit }: { matc
     return (
         <View style={{ borderRadius: 16, padding: 14, backgroundColor: theme.backgroundColor, gap: 8 }}>
             <Text style={{ color: theme.color, fontSize: 14, fontWeight: '700' }}>Same trip, {matches.runs.length} times</Text>
-            {matches.runs.slice(0, MAX_ROWS).map(({ trip, avgSpeedMps }) => {
+            {matches.runs.slice(0, MAX_ROWS).map(({ trip, avgSpeedMps, totalS }) => {
                 const current = trip.startedAt === currentStartedAt;
                 const date = new Date(trip.startedAt).toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' });
+                const tags = [
+                    trip.startedAt === matches.quickestStartedAt ? 'quickest' : null,
+                    trip.startedAt === matches.fastestStartedAt ? 'fastest walk' : null,
+                ].filter(Boolean);
                 return (
                     <Pressable
                         key={trip.startedAt}
@@ -28,11 +32,16 @@ export default function MatchedTrips({ matches, currentStartedAt, unit }: { matc
                         style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}
                     >
                         <Text style={{ flex: 1, color: current ? ACCENT : theme.color, fontSize: 13, fontWeight: current ? '700' : '400' }}>
-                            {date}{trip.startedAt === matches.fastestStartedAt ? ' · fastest' : ''}
+                            {[date, ...tags].join(' · ')}
                         </Text>
-                        <Text style={{ color: theme.color, opacity: 0.7, fontSize: 13 }}>
-                            {trip.totals.durationS > 0 ? `${formatDuration(trip.totals.durationS)} · ${formatSpeed(avgSpeedMps, unit)}` : 'No walking'}
-                        </Text>
+                        <View style={{ alignItems: 'flex-end' }}>
+                            {totalS !== null && (
+                                <Text style={{ color: theme.color, fontSize: 13, fontWeight: '600' }}>{formatDuration(totalS)} total</Text>
+                            )}
+                            <Text style={{ color: theme.color, opacity: 0.7, fontSize: 12 }}>
+                                {trip.totals.durationS > 0 ? `${formatDuration(trip.totals.durationS)} walking · ${formatSpeed(avgSpeedMps, unit)}` : 'No walking'}
+                            </Text>
+                        </View>
                     </Pressable>
                 );
             })}

@@ -19,13 +19,13 @@ What the app does today, and what could come next. Written from the code as it s
 
 ### Stop departures
 
-- **Stop dots.** Zoom in to about 2 km tall and every stop in view gets a circle (up to 150, nearest the centre first), ringed in the colour of the route that serves it most. Circles are not tappable in react-native-maps, so a tap on the map opens the nearest stop within about 22 dp. They hide while a route is shown, while picking on the map and in debug mode.
-- **Departures sheet.** Tapping a dot opens a sheet with the next 3 hours of scheduled departures: line badge in the route colour, "to <last stop>", minutes away or clock time, and a header listing the lines that serve the stop.
+- **Stop dots.** Zoom in until the map is 0.05 degrees of latitude tall, about 5.5 km, and every stop in view gets a circle (up to 150, nearest the centre first), ringed in the colour of the route that serves it most. Circles are not tappable in react-native-maps, so a tap on the map opens the nearest stop within about 22 dp. They hide while a route is shown, while picking on the map and in debug mode.
+- **Departures sheet.** Tapping a dot opens a sheet with the next 3 hours of scheduled departures: line badge in the route colour, "to <headsign>", which is the trip's own headsign when the feed has one and otherwise its last stop,, minutes away or clock time, and a header listing the lines that serve the stop.
 - **From a planned route.** Tapping a stop dot on a selected route opens the same sheet. The route stop is matched back to the database by position (nearest within 50 m, same name preferred).
 - **Filters.** When a stop has more than one line, chips filter the list by line. When the shown lines head to more than one place, a second row filters by direction. Choosing a line clears a direction it does not serve.
 - **Rest of the trip.** Tap a departure to expand the stops it calls at from here on, with the scheduled time at each. Found through the pattern's stop list and a time window, since `stop_times` has no `trip_pk` index.
 - **Realtime.** When the feed has TripUpdates URLs, each departure shows its live time and "4 min late", "On time" or "2 min early", the list is ordered by live time, a trip that is running late stays listed past its scheduled time (the query reaches back 15 minutes), a cancelled trip is struck through and marked Cancelled, and a stop the vehicle will skip says "Not stopping here". The expanded stops of a trip carry delays and mark skipped stops: the first stop's time takes the departure delay and the later ones take the arrival delay. Scheduled times show first and live ones replace them when the feeds answer, including after a warm-up that is still running finishes. The engine warms up again in the background whenever the active database changes, so live times do not wait for a search. A feed that fails leaves the scheduled times in place and logs a warning. Needs no new fetching code: the departures use the same overlay, refreshed at most every 30 seconds, that routing uses, read through the engine's `trip_realtime` call.
-- **Stops away.** When the feed has VehiclePositions URLs and a vehicle reports its trip id and the stop sequence it is at or heading to, its departure says "3 stops away", or "Arriving" when this stop is its current or next one. Counted in the pattern's stops, so sequences that skip numbers count correctly. Refreshes every 20 seconds while the sheet is open. A vehicle already past the stop, or one that reports no trip or stop sequence, shows nothing.
+- **Stops away.** When the feed has VehiclePositions URLs and a vehicle reports its trip id and the stop sequence it is at or heading to, its departure says "3 stops away", or "Arriving" when this stop is its current or next one. Counted in the pattern's stops, so sequences that skip numbers count correctly. It reads the vehicles the map already tracks, so it costs no extra requests and refreshes with them every 15 seconds. A vehicle already past the stop, or one that reports no trip or stop sequence, shows nothing.
 - **Station detail.** For a stop that belongs to a station or has a platform code, a collapsible card at the top of the sheet names the station and this platform, lists the station's other platforms with the lines and directions each serves ("96 to Brunswick"), and lists the exits ranked by the quickest route from this platform. Each exit shows an estimated walking time, whether the route is step-free (no stairs or escalators), and numbered directions built from the feed's pathways ("Take the escalator to Concourse, signed "Up to concourse""). Sections the feed has no data for are left out. Needs a feed imported with this version, since the importer now keeps `stop_platforms`, `station_nodes`, `pathways` and `levels`.
 - **Behaviour.** Works offline from the timetable. Reloads every minute, honours `calendar` and `calendar_dates` exceptions, includes yesterday's trips that run past midnight, and leaves out trips that end at the stop. Times are scheduled unless the realtime feeds say otherwise, and the sheet says which.
 
@@ -56,7 +56,7 @@ What the app does today, and what could come next. Written from the code as it s
 - **Trip summary.** A "Trip complete" notification, then a trip screen with the path on a map, distance, duration, average and top speed (GPS spikes above 10 m/s are discarded), and the records you broke.
 - **Splits and speed chart.** The trip screen shows walking pace per km or mile, with a partial last split, and a chart of walking speed over the trip's walking time. Time spent riding is not counted in either.
 - **Share.** The trip screen ends with a 4:5 picture of the trip (names, date, the route with walks in the app colour and rides in their line colour, walked distance, walking time and average speed). "Share image" rasterises it and opens the system share sheet. "Export GPX" shares the trip as a GPX 1.1 file: one track per leg, with the recorded timed fixes for walks and the followed line (no times) for rides. Uses `expo-sharing`, and `react-native-svg` to draw and rasterise the card.
-- **Same trip before.** If you have made the same journey (same first and last stop) more than once, the trip screen lists the runs with walking time and speed, marks the fastest, and links to the others.
+- **Same trip before.** If you have made the same journey (same first and last stop) more than once, the trip screen lists the runs with total time, walking time and speed, marks the quickest run and the fastest walk, and links to the others. Total time runs from start to finish, riding included, and exists only for trips saved after end times were added.
 - **Simulation.** A location simulator with movement controls lets you test a trip without walking.
 
 ### History
@@ -73,7 +73,7 @@ What the app does today, and what could come next. Written from the code as it s
 - **Duplicate detection.** The zip is MD5-hashed first, so re-adding an identical feed offers the existing one instead of a long re-import.
 - **Browse feeds.** A catalog of feeds from the Mobility Database with search by provider or place and a country filter, importing straight from a download.
 - **Suggestions.** Based on where you are, the app can suggest the best catalog feed when none imported covers you, or an update when your feed's timetable is about to end. Imported feeds remember their source for licence credit and update checks.
-- **Realtime config.** Per feed, four cards: Trip updates, Vehicle positions, Service Alerts and an optional auth header. Each URL card has one box per URL: a spare box always waits at the end, Enter moves to the next one, pasted lines split into boxes and an emptied box disappears. "Fill from Mobility Database" fills the three URL lists from the catalog, merged with what is already there. Importing a feed from Browse Feeds fills them automatically, and replacing a feed keeps its realtime settings. When the catalog says the producer wants a key, the hint (which header or query parameter) is saved with the feed. A 401 or 403 from a realtime URL opens an alert, once per feed per launch, saying where the key goes and offering the feeds screen.
+- **Realtime config.** Per feed, five cards: Trip updates, Vehicle positions, Service Alerts, an optional Header ("Name: value") and an optional Query key ("name=value"). The query key is added to each URL when it is fetched, unless the URL already has that parameter. Each URL card has one box per URL: a spare box always waits at the end, Enter moves to the next one, pasted lines split into boxes and an emptied box disappears. "Fill from Mobility Database" fills the three URL lists from the catalog, merged with what is already there. Importing a feed from Browse Feeds fills them automatically, and replacing a feed keeps its realtime settings. When the catalog says the producer wants a key, the hint (which header or query parameter) is saved with the feed. A 401 or 403 from a realtime URL opens an alert, once per feed per launch, saying where the key goes and offering the feeds screen.
 - **Caches.** Router and stop caches are reset whenever the active database changes.
 
 ### Settings
@@ -83,7 +83,7 @@ What the app does today, and what could come next. Written from the code as it s
 ### Developer tooling
 
 - **Debug visualiser.** Replays a search on the map: BFS rounds and candidate seed paths (flat, per-hop or depth coloured) and RAPTOR route-checks one at a time. The mounts in `index.tsx` are currently commented out, so it is not reachable in the app.
-- **Tests.** `npm test` runs 146 tests on Node's built-in runner, including the departures and trip stops queries against the real schema in in-memory SQLite. `cargo test --lib` in `modules/gtfs-router-rust/rust` runs the engine's 33 tests, including the realtime overlay, `trip_realtime`, and the vehicle and alert decoders. The same command in `modules/gtfs-importer/rust` runs 2 tests that import a small zip end to end and check the station tables.
+- **Tests.** `npm test` runs 158 tests on Node's built-in runner, including the departures and trip stops queries against the real schema in in-memory SQLite. `cargo test --lib` in `modules/gtfs-router-rust/rust` runs the engine's 33 tests, including the realtime overlay, `trip_realtime`, and the vehicle and alert decoders. The same command in `modules/gtfs-importer/rust` runs 3 tests that import a small zip end to end and check the station tables and trip headsigns.
 
 ## Future features
 
@@ -114,9 +114,8 @@ What the app does today, and what could come next. Written from the code as it s
 - Realtime on the departures sheet covers trips in the timetable. Added or replacement trips from the feed are used by routing but are not listed on the sheet.
 - Vehicles show only for the routes you are already looking at (the open stop, the shown journey), not every vehicle in the feed. A feed that sends VehiclePositions without a trip or route id the timetable knows shows nothing.
 - "Stops away" needs the vehicle to report both a trip id and its current stop sequence. It cannot tell a vehicle stopped at the stop from one arriving at it, so both read "Arriving".
-- The map fetches VehiclePositions every 15 seconds and the departures sheet fetches them again every 20 seconds for stops away, so a feed is hit by both while both are open.
 - The warm-up that live departures wait for costs about 12 seconds of background work each time the active database changes.
-- "to X" on a departure is the trip's last stop because the schema has no `trip_headsign`. Adding it means the importer and schema change first, and each feed would need importing again.
+- Headsigns are stored when a feed is imported. A database imported before that still shows each trip's last stop until the feed is imported again.
 
 ### Service alerts
 
@@ -128,15 +127,14 @@ What the app does today, and what could come next. Written from the code as it s
 ### Realtime setup
 
 - The catalog columns for realtime feeds (`entity_type`, `static_reference`, `urls.direct_download` and the key hints) are named from the Mobility Database documentation and have not been checked against a live copy of the file. If a name is wrong, the fill finds nothing instead of failing.
-- A key in a query parameter has to be typed into each URL by hand. Only a header key has a field.
-- The key alert fires for a 401 or 403 only, and again only after the app restarts, even if a new key still fails.
+- The key alert fires for a 401 or 403 only. It shows once per feed per launch, and again after you save that feed's realtime settings.
 
 ### Trips and the get-off alert
 
 - The planned arrival time behind a one-stop alert carries the delays known when the journey was planned. It is not refreshed during the ride, so the live part is distance over speed.
 - A ride with no stop list, as some feeds give, never alerts.
 - Alerts depend on GPS fixes arriving. A phone that stops getting fixes will not alert.
-- Matched trips compare walking speed and time only. The schema keeps no total trip duration, so time spent riding is not part of the comparison.
+- Trips saved before end times were added have no total time, so they cannot be called quickest and show walking figures only.
 - The heatmap loads every saved trip at once and thins each path to a point every 8 m. A very large history may be slow to draw.
 
 ### Data and the rest
@@ -145,5 +143,4 @@ What the app does today, and what could come next. Written from the code as it s
 - Times use the device's time zone, as the router does, not the agency's.
 - The debug visualiser still compiles but is unmounted.
 - The Rust modules' headers no longer name removed TypeScript files, but about 20 inline comments still compare with "the TS version". The originals are in git history.
-- Stop dots appear while the map is at most 0.05 degrees of latitude tall, about 5.5 km, not the 2 km the Stop dots entry gives. One test, `stopsInRegion` "returns nothing when zoomed out", fails because it expects nothing at exactly 0.05 and the code only hides stops above it.
 - Tests cover the pure logic and the departures SQL. The map, sheets, native modules and background tracking have only been checked by type-checking, not on a device. That includes the filter chips, expanding departures, the history toggle, the heatmap, the trip screen additions, the service alert rows, stops away and the realtime setup cards. The type check reports errors only where the generated native bindings are missing, which they are until a native build.

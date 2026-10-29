@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { describeAuth, reportAuthFailure, setAuthFailureListener } from '@/services/gtfs/realtime/authFailure';
+import { describeAuth, forgetAuthFailure, reportAuthFailure, setAuthFailureListener } from '@/services/gtfs/realtime/authFailure';
 import { RealtimeHttpError } from '@/services/gtfs/realtime/realtimeHttp';
 import type { GtfsDatabaseEntry } from '@/services/gtfs/import/gtfsDbRegistry';
 
@@ -35,7 +35,17 @@ test('does not use up the report while nothing is listening', () => {
 });
 
 test('says where the key goes', () => {
-    assert.match(describeAuth({ kind: 'header', name: 'x-api-key' }), /"x-api-key" header/);
+    assert.match(describeAuth({ kind: 'header', name: 'x-api-key' }), /"x-api-key: <your key>"/);
     assert.match(describeAuth({ kind: 'query', name: 'apikey' }), /apikey=<your key>/);
     assert.match(describeAuth(undefined), /may want an API key/);
+});
+
+test('reports a feed again after its settings were saved', () => {
+    const seen: string[] = [];
+    setAuthFailureListener((e) => seen.push(e.id));
+    reportAuthFailure(entry('d'), [rejected(403)]);
+    forgetAuthFailure('d');
+    reportAuthFailure(entry('d'), [rejected(403)]);
+    assert.deepEqual(seen, ['d', 'd']);
+    setAuthFailureListener(null);
 });

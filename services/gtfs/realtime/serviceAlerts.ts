@@ -3,7 +3,7 @@ import type { ServiceAlertInfo } from '@mapapp/gtfs-router-rust';
 import { getActiveDatabaseEntry } from '../import/gtfsDbRegistry';
 import type { ServiceAlert } from '../alerts/serviceAlert';
 import { reportAuthFailure } from './authFailure';
-import { authHeaders, fetchFeedBytes } from './realtimeHttp';
+import { fetchWithKey } from './realtimeHttp';
 
 // The stop sheet and the journey card both ask, so one fetch serves both.
 const CACHE_MS = 30_000;
@@ -30,11 +30,10 @@ export async function fetchServiceAlerts(): Promise<ServiceAlert[]> {
     const urls = entry?.alertUrls ?? [];
     if (!entry || urls.length === 0) return [];
 
-    const key = `${entry.id}|${urls.join('|')}|${entry.realtimeHeader ?? ''}`;
+    const key = `${entry.id}|${urls.join('|')}|${entry.realtimeHeader ?? ''}|${entry.realtimeQuery ?? ''}`;
     if (cache?.key === key && Date.now() - cache.at < CACHE_MS) return cache.alerts;
 
-    const headers = authHeaders(entry.realtimeHeader);
-    const results = await Promise.allSettled(urls.map(url => fetchFeedBytes(url, headers)));
+    const results = await Promise.allSettled(urls.map(url => fetchWithKey(entry, url)));
     reportAuthFailure(entry, results);
     const feeds: ArrayBuffer[] = [];
     results.forEach((result, i) => {

@@ -40,7 +40,7 @@ export function useTripRecorder() {
             finished = true;
             dispatch(endTrip());
             const { bests: updated, broken } = applyTrip(bests, { startedAt, legs: session.legs });
-            const trip: SavedTrip = { startedAt, legs: session.legs, records: broken };
+            const trip: SavedTrip = { startedAt, endedAt: Date.now(), legs: session.legs, records: broken };
             trip.totals = walkTotals(trip);
             Promise.all([saveTrip(trip), saveBests(updated)])
                 .then(() => {

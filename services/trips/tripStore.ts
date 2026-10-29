@@ -32,6 +32,8 @@ export type WalkTotals = { distanceM: number; durationS: number; topSpeedMps: nu
 
 export type SavedTrip = {
     startedAt: number;
+    /** When the trip was finished. Missing on trips saved before it existed, which have no total time. */
+    endedAt?: number;
     legs: SavedLeg[];
     /** Records this trip broke. */
     records: BrokenRecord[];

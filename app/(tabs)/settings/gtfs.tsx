@@ -7,7 +7,7 @@ import ImportProgressCard from '@/components/ui/ImportProgressCard';
 import InputCard, { usePillStyle } from '@/components/ui/InputCard';
 import UrlListInput from '@/components/ui/UrlListInput';
 import { loadRealtimeEndpoints } from '@/services/gtfs/catalog/feedCatalog';
-import { describeAuth } from '@/services/gtfs/realtime/authFailure';
+import { describeAuth, forgetAuthFailure } from '@/services/gtfs/realtime/authFailure';
 import { createProgressTracker, type ImportProgress } from '@/services/gtfs/import/importProgress';
 import { CancelledError } from '@/services/gtfs/import/cancelledError';
 import { pickGtfsZip, importZipAsNewDatabase } from '@/services/gtfs/import/gtfsDbImport';
@@ -60,6 +60,7 @@ export default function GtfsData() {
     const [draftName, setDraftName] = useState('');
     const [draftRealtimeUrls, setDraftRealtimeUrls] = useState<string[]>([]);
     const [draftRealtimeHeader, setDraftRealtimeHeader] = useState('');
+    const [draftRealtimeQuery, setDraftRealtimeQuery] = useState('');
     const [draftVehicleUrls, setDraftVehicleUrls] = useState<string[]>([]);
     const [draftAlertUrls, setDraftAlertUrls] = useState<string[]>([]);
     const [fillingId, setFillingId] = useState<string | null>(null);
@@ -151,6 +152,7 @@ export default function GtfsData() {
         setDraftName(db.name);
         setDraftRealtimeUrls(db.realtimeUrls ?? []);
         setDraftRealtimeHeader(db.realtimeHeader ?? '');
+        setDraftRealtimeQuery(db.realtimeQuery ?? '');
         setDraftVehicleUrls(db.vehicleUrls ?? []);
         setDraftAlertUrls(db.alertUrls ?? []);
         setFillNote('');
@@ -174,6 +176,7 @@ export default function GtfsData() {
             if (found.auth) {
                 const { auth } = found;
                 if (auth.kind === 'header') setDraftRealtimeHeader((cur) => cur || `${auth.name}: `);
+                else setDraftRealtimeQuery((cur) => cur || `${auth.name}=`);
                 setFillNote(describeAuth(auth));
                 await setRealtimeAuthHint(db.id, auth);
                 await refresh();
@@ -198,7 +201,14 @@ export default function GtfsData() {
         }
         try {
             await renameDatabase(editingId, trimmed);
-            await setRealtimeConfig(editingId, draftRealtimeUrls, draftRealtimeHeader, draftVehicleUrls, draftAlertUrls);
+            await setRealtimeConfig(editingId, {
+                tripUrls: draftRealtimeUrls,
+                vehicleUrls: draftVehicleUrls,
+                alertUrls: draftAlertUrls,
+                header: draftRealtimeHeader,
+                query: draftRealtimeQuery,
+            });
+            forgetAuthFailure(editingId);
             setEditingId(null);
             await refresh();
         } catch (err) {
@@ -368,6 +378,17 @@ export default function GtfsData() {
                                     value={draftRealtimeHeader}
                                     onChangeText={setDraftRealtimeHeader}
                                     placeholder="Name: value"
+                                    placeholderTextColor={theme.color + '66'}
+                                    autoCapitalize="none"
+                                    autoCorrect={false}
+                                    style={pill}
+                                />
+                            </InputCard>
+                            <InputCard title="Query key">
+                                <TextInput
+                                    value={draftRealtimeQuery}
+                                    onChangeText={setDraftRealtimeQuery}
+                                    placeholder="name=value"
                                     placeholderTextColor={theme.color + '66'}
                                     autoCapitalize="none"
                                     autoCorrect={false}

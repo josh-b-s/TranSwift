@@ -325,6 +325,7 @@ export default function Index() {
                 animatedPosition={bottomSheetPosition}
                 onClose={() => setDepartureStop(null)}
                 onRoutes={setStopRouteKeys}
+                vehicles={vehicles}
             />
         </View>
     );

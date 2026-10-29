@@ -15,6 +15,7 @@ import { useStopDepartures } from '@/hooks/stopDepartures';
 import { useServiceAlerts } from '@/hooks/serviceAlerts';
 import { useStopsAway } from '@/hooks/stopsAway';
 import { alertsForStop } from '@/services/gtfs/alerts/serviceAlert';
+import type { VehicleFix } from '@/services/gtfs/vehicles/vehicleFix';
 import { useSavedPlace } from '@/hooks/savedPlace';
 import { stopToPlace } from '@/services/places/endpoints';
 import type { RepoStop } from '@/services/gtfs/core/stopRepo';
@@ -35,14 +36,16 @@ type Props = {
     onClose: () => void;
     /** Told which routes serve the stop (see `routeKey`), so the map can show their vehicles. */
     onRoutes?: (keys: string[]) => void;
+    /** The vehicles the map is tracking, used for how many stops away each departure is. */
+    vehicles: VehicleFix[];
 };
 
-const StopDeparturesSheet = forwardRef<BottomSheetModal, Props>(({ stop, animatedPosition, onClose, onRoutes }, ref) => {
+const StopDeparturesSheet = forwardRef<BottomSheetModal, Props>(({ stop, animatedPosition, onClose, onRoutes, vehicles }, ref) => {
     const theme = useThemeStyle();
     const tabBarHeight = useBottomTabBarHeight();
     const { departures, loading, error, live } = useStopDepartures(stop);
     const serviceAlerts = useServiceAlerts(stop !== null);
-    const stopsAway = useStopsAway(departures, stop !== null);
+    const stopsAway = useStopsAway(departures, vehicles);
     const savedStop = useSavedPlace(useMemo(() => (stop ? stopToPlace(stop) : null), [stop]));
 
     const [filter, setFilter] = useState<DepartureFilter>(NO_FILTER);

@@ -11,13 +11,18 @@ const reported = new Set<string>();
 export function describeAuth(auth: RealtimeAuth | undefined): string {
     if (!auth) return 'The provider may want an API key. Check its developer page.';
     return auth.kind === 'header'
-        ? `Get a key from the provider and send it as the "${auth.name}" header.`
-        : `Get a key from the provider and add ${auth.name}=<your key> to each URL.`;
+        ? `Get a key from the provider and put it in the Header box as "${auth.name}: <your key>".`
+        : `Get a key from the provider and put it in the Query key box as ${auth.name}=<your key>.`;
 }
 
 /** The screen that shows the alert registers here; there is one at a time. */
 export function setAuthFailureListener(next: Listener | null): void {
     listener = next;
+}
+
+/** Lets a feed report again, for when its realtime settings changed and the new ones may still be refused. */
+export function forgetAuthFailure(entryId: string): void {
+    reported.delete(entryId);
 }
 
 /** Tells the listener once per feed per launch when a realtime request came back 401 or 403. */

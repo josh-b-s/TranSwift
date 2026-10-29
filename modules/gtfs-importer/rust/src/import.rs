@@ -212,7 +212,7 @@ fn normalize_hex_color(v: &str) -> String {
 #[derive(Clone, Copy, Default)]
 pub struct PkOffsets { pub stop: i64, pub trip: i64, pub pattern: i64, pub shape: i64 }
 
-struct TripMeta { pk: i64, route_id: String, direction_id: String, shape_id: String, service_id: String }
+struct TripMeta { pk: i64, route_id: String, direction_id: String, shape_id: String, service_id: String, headsign: Option<String> }
 struct TripStopRow { stop_pk: i64, stop_sequence: i64, arrival_sec: i64, departure_sec: i64, pickup_type: i64, drop_off_type: i64 }
 struct PatternGroup { pk: i64, route_id: String, direction_id: String, shape_id: String, trip_pk: i64, stops: Vec<TripStopRow> }
 
@@ -336,6 +336,7 @@ fn process_agency(
             direction_id: t.get("direction_id").cloned().unwrap_or_else(|| "0".into()),
             shape_id: t.get("shape_id").cloned().unwrap_or_default(),
             service_id: t.get("service_id").cloned().unwrap_or_default(),
+            headsign: t.get("trip_headsign").map(|h| h.trim()).filter(|h| !h.is_empty()).map(String::from),
         });
     }
 
@@ -431,12 +432,12 @@ fn process_agency(
     // ── trips (insert) ─────────────────────────────────────────────────
     {
         let mut ins = conn.prepare(
-            "INSERT INTO trips (trip_pk,trip_id,agency,pattern_pk,service_id) VALUES (?,?,?,?,?)"
+            "INSERT INTO trips (trip_pk,trip_id,agency,pattern_pk,service_id,trip_headsign) VALUES (?,?,?,?,?,?)"
         )?;
         let mut count = 0u64;
         for (trip_id, pattern_pk) in &trip_to_pattern_pk {
             let meta = &trip_meta[trip_id];
-            ins.execute(params![meta.pk, trip_id, agency_id, pattern_pk, meta.service_id])?;
+            ins.execute(params![meta.pk, trip_id, agency_id, pattern_pk, meta.service_id, meta.headsign])?;
             count += 1;
         }
         progress.on_progress(format!("agency {agency_id} · trips"), count, count)?;

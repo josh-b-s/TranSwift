@@ -44,6 +44,8 @@ export type GtfsDatabaseEntry = {
     alertUrls?: string[];
     /** Optional auth header sent with every realtime URL, written "Name: value". */
     realtimeHeader?: string;
+    /** A key for the realtime URLs' query string as "name=value", added to each URL when it is fetched. */
+    realtimeQuery?: string;
     /** How the catalog says the realtime producer wants a key. Only a hint: the key itself is never stored here. */
     realtimeAuth?: RealtimeAuth;
     /** Set when most of a realtime feed's trip ids matched no trip here, which suggests an older timetable. */
@@ -239,23 +241,30 @@ export async function setRealtimeMismatch(id: string, mismatch: boolean): Promis
 }
 
 /** Empty values clear the setting. */
-export async function setRealtimeConfig(
-    id: string,
-    urls: string[],
-    header: string,
-    vehicleUrls: string[],
-    alertUrls: string[],
-): Promise<void> {
+export type RealtimeConfig = {
+    tripUrls: string[];
+    vehicleUrls: string[];
+    alertUrls: string[];
+    /** "Name: value", sent as a header. */
+    header: string;
+    /** "name=value", added to each URL's query string. */
+    query: string;
+};
+
+const cleanUrls = (urls: string[]) => {
+    const cleaned = urls.map(u => u.trim()).filter(Boolean);
+    return cleaned.length > 0 ? cleaned : undefined;
+};
+
+export async function setRealtimeConfig(id: string, config: RealtimeConfig): Promise<void> {
     const reg = await readRegistry();
     const entry = reg.databases.find(d => d.id === id);
     if (!entry) throw new Error(`Unknown GTFS database id: ${id}`);
-    const cleaned = urls.map(u => u.trim()).filter(Boolean);
-    entry.realtimeUrls = cleaned.length > 0 ? cleaned : undefined;
-    const cleanedVehicles = vehicleUrls.map(u => u.trim()).filter(Boolean);
-    entry.vehicleUrls = cleanedVehicles.length > 0 ? cleanedVehicles : undefined;
-    const cleanedAlerts = alertUrls.map(u => u.trim()).filter(Boolean);
-    entry.alertUrls = cleanedAlerts.length > 0 ? cleanedAlerts : undefined;
-    entry.realtimeHeader = header.trim() || undefined;
+    entry.realtimeUrls = cleanUrls(config.tripUrls);
+    entry.vehicleUrls = cleanUrls(config.vehicleUrls);
+    entry.alertUrls = cleanUrls(config.alertUrls);
+    entry.realtimeHeader = config.header.trim() || undefined;
+    entry.realtimeQuery = config.query.trim() || undefined;
     await writeRegistry(reg);
 }
 

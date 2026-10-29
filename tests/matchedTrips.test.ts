@@ -27,7 +27,26 @@ test('matches only trips between the same places and names the fastest walker', 
     assert.equal(fastestStartedAt, 2);
 });
 
+const timed = (t: HistoryTrip, totalS: number): HistoryTrip => ({ ...t, endedAt: t.startedAt + totalS * 1000 });
+
+test('total time includes riding, and the quickest run is the one with the least of it', () => {
+    const history = [
+        timed(trip(4000, 'Home', 'Uni', 600, 300), 1500),
+        timed(trip(3000, 'Home', 'Uni', 600, 400), 1200),
+        trip(2000, 'Home', 'Uni', 600, 200), // saved before end times existed
+    ];
+    const { runs, fastestStartedAt, quickestStartedAt } = matchTrips(history, history[0]);
+    assert.deepEqual(runs.map(r => r.totalS), [1500, 1200, null]);
+    assert.equal(quickestStartedAt, 3000);
+    assert.equal(fastestStartedAt, 2000); // walking speed is judged on its own
+});
+
+test('no run is called quickest when fewer than two have a total time', () => {
+    const history = [timed(trip(2000, 'Home', 'Uni', 600, 300), 900), trip(1000, 'Home', 'Uni', 600, 300)];
+    assert.equal(matchTrips(history, history[0]).quickestStartedAt, null);
+});
+
 test('a trip with no steps matches nothing', () => {
     const empty: HistoryTrip = { startedAt: 9, legs: [], records: [], totals: { distanceM: 0, durationS: 0, topSpeedMps: 0 } };
-    assert.deepEqual(matchTrips([empty], empty), { runs: [], fastestStartedAt: null });
+    assert.deepEqual(matchTrips([empty], empty), { runs: [], fastestStartedAt: null, quickestStartedAt: null });
 });
