@@ -43,8 +43,14 @@ export async function importCatalogFeed(
             await renameDatabase(entry.id, old.name);
         }
 
-        if (old && (old.realtimeUrls || old.vehicleUrls)) {
-            await setRealtimeConfig(entry.id, old.realtimeUrls ?? [], old.realtimeHeader ?? '', old.vehicleUrls ?? []);
+        if (old && (old.realtimeUrls || old.vehicleUrls || old.alertUrls)) {
+            await setRealtimeConfig(
+                entry.id,
+                old.realtimeUrls ?? [],
+                old.realtimeHeader ?? '',
+                old.vehicleUrls ?? [],
+                old.alertUrls ?? [],
+            );
             if (old.realtimeAuth) await setRealtimeAuthHint(entry.id, old.realtimeAuth);
         } else {
             // The import already succeeded; a catalog lookup problem shouldn't undo it.

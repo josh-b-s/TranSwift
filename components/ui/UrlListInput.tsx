@@ -1,20 +1,22 @@
 import React, { useRef } from 'react';
-import { TextInput, View } from 'react-native';
+import { TextInput } from 'react-native';
 import { useThemeStyle } from '@/constants/themes';
+import InputCard, { usePillStyle } from './InputCard';
 
 type Props = {
+    title: string;
     values: string[];
     onChange: (values: string[]) => void;
-    placeholder: string;
 };
 
 /**
- * One text box per URL. A spare empty box always sits at the end; Enter jumps
- * to the next box, pasted lines become separate boxes, and an emptied box
- * disappears when it loses focus.
+ * A card with one pill input per URL. A spare empty pill always sits at the
+ * end; Enter jumps to the next one, pasted lines become separate pills, and an
+ * emptied pill disappears when it loses focus.
  */
-export default function UrlListInput({ values, onChange, placeholder }: Props) {
+export default function UrlListInput({ title, values, onChange }: Props) {
     const theme = useThemeStyle();
+    const pill = usePillStyle();
     const inputs = useRef<(TextInput | null)[]>([]);
     const rows = values[values.length - 1] === '' ? values : [...values, ''];
 
@@ -28,7 +30,7 @@ export default function UrlListInput({ values, onChange, placeholder }: Props) {
     }
 
     return (
-        <View style={{ gap: 8 }}>
+        <InputCard title={title}>
             {rows.map((value, i) => (
                 <TextInput
                     key={i}
@@ -40,14 +42,14 @@ export default function UrlListInput({ values, onChange, placeholder }: Props) {
                     multiline
                     submitBehavior="submit"
                     returnKeyType="next"
-                    placeholder={i === 0 ? placeholder : 'Add another URL'}
+                    placeholder={i === 0 ? 'Add a URL' : undefined}
                     placeholderTextColor={theme.color + '66'}
                     autoCapitalize="none"
                     autoCorrect={false}
                     keyboardType="url"
-                    style={{ color: theme.color, fontSize: 14, borderBottomWidth: 1, borderBottomColor: theme.color + '33', paddingVertical: 2 }}
+                    style={pill}
                 />
             ))}
-        </View>
+        </InputCard>
     );
 }

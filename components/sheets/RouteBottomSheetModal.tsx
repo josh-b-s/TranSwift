@@ -7,6 +7,10 @@ import { RootState, AppDispatch } from '@/store/store';
 import { ACCENT, SHADOW, TOP_SAFE, useThemeStyle } from '@/constants/themes';
 import { modeIcon } from '@/constants/modeIcons';
 import RouteSheetHeader from '@/components/sheets/RouteSheetHeader';
+import ServiceAlertList from '@/components/sheets/ServiceAlertList';
+import { useServiceAlerts } from '@/hooks/serviceAlerts';
+import { alertsForRoutes } from '@/services/gtfs/alerts/serviceAlert';
+import { routeKey } from '@/services/gtfs/vehicles/vehicleRoutes';
 import { useSavedPlace } from '@/hooks/savedPlace';
 import { isCurrentLocation } from '@/services/places/endpoints';
 import RouteOptionPills from '@/components/search/RouteOptionPills';
@@ -67,6 +71,7 @@ const RouteBottomSheetModal = forwardRef<BottomSheetModal, Props>(
         const theme = useThemeStyle();
         const dispatch = useDispatch<AppDispatch>();
         const { journeys = [], selectedJourneyIndex, error, loading } = useSelector((s: RootState) => s.route);
+        const serviceAlerts = useServiceAlerts(journeys.length > 0);
         const selectedPlace = useSelector((s: RootState) => s.search.selected);
         const savedPlace = useSavedPlace(selectedPlace && !isCurrentLocation(selectedPlace) ? selectedPlace : null);
         const [sortKey, setSortKey] = useState<SortKey>('arrival');
@@ -260,6 +265,10 @@ const RouteBottomSheetModal = forwardRef<BottomSheetModal, Props>(
 
                                             {isSelected && (
                                                 <View style={{ marginTop: 6, paddingTop: 12, borderTopWidth: 1, borderTopColor: theme.color + '14' }}>
+                                                    <ServiceAlertList
+                                                        alerts={alertsForRoutes(serviceAlerts, journey.legs.map(leg => routeKey(leg.routeName, leg.routeType)))}
+                                                        style={{ marginBottom: 12 }}
+                                                    />
                                                     {journey.legs.map((leg, i) => {
                                                         const isLastLeg = i === journey.legs.length - 1;
                                                         return (

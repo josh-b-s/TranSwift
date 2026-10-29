@@ -5,6 +5,7 @@ export type RealtimeAuth = { kind: 'query' | 'header'; name: string };
 export type RealtimeEndpoints = {
     tripUpdates: string[];
     vehiclePositions: string[];
+    serviceAlerts: string[];
     /** Set when the producer wants the user's own key; the URLs are listed without it. */
     auth: RealtimeAuth | null;
 };
@@ -24,7 +25,7 @@ const bareId = (id: string) => id.trim().replace(/^mdb-/i, '');
 
 /** The realtime rows the catalog CSV lists against one schedule feed id. */
 export function parseRealtimeEndpoints(text: string, staticId: string): RealtimeEndpoints {
-    const result: RealtimeEndpoints = { tripUpdates: [], vehiclePositions: [], auth: null };
+    const result: RealtimeEndpoints = { tripUpdates: [], vehiclePositions: [], serviceAlerts: [], auth: null };
     const [header, ...rows] = parseCsv(text);
     if (!header) return result;
 
@@ -46,6 +47,7 @@ export function parseRealtimeEndpoints(text: string, staticId: string): Realtime
         const types = cell(row, 'entityType').toLowerCase().split(/[^a-z]+/);
         if (types.includes('tu') && !result.tripUpdates.includes(url)) result.tripUpdates.push(url);
         if (types.includes('vp') && !result.vehiclePositions.includes(url)) result.vehiclePositions.push(url);
+        if (types.includes('sa') && !result.serviceAlerts.includes(url)) result.serviceAlerts.push(url);
 
         const authType = cell(row, 'authType');
         const authName = cell(row, 'authParam');

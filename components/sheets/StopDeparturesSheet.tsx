@@ -10,7 +10,10 @@ import DepartureFilterChips from '@/components/sheets/DepartureFilterChips';
 import DepartureTripStops from '@/components/sheets/DepartureTripStops';
 import DepartureDelay from '@/components/sheets/DepartureDelay';
 import StationDetailSection from '@/components/sheets/StationDetailSection';
+import ServiceAlertList from '@/components/sheets/ServiceAlertList';
 import { useStopDepartures } from '@/hooks/stopDepartures';
+import { useServiceAlerts } from '@/hooks/serviceAlerts';
+import { alertsForStop } from '@/services/gtfs/alerts/serviceAlert';
 import { useSavedPlace } from '@/hooks/savedPlace';
 import { stopToPlace } from '@/services/places/endpoints';
 import type { RepoStop } from '@/services/gtfs/core/stopRepo';
@@ -37,6 +40,7 @@ const StopDeparturesSheet = forwardRef<BottomSheetModal, Props>(({ stop, animate
     const theme = useThemeStyle();
     const tabBarHeight = useBottomTabBarHeight();
     const { departures, loading, error, live } = useStopDepartures(stop);
+    const serviceAlerts = useServiceAlerts(stop !== null);
     const savedStop = useSavedPlace(useMemo(() => (stop ? stopToPlace(stop) : null), [stop]));
 
     const [filter, setFilter] = useState<DepartureFilter>(NO_FILTER);
@@ -51,6 +55,11 @@ const StopDeparturesSheet = forwardRef<BottomSheetModal, Props>(({ stop, animate
         onRoutes?.(routeIds === '' ? [] : routeIds.split('\n'));
         return () => onRoutes?.([]);
     }, [routeIds]);
+
+    const stopAlerts = useMemo(
+        () => (stop ? alertsForStop(serviceAlerts, stop.stop_id, routeIds === '' ? [] : routeIds.split('\n')) : []),
+        [serviceAlerts, stop, routeIds],
+    );
 
     const lines = filterLines(departures);
     const termini = filterTermini(departures, filter.line);
@@ -90,6 +99,8 @@ const StopDeparturesSheet = forwardRef<BottomSheetModal, Props>(({ stop, animate
                 </View>
 
                 <StationDetailSection stop={stop} />
+
+                <ServiceAlertList alerts={stopAlerts} style={{ paddingHorizontal: 24, paddingBottom: 12 }} />
 
                 {lines.length > 1 && (
                     <DepartureFilterChips

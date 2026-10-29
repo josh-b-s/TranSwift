@@ -386,6 +386,51 @@ pub fn decode_vehicle_positions(feeds: Vec<Vec<u8>>) -> Result<Vec<VehiclePositi
     Ok(out)
 }
 
+/// When a service alert applies, in seconds since the epoch. Either end can be open.
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct AlertPeriodInfo {
+    pub start_sec: Option<u32>,
+    pub end_sec: Option<u32>,
+}
+
+/// What a service alert is about, using the feed's own ids. Any field can be empty.
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct AlertTargetInfo {
+    pub agency_id: Option<String>,
+    pub route_id: Option<String>,
+    pub route_type: Option<i32>,
+    pub trip_id: Option<String>,
+    pub stop_id: Option<String>,
+}
+
+/// One service alert from a ServiceAlerts feed. No periods means it is always in effect.
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct ServiceAlertInfo {
+    pub id: String,
+    pub header: Option<String>,
+    pub description: Option<String>,
+    pub url: Option<String>,
+    pub periods: Vec<AlertPeriodInfo>,
+    pub targets: Vec<AlertTargetInfo>,
+}
+
+/// Decodes raw GTFS-realtime ServiceAlerts feeds. Needs no engine or database: it only reads the bytes.
+#[uniffi::export]
+pub fn decode_service_alerts(feeds: Vec<Vec<u8>>) -> Result<Vec<ServiceAlertInfo>, RouterError> {
+    let mut out = Vec::new();
+    for bytes in &feeds {
+        let alerts = realtime::alerts::decode(bytes).map_err(|e| RouterError::Realtime(format!("could not decode alert feed: {e}")))?;
+        out.extend(alerts.into_iter().map(|a| ServiceAlertInfo {
+            id: a.id, header: a.header, description: a.description, url: a.url,
+            periods: a.periods.into_iter().map(|p| AlertPeriodInfo { start_sec: p.start_sec, end_sec: p.end_sec }).collect(),
+            targets: a.targets.into_iter().map(|t| AlertTargetInfo {
+                agency_id: t.agency_id, route_id: t.route_id, route_type: t.route_type, trip_id: t.trip_id, stop_id: t.stop_id,
+            }).collect(),
+        }));
+    }
+    Ok(out)
+}
+
 #[uniffi::export]
 impl GtfsRouterEngine {
     #[uniffi::constructor]

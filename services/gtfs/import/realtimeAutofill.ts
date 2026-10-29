@@ -5,7 +5,7 @@ import { setRealtimeAuthHint, setRealtimeConfig, type GtfsDatabaseEntry } from '
 export async function autofillRealtime(entry: GtfsDatabaseEntry): Promise<void> {
     if (!entry.source) return;
     const found = await loadRealtimeEndpoints(entry.source.id);
-    if (found.tripUpdates.length === 0 && found.vehiclePositions.length === 0) return;
-    await setRealtimeConfig(entry.id, found.tripUpdates, '', found.vehiclePositions);
+    if (found.tripUpdates.length + found.vehiclePositions.length + found.serviceAlerts.length === 0) return;
+    await setRealtimeConfig(entry.id, found.tripUpdates, '', found.vehiclePositions, found.serviceAlerts);
     if (found.auth) await setRealtimeAuthHint(entry.id, found.auth);
 }

@@ -39,6 +39,8 @@ export type GtfsDatabaseEntry = {
     realtimeUrls?: string[];
     /** GTFS-realtime VehiclePositions URLs. Vehicles are not drawn on the map without any. */
     vehicleUrls?: string[];
+    /** GTFS-realtime ServiceAlerts URLs. Stored for now; nothing reads them yet. */
+    alertUrls?: string[];
     /** Optional auth header sent with every realtime URL, written "Name: value". */
     realtimeHeader?: string;
     /** How the catalog says the realtime producer wants a key. Only a hint: the key itself is never stored here. */
@@ -235,7 +237,13 @@ export async function setRealtimeMismatch(id: string, mismatch: boolean): Promis
 }
 
 /** Empty values clear the setting. */
-export async function setRealtimeConfig(id: string, urls: string[], header: string, vehicleUrls: string[]): Promise<void> {
+export async function setRealtimeConfig(
+    id: string,
+    urls: string[],
+    header: string,
+    vehicleUrls: string[],
+    alertUrls: string[],
+): Promise<void> {
     const reg = await readRegistry();
     const entry = reg.databases.find(d => d.id === id);
     if (!entry) throw new Error(`Unknown GTFS database id: ${id}`);
@@ -243,6 +251,8 @@ export async function setRealtimeConfig(id: string, urls: string[], header: stri
     entry.realtimeUrls = cleaned.length > 0 ? cleaned : undefined;
     const cleanedVehicles = vehicleUrls.map(u => u.trim()).filter(Boolean);
     entry.vehicleUrls = cleanedVehicles.length > 0 ? cleanedVehicles : undefined;
+    const cleanedAlerts = alertUrls.map(u => u.trim()).filter(Boolean);
+    entry.alertUrls = cleanedAlerts.length > 0 ? cleanedAlerts : undefined;
     entry.realtimeHeader = header.trim() || undefined;
     await writeRegistry(reg);
 }

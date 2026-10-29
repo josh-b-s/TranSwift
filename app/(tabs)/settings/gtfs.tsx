@@ -4,6 +4,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { Bus, CircleCheck, CirclePlus, CircleX, Download, Globe, Pencil, Trash2 } from 'lucide-react-native';
 import { useThemeStyle } from '@/constants/themes';
 import ImportProgressCard from '@/components/ui/ImportProgressCard';
+import InputCard, { usePillStyle } from '@/components/ui/InputCard';
 import UrlListInput from '@/components/ui/UrlListInput';
 import { loadRealtimeEndpoints } from '@/services/gtfs/catalog/feedCatalog';
 import { describeAuth } from '@/services/gtfs/realtime/authFailure';
@@ -41,6 +42,7 @@ type ImportState = { busy: false } | { busy: true; fileName: string; progress: I
  */
 export default function GtfsData() {
     const theme = useThemeStyle();
+    const pill = usePillStyle();
     const router = useRouter();
     const [databases, setDatabases] = useState<GtfsDatabaseEntry[]>([]);
     const [activeId, setActiveId] = useState<string | null>(null);
@@ -59,6 +61,7 @@ export default function GtfsData() {
     const [draftRealtimeUrls, setDraftRealtimeUrls] = useState<string[]>([]);
     const [draftRealtimeHeader, setDraftRealtimeHeader] = useState('');
     const [draftVehicleUrls, setDraftVehicleUrls] = useState<string[]>([]);
+    const [draftAlertUrls, setDraftAlertUrls] = useState<string[]>([]);
     const [fillingId, setFillingId] = useState<string | null>(null);
     const [fillNote, setFillNote] = useState('');
 
@@ -149,6 +152,7 @@ export default function GtfsData() {
         setDraftRealtimeUrls(db.realtimeUrls ?? []);
         setDraftRealtimeHeader(db.realtimeHeader ?? '');
         setDraftVehicleUrls(db.vehicleUrls ?? []);
+        setDraftAlertUrls(db.alertUrls ?? []);
         setFillNote('');
     }
 
@@ -158,7 +162,7 @@ export default function GtfsData() {
         setFillNote('');
         try {
             const found = await loadRealtimeEndpoints(db.source.id);
-            if (found.tripUpdates.length === 0 && found.vehiclePositions.length === 0) {
+            if (found.tripUpdates.length + found.vehiclePositions.length + found.serviceAlerts.length === 0) {
                 setFillNote('The Mobility Database lists no realtime feeds for this one.');
                 return;
             }
@@ -166,6 +170,7 @@ export default function GtfsData() {
                 [...new Set([...current.map((u) => u.trim()).filter(Boolean), ...extra])];
             setDraftRealtimeUrls((cur) => merge(cur, found.tripUpdates));
             setDraftVehicleUrls((cur) => merge(cur, found.vehiclePositions));
+            setDraftAlertUrls((cur) => merge(cur, found.serviceAlerts));
             if (found.auth) {
                 const { auth } = found;
                 if (auth.kind === 'header') setDraftRealtimeHeader((cur) => cur || `${auth.name}: `);
@@ -193,7 +198,7 @@ export default function GtfsData() {
         }
         try {
             await renameDatabase(editingId, trimmed);
-            await setRealtimeConfig(editingId, draftRealtimeUrls, draftRealtimeHeader, draftVehicleUrls);
+            await setRealtimeConfig(editingId, draftRealtimeUrls, draftRealtimeHeader, draftVehicleUrls, draftAlertUrls);
             setEditingId(null);
             await refresh();
         } catch (err) {
@@ -338,7 +343,7 @@ export default function GtfsData() {
                         )}
                     </View>
                     {isEditing && (
-                        <View style={{ gap: 8, paddingHorizontal: 16 }}>
+                        <View style={{ gap: 8 }}>
                             {db.source && (
                                 <Pressable
                                     onPress={() => handleFillFromCatalog(db)}
@@ -355,25 +360,20 @@ export default function GtfsData() {
                                 <Text style={{ color: theme.color, opacity: 0.6, fontSize: 12 }}>{describeAuth(db.realtimeAuth)}</Text>
                             )}
                             {!!fillNote && <Text style={{ color: theme.color, opacity: 0.6, fontSize: 12 }}>{fillNote}</Text>}
-                            <UrlListInput
-                                values={draftRealtimeUrls}
-                                onChange={setDraftRealtimeUrls}
-                                placeholder="Realtime TripUpdates URL (optional)"
-                            />
-                            <UrlListInput
-                                values={draftVehicleUrls}
-                                onChange={setDraftVehicleUrls}
-                                placeholder="Vehicle positions URL (optional)"
-                            />
-                            <TextInput
-                                value={draftRealtimeHeader}
-                                onChangeText={setDraftRealtimeHeader}
-                                placeholder="Auth header, Name: value (optional)"
-                                placeholderTextColor={theme.color + '66'}
-                                autoCapitalize="none"
-                                autoCorrect={false}
-                                style={{ color: theme.color, fontSize: 14, borderBottomWidth: 1, borderBottomColor: theme.color + '33', paddingVertical: 2 }}
-                            />
+                            <UrlListInput title="Trip updates" values={draftRealtimeUrls} onChange={setDraftRealtimeUrls} />
+                            <UrlListInput title="Vehicle positions" values={draftVehicleUrls} onChange={setDraftVehicleUrls} />
+                            <UrlListInput title="Service Alerts" values={draftAlertUrls} onChange={setDraftAlertUrls} />
+                            <InputCard title="Header">
+                                <TextInput
+                                    value={draftRealtimeHeader}
+                                    onChangeText={setDraftRealtimeHeader}
+                                    placeholder="Name: value"
+                                    placeholderTextColor={theme.color + '66'}
+                                    autoCapitalize="none"
+                                    autoCorrect={false}
+                                    style={pill}
+                                />
+                            </InputCard>
                         </View>
                     )}
                     </React.Fragment>
