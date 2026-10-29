@@ -8,6 +8,12 @@ let warmedUp = false;
  * Fire and forget from the root layout; a search that starts mid-warm-up joins the same warm-up.
  * Nothing origin-specific is prefetched, since that can't be guessed before the user picks a trip.
  */
+/** After the database changes: warms the engine for the new one in the background, so live data needs no search first. */
+export function rewarmGtfsEngine(): void {
+    warmedUp = false;
+    warmUpGtfsEngine().catch(err => console.warn('[gtfsWarmup] rewarm failed:', err));
+}
+
 export async function warmUpGtfsEngine(): Promise<void> {
     if (warmedUp) return;
     warmedUp = true;

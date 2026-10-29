@@ -59,6 +59,17 @@ export function getWarmNativeEngine() {
     return engine && warmedUpPath !== null && warmedUpPath === getCurrentDbPath() ? engine : null;
 }
 
+/**
+ * Like getWarmNativeEngine, but when a warm-up is already running it waits for that to finish. Never starts one,
+ * so a caller that only reads the engine still does not pay for a warm-up nobody asked for.
+ */
+export async function whenEngineWarm() {
+    const warm = getWarmNativeEngine();
+    if (warm || !warmUpPromise) return warm;
+    await warmUpPromise.catch(() => undefined);
+    return getWarmNativeEngine();
+}
+
 // Call this once after any GTFS re-import (mirrors your old invalidate flow)
 export function invalidateNativeRouter() {
     engine?.invalidate();

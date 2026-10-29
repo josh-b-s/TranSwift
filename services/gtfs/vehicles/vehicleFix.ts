@@ -11,6 +11,8 @@ export type VehicleFix = {
     speedMps: number | null;
     /** Seconds since the epoch. Null when the feed gives none. */
     timestampSec: number | null;
+    /** The stop sequence the vehicle is at or heading to, as the timetable numbers it. Null when the feed gives none. */
+    currentStopSequence: number | null;
 };
 
 /** A vehicle last heard from longer ago than this is probably out of service, not stuck in traffic. */

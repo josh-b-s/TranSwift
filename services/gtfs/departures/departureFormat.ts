@@ -10,6 +10,12 @@ export function formatDepartureIn(timeMs: number, nowMs: number): string {
 }
 
 /** "On time", "4 min late" or "2 min early". Under 30 s either way counts as on time. */
+/** "3 stops away", or "Arriving" when the stop is the vehicle's current or next one. */
+export function formatStopsAway(stops: number): string {
+    if (stops <= 0) return 'Arriving';
+    return stops === 1 ? '1 stop away' : `${stops} stops away`;
+}
+
 export function formatDelay(delaySec: number): string {
     const minutes = Math.round(Math.abs(delaySec) / 60);
     if (minutes === 0) return 'On time';

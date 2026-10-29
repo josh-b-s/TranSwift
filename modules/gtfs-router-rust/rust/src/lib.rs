@@ -1,9 +1,8 @@
-//! lib.rs — UniFFI boundary for the full Rust GTFS routing port.
+//! lib.rs — UniFFI boundary for the Rust GTFS router.
 //!
-//! Lifecycle mirrors the JS version's module-scope caches
-//! (gtfsWarmup.ts / getCoarseGraph() / gtfsRepo.ts's stopsCache): construct
-//! one `GtfsRouterEngine`, call `warm_up(db_path)` once (e.g. at app
-//! launch, fire-and-forget), then call `compute_route(...)` per search —
+//! Lifecycle: construct one `GtfsRouterEngine`, call `warm_up(db_path)` once
+//! (e.g. at app launch, fire-and-forget), then call `compute_route(...)`
+//! per search —
 //! stops/routes/patterns/coarse-graph are all loaded once and reused.
 //!
 //! SCOPE CUTS from this first port (flagged here, not hidden):
@@ -195,6 +194,8 @@ pub struct VehiclePositionInfo {
     pub speed_mps: Option<f32>,
     /// Seconds since the epoch when the position was measured.
     pub timestamp_sec: Option<u32>,
+    /// The stop sequence the vehicle is at or heading to, in the timetable's own numbering.
+    pub current_stop_sequence: Option<u32>,
 }
 
 /// One stop of one trip to look up realtime status for.
@@ -216,6 +217,9 @@ pub struct TripStopRealtime {
     /// Seconds late leaving this stop (negative when early). None when the feeds have nothing for it,
     /// which is different from Some(0), on time.
     pub departure_delay_sec: Option<i32>,
+    /// Seconds late arriving at this stop. Feeds can report it differently from the departure. None in the
+    /// same cases as `departure_delay_sec`.
+    pub arrival_delay_sec: Option<i32>,
 }
 
 #[derive(Debug, Clone, uniffi::Record)]
@@ -381,6 +385,7 @@ pub fn decode_vehicle_positions(feeds: Vec<Vec<u8>>) -> Result<Vec<VehiclePositi
         out.extend(vehicles.into_iter().map(|v| VehiclePositionInfo {
             key: v.key, label: v.label, trip_id: v.trip_id, route_id: v.route_id,
             latitude: v.latitude, longitude: v.longitude, bearing: v.bearing, speed_mps: v.speed_mps, timestamp_sec: v.timestamp_sec,
+            current_stop_sequence: v.current_stop_sequence,
         }));
     }
     Ok(out)
@@ -547,6 +552,7 @@ impl GtfsRouterEngine {
                 cancelled: overlay.is_cancelled(trip_pk),
                 skipped: overlay.is_skipped(trip_pk, stop_sequence),
                 departure_delay_sec: overlay.departure_delay(trip_pk, stop_sequence).map(|d| d as i32),
+                arrival_delay_sec: overlay.arrival_delay(trip_pk, stop_sequence).map(|d| d as i32),
             }
         }).collect()
     }
@@ -1442,6 +1448,8 @@ mod tests {
             (3, 1, false, None),      // trip the feed does not mention
         ]);
         assert!(out.iter().all(|r| !r.skipped));
+        // The feed gave only a departure delay, so the arrival one is the same, as the GTFS-rt spec says.
+        assert_eq!(out.iter().map(|r| r.arrival_delay_sec).collect::<Vec<_>>(), vec![None, Some(120), Some(120), None, None]);
 
         engine.clear_realtime();
         assert!(engine.trip_realtime(vec![at(1, 2)])[0].departure_delay_sec.is_none());

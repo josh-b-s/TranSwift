@@ -1,4 +1,4 @@
-//! settings.rs — port of services/gtfs/shared/routingSettings.ts.
+//! settings.rs — routing settings.
 //!
 //! Walk-distance handling: there is exactly ONE caller-supplied distance —
 //! `max_walk_distance_m`, threaded in from the front end through

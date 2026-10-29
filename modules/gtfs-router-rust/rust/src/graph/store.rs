@@ -1,4 +1,4 @@
-//! graph/store.rs — port of services/gtfs/graph/coarseGraphStore.ts.
+//! graph/store.rs — keeps the coarse graph in the database.
 //!
 //! TABLE NAMES: deliberately NOT the same `coarse_graph_meta` /
 //! `coarse_graph_adjacency` tables the JS build persists to. Those are

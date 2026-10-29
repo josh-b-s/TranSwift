@@ -18,6 +18,8 @@ pub struct Vehicle {
     pub speed_mps: Option<f32>,
     /// Seconds since the epoch, clamped to what a u32 holds (until 2106).
     pub timestamp_sec: Option<u32>,
+    /// The stop sequence the vehicle is at or heading to, as the feed numbers it.
+    pub current_stop_sequence: Option<u32>,
 }
 
 fn non_empty(value: Option<String>) -> Option<String> {
@@ -49,6 +51,7 @@ pub fn decode(bytes: &[u8]) -> Result<Vec<Vehicle>, prost::DecodeError> {
             bearing: position.bearing.filter(|b| b.is_finite()),
             speed_mps: position.speed.filter(|s| s.is_finite() && *s >= 0.0),
             timestamp_sec: v.timestamp.map(|t| t.min(u64::from(u32::MAX)) as u32),
+            current_stop_sequence: v.current_stop_sequence,
         })
     }).collect())
 }
@@ -89,6 +92,7 @@ mod tests {
         assert_eq!((v.key.as_str(), v.label.as_deref(), v.trip_id.as_deref(), v.route_id.as_deref()), ("V9", Some("Tram 9"), Some("T1"), Some("R1")));
         assert!((v.latitude + 37.8136).abs() < 1e-4 && (v.longitude - 144.9631).abs() < 1e-4);
         assert_eq!((v.bearing, v.speed_mps, v.timestamp_sec), (Some(90.0), Some(8.5), Some(1_790_000_000)));
+        assert_eq!(v.current_stop_sequence, Some(4));
     }
 
     #[test]

@@ -1,4 +1,4 @@
-//! raptor.rs — port of services/gtfs/router/gtfsRouter.ts.
+//! raptor.rs — the RAPTOR journey search.
 //!
 //! Same two properties as the TS version:
 //!  1. Zero SQLite queries during search — everything comes from the

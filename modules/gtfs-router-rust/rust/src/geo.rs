@@ -1,4 +1,4 @@
-//! geo.rs — port of services/geo/geoUtil.ts.
+//! geo.rs — distance and bearing maths.
 //!
 //! Pure math, no logic changes from the TS version — kept as its own module
 //! for the same reason the TS side pulled it out: one implementation, no

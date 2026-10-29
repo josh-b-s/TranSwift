@@ -1,4 +1,4 @@
-//! corridor/tagging.rs — port of services/gtfs/corridor/corridorTagging.ts.
+//! corridor/tagging.rs — tags the stops and patterns in a search corridor.
 //!
 //! Single path now: `compute_seed_path_corridor` takes an already-run
 //! `SeedBfsRun` (see seed_bfs.rs) plus a `batch_size`, and asks directly

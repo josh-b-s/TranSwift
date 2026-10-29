@@ -7,7 +7,10 @@ export type StopRealtime = {
     stopSequence: number;
     cancelled: boolean;
     skipped: boolean;
+    /** Seconds late leaving this stop. */
     delaySec: number | null;
+    /** Seconds late arriving at this stop. Feeds can report it differently from the departure. */
+    arrivalDelaySec: number | null;
 };
 
 export type LiveDeparture = Departure & {
@@ -55,14 +58,14 @@ export const hasLiveData = (departures: LiveDeparture[]) => departures.some(d =>
 export type LiveTripStop = TripStop & { liveTimeMs: number; delaySec: number | null; skipped: boolean };
 
 /**
- * Live times for the stops of one trip. The engine reports the delay of the departure at each stop, and arrivals
- * are shifted by the same amount, which is what operators' feeds almost always say.
+ * Live times for the stops of one trip. The first stop's time is a departure and the rest are arrivals, so each
+ * takes the matching delay from the engine.
  */
 export function applyLiveToStops(stops: TripStop[], tripPk: number, statuses: StopRealtime[]): LiveTripStop[] {
     const byKey = indexRealtime(statuses);
-    return stops.map(stop => {
+    return stops.map((stop, i) => {
         const status = byKey.get(realtimeKey(tripPk, stop.stopSequence));
-        const delaySec = status?.delaySec ?? null;
+        const delaySec = (i === 0 ? status?.delaySec : status?.arrivalDelaySec) ?? null;
         return { ...stop, liveTimeMs: liveTime(stop.timeMs, delaySec), delaySec, skipped: status?.skipped ?? false };
     });
 }

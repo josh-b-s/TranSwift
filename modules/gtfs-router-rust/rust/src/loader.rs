@@ -1,4 +1,4 @@
-//! loader.rs — port of services/gtfs/loader/gtfsLoader.ts.
+//! loader.rs — loads the timetable for a search.
 //!
 //! Loads a GTFS index SCOPED to one trip: corridor -> active services ->
 //! trips -> pattern_stops for patterns running today -> time-windowed

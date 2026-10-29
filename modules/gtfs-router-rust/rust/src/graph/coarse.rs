@@ -1,4 +1,4 @@
-//! graph/coarse.rs — port of services/gtfs/graph/coarseGraph.ts.
+//! graph/coarse.rs — the coarse stop-to-stop graph.
 //!
 //! Answers "does any trip, on any day, ever go directly from stop A to stop
 //! B?" (existence only) plus "can you walk between A and B?" — enough to

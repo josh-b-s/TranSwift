@@ -13,7 +13,7 @@ const dep = (tripPk: number, minutesFromNow: number): Departure => ({
 });
 
 const status = (tripPk: number, over: Partial<StopRealtime>): StopRealtime => ({
-    tripPk, stopSequence: 1, cancelled: false, skipped: false, delaySec: null, ...over,
+    tripPk, stopSequence: 1, cancelled: false, skipped: false, delaySec: null, arrivalDelaySec: null, ...over,
 });
 
 test('with no realtime the list is the scheduled one, nothing gone, nothing live', () => {
@@ -70,13 +70,21 @@ test('delay wording rounds to the minute and treats under 30 s as on time', () =
 test('trip stops take the delay in force at each stop and flag skipped ones', () => {
     const stops = [1, 2, 3].map(stopSequence => ({ stopName: `S${stopSequence}`, stopSequence, timeMs: NOW + stopSequence * MIN }));
     const statuses = [
-        { tripPk: 5, stopSequence: 1, cancelled: false, skipped: false, delaySec: null },
-        { tripPk: 5, stopSequence: 2, cancelled: false, skipped: true, delaySec: 120 },
-        { tripPk: 5, stopSequence: 3, cancelled: false, skipped: false, delaySec: 120 },
-        { tripPk: 6, stopSequence: 1, cancelled: false, skipped: false, delaySec: 999 },
+        { tripPk: 5, stopSequence: 1, cancelled: false, skipped: false, delaySec: null, arrivalDelaySec: null },
+        { tripPk: 5, stopSequence: 2, cancelled: false, skipped: true, delaySec: 120, arrivalDelaySec: 120 },
+        { tripPk: 5, stopSequence: 3, cancelled: false, skipped: false, delaySec: 120, arrivalDelaySec: 120 },
+        { tripPk: 6, stopSequence: 1, cancelled: false, skipped: false, delaySec: 999, arrivalDelaySec: 999 },
     ];
     const out = applyLiveToStops(stops, 5, statuses);
     assert.deepEqual(out.map(s => s.liveTimeMs), [NOW + MIN, NOW + 4 * MIN, NOW + 5 * MIN]);
     assert.deepEqual(out.map(s => s.skipped), [false, true, false]);
     assert.equal(out[0].delaySec, null);
+});
+
+test('trip stops use the departure delay at the first stop and the arrival delay at the rest', () => {
+    const stops = [1, 2, 3].map(stopSequence => ({ stopName: `S${stopSequence}`, stopSequence, timeMs: NOW + stopSequence * MIN }));
+    const status = (stopSequence: number, delaySec: number, arrivalDelaySec: number) =>
+        ({ tripPk: 5, stopSequence, cancelled: false, skipped: false, delaySec, arrivalDelaySec });
+    const out = applyLiveToStops(stops, 5, [status(1, 120, 30), status(2, 120, 60), status(3, 120, -60)]);
+    assert.deepEqual(out.map(s => s.liveTimeMs), [NOW + MIN + 120_000, NOW + 2 * MIN + 60_000, NOW + 3 * MIN - 60_000]);
 });

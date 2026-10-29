@@ -1,4 +1,4 @@
-//! corridor/resolver.rs — port of services/gtfs/corridor/corridorResolver.ts.
+//! corridor/resolver.rs — works out a search corridor.
 //!
 //! Resolves "which patterns and stops make up this trip's corridor,"
 //! independent of date/time — cached by (origin, destination, maxTransfers)

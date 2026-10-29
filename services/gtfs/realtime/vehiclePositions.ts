@@ -36,5 +36,6 @@ export async function fetchVehicleFixes(): Promise<VehicleFix[]> {
         bearing: v.bearing ?? null,
         speedMps: v.speedMps ?? null,
         timestampSec: v.timestampSec ?? null,
+        currentStopSequence: v.currentStopSequence ?? null,
     }));
 }

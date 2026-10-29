@@ -13,12 +13,13 @@ import StationDetailSection from '@/components/sheets/StationDetailSection';
 import ServiceAlertList from '@/components/sheets/ServiceAlertList';
 import { useStopDepartures } from '@/hooks/stopDepartures';
 import { useServiceAlerts } from '@/hooks/serviceAlerts';
+import { useStopsAway } from '@/hooks/stopsAway';
 import { alertsForStop } from '@/services/gtfs/alerts/serviceAlert';
 import { useSavedPlace } from '@/hooks/savedPlace';
 import { stopToPlace } from '@/services/places/endpoints';
 import type { RepoStop } from '@/services/gtfs/core/stopRepo';
 import { routeKey } from '@/services/gtfs/vehicles/vehicleRoutes';
-import { formatClock, formatDepartureIn } from '@/services/gtfs/departures/departureFormat';
+import { formatClock, formatDepartureIn, formatStopsAway } from '@/services/gtfs/departures/departureFormat';
 import {
     applyDepartureFilter,
     filterLines,
@@ -41,6 +42,7 @@ const StopDeparturesSheet = forwardRef<BottomSheetModal, Props>(({ stop, animate
     const tabBarHeight = useBottomTabBarHeight();
     const { departures, loading, error, live } = useStopDepartures(stop);
     const serviceAlerts = useServiceAlerts(stop !== null);
+    const stopsAway = useStopsAway(departures, stop !== null);
     const savedStop = useSavedPlace(useMemo(() => (stop ? stopToPlace(stop) : null), [stop]));
 
     const [filter, setFilter] = useState<DepartureFilter>(NO_FILTER);
@@ -133,6 +135,7 @@ const StopDeparturesSheet = forwardRef<BottomSheetModal, Props>(({ stop, animate
                         const relative = formatDepartureIn(d.liveTimeMs, now);
                         const clock = formatClock(d.liveTimeMs);
                         const key = `${d.dayStartMs}:${d.tripPk}`;
+                        const away = stopsAway.get(d.tripPk);
                         const open = key === openKey;
                         return (
                             <Pressable
@@ -156,6 +159,9 @@ const StopDeparturesSheet = forwardRef<BottomSheetModal, Props>(({ stop, animate
                                         </Text>
                                         {d.skipped && !d.cancelled && (
                                             <Text style={{ color: '#ef4444', fontSize: 12, fontWeight: '600' }}>Not stopping here</Text>
+                                        )}
+                                        {away !== undefined && !d.cancelled && !d.skipped && (
+                                            <Text style={{ color: theme.color, opacity: 0.6, fontSize: 12 }}>{formatStopsAway(away)}</Text>
                                         )}
                                     </View>
                                     <View style={{ alignItems: 'flex-end' }}>

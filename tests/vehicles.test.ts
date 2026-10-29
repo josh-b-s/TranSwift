@@ -10,7 +10,7 @@ const NOW_MS = 1_790_000_000_000;
 const NOW_S = NOW_MS / 1000;
 
 const fix = (key: string, over: Partial<VehicleFix> = {}): VehicleFix => ({
-    key, label: null, tripId: null, routeId: null, latitude: -37.8, longitude: 144.9, bearing: null, speedMps: null, timestampSec: NOW_S, ...over,
+    key, label: null, tripId: null, routeId: null, latitude: -37.8, longitude: 144.9, bearing: null, speedMps: null, timestampSec: NOW_S, currentStopSequence: null, ...over,
 });
 
 let sqlite: Database.Database;

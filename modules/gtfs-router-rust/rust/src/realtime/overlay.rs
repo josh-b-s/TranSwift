@@ -72,14 +72,24 @@ impl Overlay {
         matches!(self.trips.get(&trip_pk), Some(TripRealtime::Updated { skipped, .. }) if skipped.contains(&stop_sequence))
     }
 
-    /// Seconds the vehicle is late leaving this stop of the trip (negative when early), or None when the
-    /// feed has no update covering it: no update for the trip, or the stop is before its first one.
-    pub fn departure_delay(&self, trip_pk: i64, stop_sequence: i64) -> Option<i64> {
+    /// The delay point in force at this stop: the last update at or before it.
+    fn delay_point(&self, trip_pk: i64, stop_sequence: i64) -> Option<DelayPoint> {
         let Some(TripRealtime::Updated { delays: points, .. }) = self.trips.get(&trip_pk) else {
             return None;
         };
         let idx = points.partition_point(|p| p.stop_sequence <= stop_sequence);
-        idx.checked_sub(1).map(|i| points[i].departure_delay_sec)
+        idx.checked_sub(1).map(|i| points[i])
+    }
+
+    /// Seconds the vehicle is late leaving this stop of the trip (negative when early), or None when the
+    /// feed has no update covering it: no update for the trip, or the stop is before its first one.
+    pub fn departure_delay(&self, trip_pk: i64, stop_sequence: i64) -> Option<i64> {
+        self.delay_point(trip_pk, stop_sequence).map(|p| p.departure_delay_sec)
+    }
+
+    /// Like `departure_delay`, for arriving at the stop. Feeds can report the two differently.
+    pub fn arrival_delay(&self, trip_pk: i64, stop_sequence: i64) -> Option<i64> {
+        self.delay_point(trip_pk, stop_sequence).map(|p| p.arrival_delay_sec)
     }
 
     /// Returns (arrival_sec, departure_sec, departure_delay_sec) with the
@@ -254,6 +264,22 @@ mod tests {
         assert_eq!(overlay.departure_delay(1, 3), Some(90)); // carried forward
         assert_eq!(overlay.departure_delay(2, 2), None); // trip with no update
         assert_eq!(overlay.departure_delay(99, 2), None); // unknown trip
+    }
+
+    #[test]
+    fn arrival_delay_can_differ_from_departure_delay() {
+        let bytes = encode(vec![TripUpdate {
+            trip: Some(TripDescriptor { trip_id: Some("T1".into()), route_id: None, schedule_relationship: None }),
+            stop_time_update: vec![
+                StopTimeUpdate { stop_sequence: Some(2), stop_id: None, arrival: event(-30), departure: event(90), schedule_relationship: None },
+            ],
+        }]);
+        let overlay = Overlay::from_feed(&bytes, 0, &test_db()).unwrap().0;
+        assert_eq!(overlay.arrival_delay(1, 1), None); // before the first update
+        assert_eq!(overlay.arrival_delay(1, 2), Some(-30));
+        assert_eq!(overlay.departure_delay(1, 2), Some(90));
+        assert_eq!(overlay.arrival_delay(1, 3), Some(-30)); // carried forward
+        assert_eq!(overlay.arrival_delay(99, 2), None); // unknown trip
     }
 
     #[test]

@@ -1,4 +1,4 @@
-//! repo.rs — port of services/gtfs/core/gtfsRepo.ts.
+//! repo.rs — stops, routes and patterns read from the database.
 //!
 //! DESIGN CHANGE FROM THE TS VERSION: gtfsRepo.ts exists mainly to translate
 //! SQLite's integer surrogate pks into the (agency, real-id) composite
