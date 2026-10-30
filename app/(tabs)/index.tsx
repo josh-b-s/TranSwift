@@ -247,7 +247,7 @@ export default function Index() {
                 }}
                 onPress={handleMapPress}
                 onPanDrag={follow.release}
-                mapPadding={follow.padding}
+                mapPadding={follow.mapPadding}
                 onRegionChangeComplete={r => {
                     regionRef.current = r;
                     setRegion(r);
@@ -295,7 +295,7 @@ export default function Index() {
                     />
                 )}
 
-                <UserLocationMarker position={position} heading={compass}/>
+                <UserLocationMarker position={position} heading={compass} poseFeed={follow.poseFeed} tilted={follow.mode === 'heading'}/>
                 {__DEV__ && <SimulatedLocationMarker/>}
                 {/*<DebugMapOverlay />*/}
             </MapView>
@@ -341,7 +341,7 @@ export default function Index() {
             <Speedometer animatedPosition={bottomSheetPosition} />
             <LocationButton mode={follow.mode} onPress={follow.press} animatedPosition={bottomSheetPosition} />
             {/*<DebugControls />*/}
-            {__DEV__ && <DebugMovementControls mapRef={mapRef} animatedPosition={bottomSheetPosition}/>}
+            {__DEV__ && <DebugMovementControls mapRef={mapRef} animatedPosition={bottomSheetPosition} followsUser={follow.mode !== 'free'}/>}
             <RouteBottomSheetModal ref={modalRef} animatedPosition={bottomSheetPosition} />
             <StopDeparturesSheet
                 ref={departuresRef}

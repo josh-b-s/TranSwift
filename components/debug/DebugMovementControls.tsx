@@ -54,9 +54,11 @@ function PadButton({ icon: Icon, label, onPress, active = false }: {
 }
 
 /** Dev-only panel for faking GPS: start at the map centre, steer by compass direction, change speed. */
-export default function DebugMovementControls({ mapRef, animatedPosition }: {
+export default function DebugMovementControls({ mapRef, animatedPosition, followsUser }: {
     mapRef: RefObject<MapView | null>;
     animatedPosition: SharedValue<number>;
+    /** The map's own follow mode is steering the camera, so this must not. */
+    followsUser: boolean;
 }) {
     const dispatch = useDispatch<AppDispatch>();
     const theme = useThemeStyle();
@@ -67,8 +69,8 @@ export default function DebugMovementControls({ mapRef, animatedPosition }: {
 
     // Duration matches the tick interval so the camera glides instead of stepping.
     useEffect(() => {
-        if (simulation) mapRef.current?.animateCamera({ center: simulation.position }, { duration: 1000 });
-    }, [simulation?.position, mapRef]);
+        if (simulation && !followsUser) mapRef.current?.animateCamera({ center: simulation.position }, { duration: 1000 });
+    }, [simulation?.position, followsUser, mapRef]);
 
     // Store updates happen only on start and stop: Search re-queries Places on every change.
     const start = async () => {

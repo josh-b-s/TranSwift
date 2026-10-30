@@ -1,23 +1,37 @@
-import React from 'react';
-import { Circle, Marker } from 'react-native-maps';
-import { ACCENT } from '@/constants/themes';
+import React, { useEffect, useState } from 'react';
+import { Circle, LatLng, Marker } from 'react-native-maps';
 import type { CompassHeading } from '@/hooks/compassHeading';
 import type { UserPosition } from '@/hooks/userPosition';
+import type { PoseFeed } from '@/services/geo/poseFeed';
+import { ACCURACY_FILL, ACCURACY_STROKE } from '@/components/map/accuracyColors';
 import { userMarkerImage } from '@/components/map/userMarkerImages';
 
-// Hex alpha suffixes: about 15% fill, 40% outline.
-const ACCURACY_FILL = `${ACCENT}26`;
-const ACCURACY_STROKE = `${ACCENT}66`;
+// Measured on a recording: with the map tilted the arrow draws right of the circle's centre by about this much of its
+// width, whatever its rotation. The anchor is moved the same way to cancel it.
+const TILTED_ANCHOR_X = 0.513;
 
-/** The user's position as the app arrow turned to the compass heading, with a cone for the heading's uncertainty and a circle for the position's. */
-export default function UserLocationMarker({ position, heading }: { position: UserPosition | null; heading: CompassHeading | null }) {
+/**
+ * The user's position as the app arrow turned to the compass heading, with a circle for the position's accuracy.
+ * While the camera follows the user it is drawn where the camera is aimed (`poseFeed`) rather than at the raw fix,
+ * so the two move together.
+ */
+export default function UserLocationMarker({ position, heading, poseFeed, tilted }: {
+    position: UserPosition | null;
+    heading: CompassHeading | null;
+    poseFeed: PoseFeed;
+    tilted: boolean;
+}) {
+    const [followed, setFollowed] = useState<LatLng | null>(null);
+    useEffect(() => poseFeed.subscribe(setFollowed), [poseFeed]);
+
     if (!position) return null;
+    const center = followed ?? position;
 
     return (
         <>
             {position.accuracyM !== null && (
                 <Circle
-                    center={position}
+                    center={center}
                     radius={position.accuracyM}
                     fillColor={ACCURACY_FILL}
                     strokeColor={ACCURACY_STROKE}
@@ -25,11 +39,11 @@ export default function UserLocationMarker({ position, heading }: { position: Us
                 />
             )}
             <Marker
-                coordinate={position}
+                coordinate={center}
                 image={userMarkerImage(heading?.accuracyLevel ?? null)}
                 rotation={heading?.degrees ?? 0}
                 flat
-                anchor={{ x: 0.5, y: 0.5 }}
+                anchor={{ x: tilted ? TILTED_ANCHOR_X : 0.5, y: 0.5 }}
             />
         </>
     );
