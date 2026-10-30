@@ -1,13 +1,12 @@
 import React from 'react';
-import { Alert, Pressable, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { Play, Square } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch, RootState } from '@/store/store';
 import { selectDisplayedJourney } from '@/store/route.slice';
-import { endTrip, startTrip } from '@/store/trip.slice';
-import { stepsFromJourney } from '@/services/trips/tripSteps';
-import { loadBests } from '@/services/trips/bestsStore';
+import { endTrip } from '@/store/trip.slice';
+import { useStartTrip } from '@/hooks/startTrip';
 import { formatPaceDelta } from '@/services/trips/tripFormat';
 import { SPEED_UNITS } from '@/constants/speedUnits';
 import { ACCENT, useThemeStyle } from '@/constants/themes';
@@ -15,6 +14,7 @@ import { ACCENT, useThemeStyle } from '@/constants/themes';
 /** Starts the selected journey as a trip, or shows the current step of the running one. */
 export default function TripButton() {
     const dispatch = useDispatch<AppDispatch>();
+    const startTrip = useStartTrip();
     const theme = useThemeStyle();
     const unit = SPEED_UNITS[useSelector((s: RootState) => s.preferences.speedUnit)];
     const journey = useSelector(selectDisplayedJourney);
@@ -38,10 +38,7 @@ export default function TripButton() {
         if (running) {
             dispatch(endTrip());
         } else if (journey) {
-            const tripSteps = stepsFromJourney(journey);
-            loadBests()
-                .then(loaded => dispatch(startTrip({ startedAt: Date.now(), steps: tripSteps, bests: loaded })))
-                .catch(err => Alert.alert('Could not start trip', String(err)));
+            startTrip(journey);
         }
     };
 

@@ -1,26 +1,27 @@
-import React, { RefObject } from 'react';
+import React from 'react';
 import { TouchableOpacity, View } from 'react-native';
+import { LocateFixed } from 'lucide-react-native';
 import ArrowLogo from '@/components/ui/ArrowLogo';
 import Animated, { SharedValue } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
-import { useDispatch } from 'react-redux';
-import { AppDispatch } from '@/store/store';
-import { setUserLocation } from '@/store/location.slice';
-import MapView, { LatLng } from 'react-native-maps';
-import * as Location from 'expo-location';
 import { SHADOW, useThemeStyle } from '@/constants/themes';
-import {useGoToUserLocation} from "@/hooks/goToUserLocation";
-import {useSheetFollowTop} from "@/hooks/sheetFollowTop";
+import { useSheetFollowTop } from '@/hooks/sheetFollowTop';
+import type { FollowMode } from '@/hooks/mapFollow';
 
-export default function LocationButton({ mapRef, animatedPosition }: {
-    mapRef: RefObject<MapView | null>;
+const LABELS: Record<FollowMode, string> = {
+    free: 'Center map on my location',
+    centered: 'Follow my direction',
+    heading: 'Stop following my direction',
+};
+
+/** Locate icon while the map is off the user, the arrow tipped 45 degrees once centered, and upright when following their direction. */
+export default function LocationButton({ mode, onPress, animatedPosition }: {
+    mode: FollowMode;
+    onPress: () => void;
     animatedPosition: SharedValue<number>;
 }) {
-    const dispatch = useDispatch<AppDispatch>();
     const theme = useThemeStyle();
     const clampedTop = useSheetFollowTop(animatedPosition);
-
-    const goToUserLocation = useGoToUserLocation(mapRef);
 
     return (
         <Animated.View style={{ top: clampedTop }}>
@@ -28,15 +29,19 @@ export default function LocationButton({ mapRef, animatedPosition }: {
                 className="absolute bottom-5 right-4 w-14 h-14 rounded-full items-center justify-center"
                 style={[{ backgroundColor: theme.backgroundColor }, SHADOW]}
                 accessibilityRole="button"
-                accessibilityLabel="Center map on my location"
+                accessibilityLabel={LABELS[mode]}
                 onPress={() => {
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    goToUserLocation();
+                    onPress();
                 }}
             >
-                <View style={{ transform: [{ rotate: '45deg' }] }}>
-                    <ArrowLogo width={22} />
-                </View>
+                {mode === 'free' ? (
+                    <LocateFixed size={24} color={theme.color} />
+                ) : (
+                    <View style={{ transform: [{ rotate: mode === 'centered' ? '45deg' : '0deg' }] }}>
+                        <ArrowLogo width={22} />
+                    </View>
+                )}
             </TouchableOpacity>
         </Animated.View>
     );

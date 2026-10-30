@@ -34,6 +34,11 @@ import {useFeedSuggestion} from '../../hooks/feedSuggestion';
 import {useRealtimeAuthAlert} from '@/hooks/realtimeAuthAlert';
 import {useTripRecorder} from '@/hooks/tripRecorder';
 import {useTripNotificationTap} from '@/hooks/tripNotificationTap';
+import {useAutoStartTrip} from '@/hooks/autoStartTrip';
+import {useMapFollow} from '@/hooks/mapFollow';
+import {useUserPosition} from '@/hooks/userPosition';
+import {useCompassHeading} from '@/hooks/compassHeading';
+import {useSimulation} from '@/hooks/simulation';
 import {useStopsInView} from '@/hooks/stopsInView';
 import {useStopColors} from '@/hooks/stopColors';
 import {nearestWithin} from '@/services/geo/nearestPoint';
@@ -101,6 +106,14 @@ export default function Index() {
     // Settings screen is already on screen, so an animated slide-down would
     // visibly play over it instead of on the map.
     const isFocused = useIsFocused();
+
+    const position = useUserPosition(isFocused);
+    const compass = useCompassHeading(isFocused);
+    // A simulated fix is exact, and the simulator stands in for both the position and the compass.
+    const simulation = useSimulation();
+    const here = useMemo(() => (simulation ? {...simulation.position, accuracyM: 0} : position), [simulation, position]);
+    const follow = useMapFollow(mapRef, here, simulation ? simulation.headingDeg : compass?.degrees ?? null);
+    useAutoStartTrip(here);
     // Hidden while choosing a point on the map, so it doesn't cover the map.
     const showSheet = selectedPlace !== null && pickingField === null;
     useEffect(() => {
@@ -138,6 +151,7 @@ export default function Index() {
     }, [isFocused, departureStop]);
 
     const selectStop = useCallback((stop: RepoStop) => {
+        follow.release();
         setDepartureStop(stop);
         // Aim a little south of the stop so the sheet doesn't cover it.
         const delta = Math.min(regionRef.current?.latitudeDelta ?? STOP_FOCUS_DELTA, STOP_FOCUS_DELTA);
@@ -145,7 +159,7 @@ export default function Index() {
             { latitude: stop.stop_lat - delta * 0.25, longitude: stop.stop_lon, latitudeDelta: delta, longitudeDelta: delta },
             400,
         );
-    }, []);
+    }, [follow.release]);
 
     const selectRouteStop = useCallback(async (routeStop: RouteStop) => {
         const stop = findRepoStop(await getAllStopsCached(await getDb()), routeStop);
@@ -179,6 +193,7 @@ export default function Index() {
 
     useEffect(() => {
         if (!routeCoords?.length) return;
+        follow.release();
 
         if (routeCoords.length > 1) {
             mapRef.current?.fitToCoordinates(routeCoords, {
@@ -197,7 +212,11 @@ export default function Index() {
                 700,
             );
         }
-    }, [routeCoords]);
+    }, [routeCoords, follow.release]);
+
+    useEffect(() => {
+        if (pickingField !== null) follow.release();
+    }, [pickingField, follow.release]);
 
     return (
         <View style={{flex: 1}}>
@@ -227,6 +246,8 @@ export default function Index() {
                     }
                 }}
                 onPress={handleMapPress}
+                onPanDrag={follow.release}
+                mapPadding={follow.padding}
                 onRegionChangeComplete={r => {
                     regionRef.current = r;
                     setRegion(r);
@@ -274,7 +295,7 @@ export default function Index() {
                     />
                 )}
 
-                <UserLocationMarker/>
+                <UserLocationMarker position={position} heading={compass}/>
                 {__DEV__ && <SimulatedLocationMarker/>}
                 {/*<DebugMapOverlay />*/}
             </MapView>
@@ -318,7 +339,7 @@ export default function Index() {
 
             <MapPickOverlay mapRef={mapRef} />
             <Speedometer animatedPosition={bottomSheetPosition} />
-            <LocationButton mapRef={mapRef} animatedPosition={bottomSheetPosition} />
+            <LocationButton mode={follow.mode} onPress={follow.press} animatedPosition={bottomSheetPosition} />
             {/*<DebugControls />*/}
             {__DEV__ && <DebugMovementControls mapRef={mapRef} animatedPosition={bottomSheetPosition}/>}
             <RouteBottomSheetModal ref={modalRef} animatedPosition={bottomSheetPosition} />
