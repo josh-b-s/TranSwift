@@ -18,6 +18,9 @@ export interface RouteSegment {
     arrivalTime?: string;
     /** Every stop a ride passes, board to alight. Absent on walks. */
     stops?: RouteStop[];
+    /** The trip a ride is on and the stop sequence it gets off at, to look it up in realtime data. Absent on walks. */
+    tripPk?: number;
+    alightSequence?: number;
 }
 
 export interface GtfsJourney {

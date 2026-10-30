@@ -18,6 +18,7 @@ import StopDeparturesSheet from '@/components/sheets/StopDeparturesSheet';
 import {StopDots} from '@/components/map/StopDots';
 import VehicleMarkers from '@/components/map/VehicleMarkers';
 import {useVehicles} from '@/hooks/vehiclePositions';
+import {MAX_LATITUDE_DELTA} from '@/services/gtfs/departures/stopsInRegion';
 import {routeKey} from '@/services/gtfs/vehicles/vehicleRoutes';
 import MapPickOverlay from '@/components/map/MapPickOverlay';
 import DebugMapOverlay from '@/components/debug/DebugMapOverlay';
@@ -118,7 +119,9 @@ export default function Index() {
     // Stop dots give way to the route once a place is chosen, and so does the departures sheet.
     const stopsTappable = isFocused && selectedPlace === null && pickingField === null && !debugEnabled;
     const stopsInView = useStopsInView(region, stopsTappable);
-    const vehicles = useVehicles(wantedRouteKeys, isFocused && !debugEnabled);
+    const vehicleScope = useSelector((s: RootState) => s.preferences.vehicleScope);
+    const showAllVehicles = vehicleScope === 'nearby' && region !== null && region.latitudeDelta <= MAX_LATITUDE_DELTA;
+    const vehicles = useVehicles(wantedRouteKeys, isFocused && !debugEnabled, showAllVehicles);
     const stopColors = useStopColors(stopsInView);
     useEffect(() => {
         if (selectedPlace !== null) setDepartureStop(null);

@@ -39,6 +39,7 @@ What the app does today, and what could come next. Written from the code as it s
 ### Vehicles on the map
 
 - **Live positions.** If a feed has VehiclePositions URLs set (a separate box in its settings, sharing the feed's auth header), vehicles on the routes of the open departures sheet and of the shown journey appear on the map as a badge in the route colour with its name and a dot on the side it is heading. Refreshes every 15 seconds while the map is on screen, and only fetches when there is something to show. The 60 vehicles nearest the middle of the map are drawn.
+- **All nearby.** A preference, "Vehicles on the map", switches from "Route only" to "All nearby". With it on, once the map is zoomed in as far as the stop dots show, every tracked vehicle in view appears, not only those on the routes you are looking at. Off by default.
 - **How they are matched.** The engine decodes the feed. A vehicle's trip id finds its route through the timetable, else its route id does. Vehicles are matched to the routes you are looking at by name and route type, so tram 96 and bus 96 stay apart. Positions older than 5 minutes are dropped, and a vehicle repeated across feeds keeps its newest position. A failed refresh keeps the last positions and logs a warning.
 
 ### Service alerts
@@ -51,7 +52,7 @@ What the app does today, and what could come next. Written from the code as it s
 - **Start trip.** Turns the selected journey into steps (walk to X, ride to Y). A button on the map shows the current step and, on walks, your previous best.
 - **Background tracking.** GPS at 1 second or 3 metres, best-for-navigation accuracy, with the background location indicator on.
 - **Live pace.** On a walk you have done before between the same two stops, it shows how many seconds ahead of or behind your best you are, once you are past 50 m.
-- **Get-off alert.** A notification, "Get off at the next stop", when you reach the stop before yours on a ride. A one-stop ride, with nothing between boarding and alighting, alerts about a minute before arriving instead: from distance over speed while the vehicle is moving, otherwise from the planned arrival time, and within 100 m of the stop as a last resort.
+- **Get-off alert.** A notification, "Get off at the next stop", when you reach the stop before yours on a ride. A one-stop ride, with nothing between boarding and alighting, alerts about a minute before arriving instead: from distance over speed while the vehicle is moving, otherwise from the ride's arrival time, and within 100 m of the stop as a last resort. While a one-stop ride is the current step, its arrival time is refreshed every 30 seconds: the timetable's arrival at the last stop plus the delay the realtime feeds now report for it. When the feeds give no delay for the trip, the arrival time from planning stays.
 - **Personal bests and records.** Each repeated walk keeps its best average speed. Finishing a trip reports broken records, either a faster walk between two stops or a longest walk.
 - **Trip summary.** A "Trip complete" notification, then a trip screen with the path on a map, distance, duration, average and top speed (GPS spikes above 10 m/s are discarded), and the records you broke.
 - **Splits and speed chart.** The trip screen shows walking pace per km or mile, with a partial last split, and a chart of walking speed over the trip's walking time. Time spent riding is not counted in either.
@@ -63,7 +64,7 @@ What the app does today, and what could come next. Written from the code as it s
 
 - Totals across trips, a bar chart of distance walked, and a bar chart of average speed. A toggle switches the charts between the latest trips, the last 8 weeks (Monday start) and the last 6 months. Quiet periods show as empty bars.
 - A walking streak (days in a row with a walk, not broken until a day ends without one) and, if a weekly goal is set, progress towards it.
-- A heatmap screen draws every recorded walk on one map in translucent lines, so paths you repeat read darker.
+- A heatmap screen draws every recorded walk on one map in translucent lines, so paths you repeat read darker. Each walk is thinned to a point every 8 m, and harder (the gap doubles, up to 128 m) when the whole history would pass 20,000 points.
 - Open any trip, or delete it with a confirmation.
 
 ### GTFS data management
@@ -83,7 +84,7 @@ What the app does today, and what could come next. Written from the code as it s
 ### Developer tooling
 
 - **Debug visualiser.** Replays a search on the map: BFS rounds and candidate seed paths (flat, per-hop or depth coloured) and RAPTOR route-checks one at a time. The mounts in `index.tsx` are currently commented out, so it is not reachable in the app.
-- **Tests.** `npm test` runs 158 tests on Node's built-in runner, including the departures and trip stops queries against the real schema in in-memory SQLite. `cargo test --lib` in `modules/gtfs-router-rust/rust` runs the engine's 33 tests, including the realtime overlay, `trip_realtime`, and the vehicle and alert decoders. The same command in `modules/gtfs-importer/rust` runs 3 tests that import a small zip end to end and check the station tables and trip headsigns.
+- **Tests.** `npm test` runs 168 tests on Node's built-in runner, including the departures and trip stops queries against the real schema in in-memory SQLite. `cargo test --lib` in `modules/gtfs-router-rust/rust` runs the engine's 34 tests, including the realtime overlay, `trip_realtime`, and the vehicle and alert decoders. The same command in `modules/gtfs-importer/rust` runs 3 tests that import a small zip end to end and check the station tables and trip headsigns.
 
 ## Future features
 
@@ -111,8 +112,8 @@ What the app does today, and what could come next. Written from the code as it s
 
 ### Realtime and vehicles
 
-- Realtime on the departures sheet covers trips in the timetable. Added or replacement trips from the feed are used by routing but are not listed on the sheet.
-- Vehicles show only for the routes you are already looking at (the open stop, the shown journey), not every vehicle in the feed. A feed that sends VehiclePositions without a trip or route id the timetable knows shows nothing.
+- Added and replacement trips from the feed are listed on the departures sheet as "Extra service", with their route and direction. They have no stops to expand, no delay and no stops away, and only trips whose stops the engine could place in the timetable appear. A trip with no route the timetable knows shows a "?" badge.
+- By default vehicles show only for the routes you are already looking at. With "All nearby" on they show for everything in view, but only when zoomed in to stop dot level, and the route lookup for every tracked vehicle runs on each 15 second refresh, which may be heavy on a feed with thousands of vehicles. A feed that sends VehiclePositions without a trip or route id the timetable knows shows nothing.
 - "Stops away" needs the vehicle to report both a trip id and its current stop sequence. It cannot tell a vehicle stopped at the stop from one arriving at it, so both read "Arriving".
 - The warm-up that live departures wait for costs about 12 seconds of background work each time the active database changes.
 - Headsigns are stored when a feed is imported. A database imported before that still shows each trip's last stop until the feed is imported again.
@@ -131,16 +132,16 @@ What the app does today, and what could come next. Written from the code as it s
 
 ### Trips and the get-off alert
 
-- The planned arrival time behind a one-stop alert carries the delays known when the journey was planned. It is not refreshed during the ride, so the live part is distance over speed.
+- The refreshed arrival time for a one-stop ride needs the engine to be warm and the feed to report a delay for that trip. Otherwise the alert uses distance over speed, then the arrival time from planning.
 - A ride with no stop list, as some feeds give, never alerts.
 - Alerts depend on GPS fixes arriving. A phone that stops getting fixes will not alert.
 - Trips saved before end times were added have no total time, so they cannot be called quickest and show walking figures only.
-- The heatmap loads every saved trip at once and thins each path to a point every 8 m. A very large history may be slow to draw.
+- The heatmap loads every saved trip at once. The point budget bounds the total vertices, but each walk is still its own line, so thousands of walks mean thousands of lines.
 
 ### Data and the rest
 
 - Station detail only exists for feeds imported after it was added; an older database shows no station card until the feed is imported again, because pathways were not stored. Many feeds have platform codes but no pathways, in which case the exits are listed without routes. Exit times are the feed's traversal times where given, otherwise an estimate from length at 1.2 m/s, otherwise 20 seconds per pathway.
-- Times use the device's time zone, as the router does, not the agency's.
+- Times use the device's time zone, as the router does, not the agency's. This only shows when the phone is in a different zone from the agency. Changing it means the service day maths, the realtime midnight and every clock time shown would all move to the agency's zone, which needs a feed's `agency_timezone` stored at import and reliable `Intl` time zone support on the device.
 - The debug visualiser still compiles but is unmounted.
 - The Rust modules' headers no longer name removed TypeScript files, but about 20 inline comments still compare with "the TS version". The originals are in git history.
-- Tests cover the pure logic and the departures SQL. The map, sheets, native modules and background tracking have only been checked by type-checking, not on a device. That includes the filter chips, expanding departures, the history toggle, the heatmap, the trip screen additions, the service alert rows, stops away and the realtime setup cards. The type check reports errors only where the generated native bindings are missing, which they are until a native build.
+- Tests cover the pure logic and the departures SQL. The map, sheets, native modules and background tracking have only been checked by type-checking, not on a device. That includes the filter chips, expanding departures, the history toggle, the heatmap, the trip screen additions, the service alert rows, stops away, extra service rows, all nearby vehicles, the refreshed arrival time and the realtime setup cards. The type check reports errors only where the generated native bindings are missing, which they are until a native build.

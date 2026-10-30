@@ -23,6 +23,11 @@ function localMidnightEpoch(): bigint {
     return BigInt(Math.floor(d.getTime() / 1000));
 }
 
+/** The same midnight as milliseconds, for turning the engine's seconds-after-midnight times into clock times. */
+export function serviceMidnightMs(): number {
+    return Number(localMidnightEpoch()) * 1000;
+}
+
 /** ".../v1/metro/trip-updates" -> "metro", for log lines. */
 function feedLabel(url: string): string {
     const parts = url.split('?')[0].split('/').filter(Boolean);

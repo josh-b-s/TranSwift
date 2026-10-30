@@ -27,3 +27,17 @@ test('collects walks from every trip and skips rides and one-point walks', () =>
     ];
     assert.equal(heatmapLines(trips, 1).length, 2);
 });
+
+test('a long history is thinned harder to stay within the point budget', () => {
+    const walk = {
+        kind: 'walk' as const, stepIndex: 0, from: 'A', to: 'B',
+        path: encodePath(line(200).map((c, i) => ({ ...c, time: i * 1000 }))),
+    };
+    const trips: SavedTrip[] = Array.from({ length: 10 }, (_, i) => ({ startedAt: i, records: [], legs: [walk] }));
+    const count = (lines: { length: number }[]) => lines.reduce((n, l) => n + l.length, 0);
+    const roomy = heatmapLines(trips, 8, 100_000);
+    const tight = heatmapLines(trips, 8, 500);
+    assert.ok(count(roomy) > 500);
+    assert.ok(count(tight) <= 500);
+    assert.equal(tight.length, 10); // every walk is still drawn
+});

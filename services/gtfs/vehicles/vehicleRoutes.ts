@@ -70,14 +70,14 @@ export function attachRoutes(fixes: VehicleFix[], lookup: RouteLookup): MapVehic
     });
 }
 
-/** The vehicles on the wanted routes, nearest first when a point is given, at most `max`. */
+/** The vehicles on the wanted routes, or all of them when `wanted` is null. Nearest first when a point is given, at most `max`. */
 export function pickVehicles(
     vehicles: MapVehicle[],
-    wanted: ReadonlySet<string>,
+    wanted: ReadonlySet<string> | null,
     max: number,
     near?: { latitude: number; longitude: number },
 ): MapVehicle[] {
-    const onRoute = vehicles.filter(v => wanted.has(routeKey(v.routeName, v.routeType)));
+    const onRoute = wanted ? vehicles.filter(v => wanted.has(routeKey(v.routeName, v.routeType))) : [...vehicles];
     if (!near) return onRoute.slice(0, max);
     const distance = (v: MapVehicle) => (v.latitude - near.latitude) ** 2 + ((v.longitude - near.longitude) * Math.cos((near.latitude * Math.PI) / 180)) ** 2;
     return onRoute.sort((a, b) => distance(a) - distance(b)).slice(0, max);

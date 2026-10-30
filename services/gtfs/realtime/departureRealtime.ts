@@ -1,7 +1,8 @@
 import type { TripStopRealtime } from '@mapapp/gtfs-router-rust';
 import { whenEngineWarm } from '@/services/gtfs/router/gtfsRouterNative';
+import type { AddedDeparture } from '@/services/gtfs/departures/addedDepartures';
 import type { StopRealtime } from '@/services/gtfs/departures/liveDepartures';
-import { refreshRealtime } from './gtfsRealtime';
+import { refreshRealtime, serviceMidnightMs } from './gtfsRealtime';
 
 export type TripStopRef = { tripPk: number; stopSequence: number };
 
@@ -22,5 +23,22 @@ export async function fetchStopRealtime(refs: TripStopRef[]): Promise<StopRealti
         skipped: r.skipped,
         delaySec: r.departureDelaySec ?? null,
         arrivalDelaySec: r.arrivalDelaySec ?? null,
+    }));
+}
+
+/**
+ * The added and replacement trips that leave a stop: ones only the realtime feeds know of, which the timetable
+ * cannot list. Same refresh and warm-up rules as `fetchStopRealtime`.
+ */
+export async function fetchAddedDepartures(stopPk: number): Promise<AddedDeparture[]> {
+    const engine = await whenEngineWarm();
+    if (!engine) return [];
+    await refreshRealtime(engine);
+    const midnightMs = serviceMidnightMs();
+    return engine.addedDepartures(stopPk).map(a => ({
+        routeId: a.routeId ?? null,
+        agency: a.agency,
+        timeMs: midnightMs + a.departureSec * 1000,
+        lastStopPk: a.lastStopPk,
     }));
 }

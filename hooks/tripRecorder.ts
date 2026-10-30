@@ -5,7 +5,9 @@ import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch, RootState } from '@/store/store';
 import { endTrip, setTripPace, setTripStep } from '@/store/trip.slice';
 import { createTripSession } from '@/services/trips/tripSession';
+import { getDb } from '@/services/db/sqliteDb';
 import { createAlightAlert } from '@/services/trips/alightAlert';
+import { refreshedArrivalMs } from '@/services/trips/liveArrival';
 import { paceAgainstBest } from '@/services/trips/livePace';
 import { startTracking } from '@/services/trips/locationTracking';
 import { applyTrip } from '@/services/trips/personalBests';
@@ -13,6 +15,8 @@ import { saveTrip, type SavedTrip } from '@/services/trips/tripStore';
 import { saveBests } from '@/services/trips/bestsStore';
 import { summarizeTrip, walkTotals } from '@/services/trips/tripSummary';
 import { notifyGetOff, notifyTripDone, requestNotificationPermission } from '@/services/trips/tripNotification';
+
+const ARRIVAL_REFRESH_MS = 30_000;
 
 /** While a trip is running, tracks the rider through its steps and saves the trip on arrival. */
 export function useTripRecorder() {
@@ -32,6 +36,20 @@ export function useTripRecorder() {
         const checkAlight = createAlightAlert(steps, ride =>
             notifyGetOff(ride.to).catch(err => console.warn('[trip] get-off alert failed:', err)));
         let lastPace: number | null = null;
+        // A one-stop ride's arrival time is refreshed from realtime data while it is the current step, so a late
+        // vehicle does not set the alert off early.
+        let liveArrival: { stepIndex: number; ms: number } | null = null;
+        let lastArrivalRefresh = 0;
+        const refreshArrival = (stepIndex: number) => {
+            const step = steps[stepIndex];
+            if (step?.type !== 'transit' || step.stops.length !== 2) return;
+            if (Date.now() - lastArrivalRefresh < ARRIVAL_REFRESH_MS) return;
+            lastArrivalRefresh = Date.now();
+            getDb()
+                .then(db => refreshedArrivalMs(db, step, new Date()))
+                .then(ms => { if (ms !== null && !finished) liveArrival = { stepIndex, ms }; })
+                .catch(err => console.warn('[trip] could not refresh the arrival time:', err));
+        };
         let cancelled = false;
         let finished = false;
         let stopTracking: (() => void) | undefined;
@@ -79,7 +97,8 @@ export function useTripRecorder() {
             }
             if (session.stepIndex !== before) dispatch(setTripStep(session.stepIndex));
             const { coords } = locations[locations.length - 1];
-            checkAlight(session.stepIndex, coords);
+            refreshArrival(session.stepIndex);
+            checkAlight(session.stepIndex, coords, Date.now(), liveArrival?.stepIndex === session.stepIndex ? liveArrival.ms : undefined);
             updatePace();
         })
             .then(stop => {

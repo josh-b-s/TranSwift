@@ -110,6 +110,8 @@ function toSegment(seg: import('@mapapp/gtfs-router-rust').RouteSegment): RouteS
         departureTime: secToTimeString(seg.departureTimeSec),
         arrivalTime: secToTimeString(seg.arrivalTimeSec),
         stops: seg.stops,
+        tripPk: seg.tripPk ?? undefined,
+        alightSequence: seg.alightSequence ?? undefined,
     };
 }
 

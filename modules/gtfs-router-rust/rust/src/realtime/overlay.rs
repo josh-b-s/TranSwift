@@ -4,7 +4,7 @@
 use std::collections::HashMap;
 use prost::Message;
 use rusqlite::Connection;
-use super::added::{self, AddedTrip};
+use super::added::{self, AddedStop, AddedTrip};
 use super::feed::{FeedMessage, StopTimeUpdate, STOP_SKIPPED, TRIP_CANCELED};
 
 #[derive(Debug, thiserror::Error)]
@@ -56,6 +56,18 @@ pub struct Overlay {
 impl Overlay {
     pub fn added_trips(&self) -> &[AddedTrip] {
         &self.added
+    }
+
+    /// The added trips that call at this stop and go on to another one, each with its call there. A trip's
+    /// last stop is left out, since nobody can board there.
+    pub fn added_leaving(&self, stop_pk: i64) -> Vec<(&AddedTrip, AddedStop)> {
+        self.added
+            .iter()
+            .filter_map(|trip| {
+                let (_, before_last) = trip.stops.split_last()?;
+                before_last.iter().find(|s| s.stop_pk == stop_pk).map(|call| (trip, *call))
+            })
+            .collect()
     }
 
     #[cfg(test)]
@@ -333,6 +345,23 @@ mod tests {
         let trip = &overlay.added_trips()[0];
         assert_eq!(trip.agency, 1);
         assert_eq!(trip.stops.iter().map(|s| (s.stop_pk, s.departure_sec)).collect::<Vec<_>>(), vec![(100, 1000), (101, 1600)]);
+    }
+
+    #[test]
+    fn added_trips_are_listed_at_every_stop_but_their_last() {
+        let at = |stop: &str, t: i64| StopTimeUpdate {
+            stop_sequence: None, stop_id: Some(stop.into()), arrival: timed(t), departure: timed(t), schedule_relationship: None,
+        };
+        let bytes = encode(vec![TripUpdate {
+            trip: Some(TripDescriptor { trip_id: Some("extra".into()), route_id: Some("R1".into()), schedule_relationship: Some(1) }),
+            stop_time_update: vec![at("A", 51_000), at("B", 51_600)],
+        }]);
+        let overlay = Overlay::from_feed(&bytes, 50_000, &test_db()).unwrap().0;
+        let from_a = overlay.added_leaving(100);
+        assert_eq!(from_a.len(), 1);
+        assert_eq!((from_a[0].1.departure_sec, from_a[0].0.route_id.as_deref()), (1000, Some("R1")));
+        assert!(overlay.added_leaving(101).is_empty()); // the last stop
+        assert!(overlay.added_leaving(999).is_empty()); // not on the trip
     }
 
     #[test]

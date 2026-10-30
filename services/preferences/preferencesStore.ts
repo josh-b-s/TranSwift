@@ -12,6 +12,9 @@ export type ThemeMode = 'system' | 'light' | 'dark';
 
 export type SpeedUnit = 'kmh' | 'mph';
 
+/** Which vehicles the map shows: only those on the routes you are looking at, or every one in view. */
+export type VehicleScope = 'routes' | 'nearby';
+
 export type WalkingSpeedOption = {
     id: string;
     label: string;
@@ -27,10 +30,12 @@ export type StoredPreferences = {
     maxWalkDistanceM: number;
     /** Distance to walk each week, in meters. Zero means no goal. */
     weeklyGoalM: number;
+    vehicleScope: VehicleScope;
 };
 
 export const DEFAULT_THEME_MODE: ThemeMode = 'system';
 export const DEFAULT_SPEED_UNIT: SpeedUnit = 'kmh';
+export const DEFAULT_VEHICLE_SCOPE: VehicleScope = 'routes';
 
 // Same three tiers Search.tsx's WALK_SPEED_CYCLE used to hardcode.
 export const DEFAULT_WALKING_SPEEDS: WalkingSpeedOption[] = [
@@ -53,6 +58,7 @@ export async function loadStoredPreferences(): Promise<StoredPreferences> {
                 ? clampWalkDistance(parsed.maxWalkDistanceM as number)
                 : DEFAULT_MAX_WALK_DISTANCE_M,
             weeklyGoalM: Number.isFinite(parsed.weeklyGoalM) ? clampWeeklyGoal(parsed.weeklyGoalM as number) : NO_WEEKLY_GOAL_M,
+            vehicleScope: parsed.vehicleScope === 'nearby' ? 'nearby' : DEFAULT_VEHICLE_SCOPE,
         };
     } catch {
         // No file yet (fresh install) — defaults, not an error.
@@ -62,6 +68,7 @@ export async function loadStoredPreferences(): Promise<StoredPreferences> {
             speedUnit: DEFAULT_SPEED_UNIT,
             maxWalkDistanceM: DEFAULT_MAX_WALK_DISTANCE_M,
             weeklyGoalM: NO_WEEKLY_GOAL_M,
+            vehicleScope: DEFAULT_VEHICLE_SCOPE,
         };
     }
 }

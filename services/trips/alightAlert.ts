@@ -14,7 +14,7 @@ const meters = (a: Position, b: Position) =>
     haversineMeters({ lat: a.latitude, lon: a.longitude }, { lat: b.latitude, lon: b.longitude });
 
 /** A ride with nothing between boarding and alighting is due once the vehicle has left and is a minute away. */
-function oneStopRideDue(step: RideStep, fix: Fix, now: number): boolean {
+function oneStopRideDue(step: RideStep, fix: Fix, now: number, arrivalMs: number | undefined): boolean {
     const [boarding, alighting] = step.stops;
     if (meters(fix, boarding) <= NEAR_STOP_M) return false;
 
@@ -22,23 +22,24 @@ function oneStopRideDue(step: RideStep, fix: Fix, now: number): boolean {
     // Covers a vehicle that is stopped, or a fix with no speed and a ride with no arrival time.
     if (distance <= NEAR_STOP_M) return true;
 
-    const eta = secondsToArrival(distance, fix.speed, step.arrivalMs, now);
+    const eta = secondsToArrival(distance, fix.speed, arrivalMs, now);
     return eta !== null && eta <= ONE_STOP_LEAD_S;
 }
 
 /**
  * Calls `onAlert` once per ride. A ride with stops in between alerts on reaching the stop before the last one.
  * A one-stop ride alerts about a minute before arriving instead, since there is no stop in between to wait for.
+ * `liveArrivalMs`, when given, replaces the planned arrival time of the ride being checked.
  */
 export function createAlightAlert(steps: TripStep[], onAlert: (ride: RideStep) => void) {
     const alerted = new Set<number>();
 
-    return (stepIndex: number, fix: Fix, now = Date.now()) => {
+    return (stepIndex: number, fix: Fix, now = Date.now(), liveArrivalMs?: number) => {
         const step = steps[stepIndex];
         if (step?.type !== 'transit' || alerted.has(stepIndex) || step.stops.length < 2) return;
 
         const ready = step.stops.length === 2
-            ? oneStopRideDue(step, fix, now)
+            ? oneStopRideDue(step, fix, now, liveArrivalMs ?? step.arrivalMs)
             : meters(fix, step.stops[step.stops.length - 2]) <= NEAR_STOP_M;
         if (!ready) return;
 

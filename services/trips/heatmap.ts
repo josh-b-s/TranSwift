@@ -22,13 +22,24 @@ export function thinCoords(coords: LatLng[], minGapM: number): LatLng[] {
     return kept;
 }
 
-/** Every recorded walk across the given trips as a thinned line. Rides are left out: they are not the rider's own path. */
-export function heatmapLines(trips: SavedTrip[], minGapM = MIN_GAP_M): LatLng[][] {
-    return trips.flatMap(trip =>
-        trip.legs.flatMap(leg => {
-            if (leg.kind !== 'walk') return [];
-            const coords = decodePath(leg.path).map(({ latitude, longitude }) => ({ latitude, longitude }));
-            return coords.length > 1 ? [thinCoords(coords, minGapM)] : [];
-        }),
-    );
+// Past this many vertices in total the map slows down, so a long history is thinned harder instead of drawn in full.
+const MAX_VERTICES = 20_000;
+// Thinning stops doubling the gap here; a walk keeps at least its ends.
+const MAX_GAP_M = 128;
+
+/**
+ * Every recorded walk across the given trips as a thinned line. Rides are left out: they are not the rider's own
+ * path. When the lines would hold more than `maxVertices` points in all, the gap doubles until they fit.
+ */
+export function heatmapLines(trips: SavedTrip[], minGapM = MIN_GAP_M, maxVertices = MAX_VERTICES): LatLng[][] {
+    const paths = trips
+        .flatMap(trip => trip.legs.flatMap(leg => (leg.kind === 'walk' ? [decodePath(leg.path)] : [])))
+        .map(path => path.map(({ latitude, longitude }) => ({ latitude, longitude })))
+        .filter(path => path.length > 1);
+
+    for (let gap = minGapM; ; gap *= 2) {
+        const lines = paths.map(path => thinCoords(path, gap));
+        const vertices = lines.reduce((sum, line) => sum + line.length, 0);
+        if (vertices <= maxVertices || gap >= MAX_GAP_M) return lines;
+    }
 }

@@ -79,3 +79,13 @@ test('each ride alerts on its own', () => {
     check(2, at(-37.9205));
     assert.equal(alerts.length, 2);
 });
+
+test('a refreshed arrival time replaces the planned one', () => {
+    const alerts: RideStep[] = [];
+    const planned = { ...ride([-37.80, -37.84]), arrivalMs: 10_000_000 }; // planned for much later
+    const check = createAlightAlert([planned], r => alerts.push(r));
+    check(0, { ...at(-37.82), speed: 0 }, 900_000);
+    assert.equal(alerts.length, 0);
+    check(0, { ...at(-37.82), speed: 0 }, 900_000, 940_000); // the feeds now say 40 s away
+    assert.equal(alerts.length, 1);
+});

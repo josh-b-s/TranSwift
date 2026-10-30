@@ -19,6 +19,9 @@ export type RideStep = StepBase & {
     stops: RouteStop[];
     /** When the ride is due at its last stop. Includes the realtime delays known when the journey was planned. */
     arrivalMs?: number;
+    /** The trip and the stop sequence it gets off at, to refresh the arrival time from realtime data during the ride. */
+    tripPk?: number;
+    alightSequence?: number;
 };
 
 export type TripStep = WalkStep | RideStep;
@@ -46,6 +49,8 @@ export function stepsFromJourney(journey: GtfsJourney, now = new Date()): TripSt
                 line: encodeLine(seg.coords),
                 stops: seg.stops ?? [],
                 arrivalMs: seg.arrivalTime ? clockToMs(seg.arrivalTime, now) : undefined,
+                tripPk: seg.tripPk,
+                alightSequence: seg.alightSequence,
             };
         }
         // The first and last walks start or end wherever the rider is, so only the ones between stops repeat.

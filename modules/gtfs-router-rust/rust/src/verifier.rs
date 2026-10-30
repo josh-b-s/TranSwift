@@ -203,6 +203,8 @@ fn build_journey(
             origin_stop_name: from_name.to_string(), dest_stop_name: to_name.to_string(),
             is_walk: true, departure_time_sec: None, arrival_time_sec: None,
             pattern_pk: None,
+            trip_pk: None,
+            alight_sequence: None,
             stops: vec![],
         }
     };
@@ -262,6 +264,8 @@ fn build_journey(
                     dest_stop_name: alight_stop.stop_name.clone(), is_walk: false,
                     departure_time_sec: Some(*depart_sec), arrival_time_sec: Some(*arrive_sec),
                     pattern_pk: Some(*pattern_pk),
+                    trip_pk: Some(*trip_pk),
+                    alight_sequence: Some(*alight_seq),
                     stops: ride_stops(&seq_list, stops, board_stop, alight_stop, *board_seq, *alight_seq),
                 });
                 legs.push(Leg {

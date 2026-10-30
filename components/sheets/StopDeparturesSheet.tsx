@@ -143,10 +143,10 @@ const StopDeparturesSheet = forwardRef<BottomSheetModal, Props>(({ stop, animate
                         return (
                             <Pressable
                                 key={key}
-                                accessibilityRole="button"
-                                accessibilityLabel={`${d.routeName} to ${d.terminus}, ${open ? 'hide' : 'show'} stops`}
-                                accessibilityState={{ expanded: open }}
-                                onPress={() => setOpenKey(open ? null : key)}
+                                accessibilityRole={d.added ? 'text' : 'button'}
+                                accessibilityLabel={d.added ? `${d.routeName} to ${d.terminus}, extra service` : `${d.routeName} to ${d.terminus}, ${open ? 'hide' : 'show'} stops`}
+                                accessibilityState={d.added ? undefined : { expanded: open }}
+                                onPress={d.added ? undefined : () => setOpenKey(open ? null : key)}
                                 style={{ borderRadius: 16, padding: 14, backgroundColor: theme.backgroundColor }}
                             >
                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
@@ -160,6 +160,9 @@ const StopDeparturesSheet = forwardRef<BottomSheetModal, Props>(({ stop, animate
                                         >
                                             {d.terminus ? `to ${d.terminus}` : ''}
                                         </Text>
+                                        {d.added && (
+                                            <Text style={{ color: theme.color, opacity: 0.6, fontSize: 12 }}>Extra service</Text>
+                                        )}
                                         {d.skipped && !d.cancelled && (
                                             <Text style={{ color: '#ef4444', fontSize: 12, fontWeight: '600' }}>Not stopping here</Text>
                                         )}
@@ -181,7 +184,7 @@ const StopDeparturesSheet = forwardRef<BottomSheetModal, Props>(({ stop, animate
                                         )}
                                     </View>
                                 </View>
-                                {open && <DepartureTripStops departure={d} />}
+                                {open && !d.added && <DepartureTripStops departure={d} />}
                             </Pressable>
                         );
                     })}

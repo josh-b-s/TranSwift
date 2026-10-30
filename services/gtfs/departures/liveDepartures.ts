@@ -20,6 +20,8 @@ export type LiveDeparture = Departure & {
     cancelled: boolean;
     /** The vehicle will not stop here. */
     skipped: boolean;
+    /** A trip that exists only in the realtime feed. It has no scheduled stops to show. */
+    added?: boolean;
 };
 
 export const realtimeKey = (tripPk: number, stopSequence: number) => `${tripPk}:${stopSequence}`;
@@ -53,7 +55,11 @@ export function applyLiveStatus(departures: Departure[], statuses: StopRealtime[
 }
 
 /** True when any departure carries live data, so the sheet can say its times are not only scheduled. */
-export const hasLiveData = (departures: LiveDeparture[]) => departures.some(d => d.delaySec !== null || d.cancelled);
+export const hasLiveData = (departures: LiveDeparture[]) => departures.some(d => d.delaySec !== null || d.cancelled || d.added);
+
+/** Scheduled departures with the realtime-only ones, in order of live time. */
+export const withAdded = (live: LiveDeparture[], added: LiveDeparture[]) =>
+    [...live, ...added].sort((a, b) => a.liveTimeMs - b.liveTimeMs);
 
 export type LiveTripStop = TripStop & { liveTimeMs: number; delaySec: number | null; skipped: boolean };
 

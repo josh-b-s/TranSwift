@@ -17,10 +17,12 @@ import {
     setMaxWalkDistance,
     setSpeedUnit,
     setThemeMode,
+    setVehicleScope,
     setWeeklyGoal,
     updateWalkingSpeed,
     type SpeedUnit,
     type ThemeMode,
+    type VehicleScope,
 } from '@/store/preferences.slice';
 
 const THEME_OPTIONS: { value: ThemeMode; label: string; icon: LucideIcon }[] = [
@@ -32,6 +34,11 @@ const THEME_OPTIONS: { value: ThemeMode; label: string; icon: LucideIcon }[] = [
 const SPEED_UNIT_OPTIONS: { value: SpeedUnit; label: string }[] = [
     { value: 'kmh', label: SPEED_UNITS.kmh.label },
     { value: 'mph', label: SPEED_UNITS.mph.label },
+];
+
+const VEHICLE_SCOPE_OPTIONS: { value: VehicleScope; label: string }[] = [
+    { value: 'routes', label: 'Route only' },
+    { value: 'nearby', label: 'All nearby' },
 ];
 
 function SectionLabel({ text, theme }: { text: string; theme: ReturnType<typeof useThemeStyle> }) {
@@ -50,6 +57,7 @@ export default function Preferences() {
     const speedUnit = useSelector((s: RootState) => s.preferences.speedUnit);
     const maxWalkDistanceM = useSelector((s: RootState) => s.preferences.maxWalkDistanceM);
     const weeklyGoalM = useSelector((s: RootState) => s.preferences.weeklyGoalM);
+    const vehicleScope = useSelector((s: RootState) => s.preferences.vehicleScope);
 
     // Inline-edit state for the walking speed list — editingId names which
     // row is currently showing text inputs instead of static text; the two
@@ -102,7 +110,7 @@ export default function Preferences() {
     function handleReset() {
         Alert.alert(
             'Reset to defaults?',
-            'Theme, speedometer unit, walk limit, weekly goal and walking speeds will be reset to their default values.',
+            'Theme, speedometer unit, vehicles on the map, walk limit, weekly goal and walking speeds will be reset to their default values.',
             [
                 { text: 'Cancel', style: 'cancel' },
                 { text: 'Reset', style: 'destructive', onPress: () => { setEditingId(null); dispatch(resetPreferences()); } },
@@ -124,6 +132,16 @@ export default function Preferences() {
                 options={SPEED_UNIT_OPTIONS}
                 value={speedUnit}
                 onChange={(unit) => dispatch(setSpeedUnit(unit))}
+            />
+
+            <SectionLabel text="Vehicles on the map" theme={theme} />
+            <Text style={{ color: theme.color, opacity: 0.5, fontSize: 12, marginBottom: 4 }}>
+                Route only shows vehicles on the routes you are looking at. All nearby also shows every tracked vehicle in view once you zoom in as far as the stop dots, up to the 60 closest to the centre.
+            </Text>
+            <SegmentedControl
+                options={VEHICLE_SCOPE_OPTIONS}
+                value={vehicleScope}
+                onChange={(scope) => dispatch(setVehicleScope(scope))}
             />
 
             <SectionLabel text="Maximum walk" theme={theme} />

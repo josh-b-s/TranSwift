@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react';
 import { getDb } from '@/services/db/sqliteDb';
 import type { RepoStop } from '@/services/gtfs/core/stopRepo';
 import { getStopDepartures } from '@/services/gtfs/departures/stopDepartures';
-import { applyLiveStatus, hasLiveData, type LiveDeparture } from '@/services/gtfs/departures/liveDepartures';
-import { fetchStopRealtime } from '@/services/gtfs/realtime/departureRealtime';
+import { addedToLiveDepartures } from '@/services/gtfs/departures/addedDepartures';
+import { applyLiveStatus, hasLiveData, withAdded, type LiveDeparture } from '@/services/gtfs/departures/liveDepartures';
+import { fetchAddedDepartures, fetchStopRealtime } from '@/services/gtfs/realtime/departureRealtime';
 
 const WINDOW_MS = 3 * 3_600_000;
 const MAX_DEPARTURES = 40;
@@ -19,7 +20,7 @@ const EMPTY: State = { departures: [], loading: false, error: null, live: false 
 
 /**
  * Upcoming departures for a stop, reloaded every minute. Scheduled times show at once, then realtime delays and
- * cancellations are applied when the feeds have them.
+ * cancellations are applied when the feeds have them, along with trips only the feeds know of (added or replacement).
  */
 export function useStopDepartures(stop: RepoStop | null): State {
     const [state, setState] = useState<State>(EMPTY);
@@ -48,8 +49,15 @@ export function useStopDepartures(stop: RepoStop | null): State {
                     console.warn('[stopDepartures] realtime unavailable, showing scheduled times:', err);
                     return [];
                 });
+                // Needs the overlay the call above refreshed, so it follows it instead of running beside it.
+                const addedRows = await fetchAddedDepartures(stop.stop_pk)
+                    .then(async added => addedToLiveDepartures(await getDb(), added, Date.now()))
+                    .catch(err => {
+                        console.warn('[stopDepartures] could not list added trips:', err);
+                        return [];
+                    });
                 if (cancelled) return;
-                const departures = applyLiveStatus(scheduled, statuses, Date.now()).slice(0, MAX_DEPARTURES);
+                const departures = withAdded(applyLiveStatus(scheduled, statuses, Date.now()), addedRows).slice(0, MAX_DEPARTURES);
                 setState({ departures, loading: false, error: null, live: hasLiveData(departures) });
             } catch (e) {
                 if (!cancelled) setState({ ...EMPTY, error: e instanceof Error ? e.message : String(e) });

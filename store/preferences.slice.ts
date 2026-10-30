@@ -5,15 +5,17 @@ import { clampWeeklyGoal, NO_WEEKLY_GOAL_M } from '@/constants/walkGoal';
 import {
     DEFAULT_SPEED_UNIT,
     DEFAULT_THEME_MODE,
+    DEFAULT_VEHICLE_SCOPE,
     DEFAULT_WALKING_SPEEDS,
     loadStoredPreferences,
     saveStoredPreferences,
     type SpeedUnit,
     type ThemeMode,
+    type VehicleScope,
     type WalkingSpeedOption,
 } from '@/services/preferences/preferencesStore';
 
-export type { SpeedUnit, ThemeMode, WalkingSpeedOption };
+export type { SpeedUnit, ThemeMode, VehicleScope, WalkingSpeedOption };
 
 type State = {
     themeMode: ThemeMode;
@@ -21,6 +23,7 @@ type State = {
     speedUnit: SpeedUnit;
     maxWalkDistanceM: number;
     weeklyGoalM: number;
+    vehicleScope: VehicleScope;
     /** True once loadPreferences() has resolved — screens can use this to
      *  avoid flashing default values before the real ones load. */
     loaded: boolean;
@@ -32,6 +35,7 @@ const initialState: State = {
     speedUnit: DEFAULT_SPEED_UNIT,
     maxWalkDistanceM: DEFAULT_MAX_WALK_DISTANCE_M,
     weeklyGoalM: NO_WEEKLY_GOAL_M,
+    vehicleScope: DEFAULT_VEHICLE_SCOPE,
     loaded: false,
 };
 
@@ -44,6 +48,7 @@ function persist(state: State) {
         speedUnit: state.speedUnit,
         maxWalkDistanceM: state.maxWalkDistanceM,
         weeklyGoalM: state.weeklyGoalM,
+        vehicleScope: state.vehicleScope,
     }).catch(err => {
         console.warn('[preferences] failed to persist:', err);
     });
@@ -66,6 +71,10 @@ const slice = createSlice({
         },
         setSpeedUnit(state, action: PayloadAction<SpeedUnit>) {
             state.speedUnit = action.payload;
+            persist(state);
+        },
+        setVehicleScope(state, action: PayloadAction<VehicleScope>) {
+            state.vehicleScope = action.payload;
             persist(state);
         },
         setMaxWalkDistance(state, action: PayloadAction<number>) {
@@ -99,6 +108,7 @@ const slice = createSlice({
             state.speedUnit = DEFAULT_SPEED_UNIT;
             state.maxWalkDistanceM = DEFAULT_MAX_WALK_DISTANCE_M;
             state.weeklyGoalM = NO_WEEKLY_GOAL_M;
+            state.vehicleScope = DEFAULT_VEHICLE_SCOPE;
             nativewindColorScheme.set(DEFAULT_THEME_MODE);
             persist(state);
         },
@@ -110,6 +120,7 @@ const slice = createSlice({
             state.speedUnit = action.payload.speedUnit;
             state.maxWalkDistanceM = action.payload.maxWalkDistanceM;
             state.weeklyGoalM = action.payload.weeklyGoalM;
+            state.vehicleScope = action.payload.vehicleScope;
             state.loaded = true;
             nativewindColorScheme.set(action.payload.themeMode);
         });
@@ -121,6 +132,7 @@ export const {
     setSpeedUnit,
     setMaxWalkDistance,
     setWeeklyGoal,
+    setVehicleScope,
     addWalkingSpeed,
     updateWalkingSpeed,
     removeWalkingSpeed,

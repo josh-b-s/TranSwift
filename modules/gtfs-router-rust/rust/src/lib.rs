@@ -118,6 +118,10 @@ pub struct RouteSegment {
     pub departure_time_sec: Option<i32>,
     pub arrival_time_sec: Option<i32>,
     pub stops: Vec<RouteStop>,
+    /// The trip a ride is on and the stop sequence it gets off at, as the timetable numbers them, to look the ride
+    /// up in realtime data. None for walks.
+    pub trip_pk: Option<u32>,
+    pub alight_sequence: Option<u32>,
 }
 
 #[derive(Debug, Clone, uniffi::Record)]
@@ -419,6 +423,18 @@ pub struct ServiceAlertInfo {
     pub targets: Vec<AlertTargetInfo>,
 }
 
+/// A trip that exists only in the realtime feed (added or replacement), leaving a stop.
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct AddedDepartureInfo {
+    pub route_id: Option<String>,
+    /// With `route_id`, picks the route in the timetable.
+    pub agency: u32,
+    /// Seconds after the midnight given to `set_realtime`.
+    pub departure_sec: i32,
+    /// Where the trip ends, to name its direction.
+    pub last_stop_pk: u32,
+}
+
 /// Decodes raw GTFS-realtime ServiceAlerts feeds. Needs no engine or database: it only reads the bytes.
 #[uniffi::export]
 pub fn decode_service_alerts(feeds: Vec<Vec<u8>>) -> Result<Vec<ServiceAlertInfo>, RouterError> {
@@ -537,6 +553,22 @@ impl GtfsRouterEngine {
     /// Drops all realtime data so searches use the static timetable only.
     pub fn clear_realtime(&self) {
         *self.realtime.write().unwrap() = Arc::new(realtime::overlay::Overlay::default());
+    }
+
+    /// Added and replacement trips that leave this stop, from the overlay `set_realtime` last stored. They are not in
+    /// the timetable, so a departures list cannot find them there. Needs no warm-up.
+    pub fn added_departures(&self, stop_pk: u32) -> Vec<AddedDepartureInfo> {
+        let overlay = Arc::clone(&self.realtime.read().unwrap());
+        overlay
+            .added_leaving(i64::from(stop_pk))
+            .into_iter()
+            .map(|(trip, call)| AddedDepartureInfo {
+                route_id: trip.route_id.clone(),
+                agency: trip.agency as u32,
+                departure_sec: call.departure_sec as i32,
+                last_stop_pk: trip.stops.last().map_or(0, |s| s.stop_pk) as u32,
+            })
+            .collect()
     }
 
     /// Looks up the latest realtime status of the given trip stops, for showing live times on a departures list.
@@ -1387,6 +1419,8 @@ fn segment_to_ffi(s: raptor::RouteSegment) -> RouteSegment {
         stops: s.stops.into_iter()
             .map(|p| RouteStop { name: p.name, latitude: p.lat, longitude: p.lon })
             .collect(),
+        trip_pk: s.trip_pk.map(|v| v as u32),
+        alight_sequence: s.alight_sequence.map(|v| v as u32),
     }
 }
 

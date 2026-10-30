@@ -37,7 +37,7 @@ type DepartureRow = {
 };
 
 /** GTFS times count from noon minus 12 hours, which is not midnight on a daylight saving day. */
-function serviceDayStartMs(day: Date): number {
+export function serviceDayStartMs(day: Date): number {
     return new Date(day.getFullYear(), day.getMonth(), day.getDate(), 12).getTime() - 12 * HOUR_MS;
 }
 

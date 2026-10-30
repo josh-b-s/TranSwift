@@ -2,7 +2,7 @@ import type { Region } from 'react-native-maps';
 import type { RepoStop } from '@/services/gtfs/core/stopRepo';
 
 /** Zoomed out past this (about 5 km tall) the dots would only be clutter. */
-const MAX_LATITUDE_DELTA = 0.05;
+export const MAX_LATITUDE_DELTA = 0.05;
 const MAX_STOPS = 150;
 
 /** The stops inside the visible map area, nearest the centre first if there are too many to draw. */

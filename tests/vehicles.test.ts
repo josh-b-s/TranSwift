@@ -78,6 +78,7 @@ test('picking keeps wanted routes only, telling same-named routes apart by type'
     const all = [mapVehicle('tram', '96', 0, -37.8), mapVehicle('bus', '96', 3, -37.8), mapVehicle('other', '109', 0, -37.8)];
     assert.deepEqual(pickVehicles(all, new Set([routeKey('96', 0)]), 10).map(v => v.key), ['tram']);
     assert.deepEqual(pickVehicles(all, new Set(), 10), []);
+    assert.equal(pickVehicles(all, null, 10).length, all.length);
 });
 
 test('picking takes the nearest when over the cap', () => {

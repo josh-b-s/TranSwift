@@ -48,6 +48,10 @@ pub struct RouteSegment {
     /// run_search returns. Never exposed over the FFI boundary — see
     /// lib.rs's segment_to_ffi, which doesn't carry this field forward.
     pub pattern_pk: Option<i64>,
+    /// The trip this segment rides and the stop sequence it gets off at, so a caller can look the ride up in
+    /// realtime data. None for walk segments.
+    pub trip_pk: Option<i64>,
+    pub alight_sequence: Option<i64>,
     /// Every stop a ride passes, board to alight in travel order. Empty for walks.
     pub stops: Vec<RouteStop>,
 }
@@ -620,6 +624,8 @@ fn reconstruct_path(
             origin_stop_name: from_name.to_string(), dest_stop_name: to_name.to_string(),
             is_walk: true, departure_time_sec: None, arrival_time_sec: None,
             pattern_pk: None,
+            trip_pk: None,
+            alight_sequence: None,
             stops: vec![],
         }
     };
@@ -684,6 +690,8 @@ fn reconstruct_path(
                     dest_stop_name: alight_stop.stop_name.clone(), is_walk: false,
                     departure_time_sec: depart_sec, arrival_time_sec: arrive_sec,
                     pattern_pk: Some(*pattern_pk),
+                    trip_pk: Some(*trip_pk),
+                    alight_sequence: Some(*alight_seq),
                     stops: ride_stops(&seq_list, stops, board_stop, alight_stop, *board_seq, *alight_seq),
                 });
                 legs.push(Leg {
