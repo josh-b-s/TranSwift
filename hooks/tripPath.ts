@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react';
 import { getDb } from '@/services/db/sqliteDb';
 import { loadTripPath, type TripPath, type TripRef } from '@/services/gtfs/vehicles/tripPath';
 
-/** A trip the map is showing the line of, and the colour to draw it in. */
-export type TripFocus = { trip: TripRef; color: string };
+/** A trip the map is showing the line of, the colour to draw it in, and its route (see `routeKey`) so its vehicles are fetched. */
+export type TripFocus = { trip: TripRef; color: string; routeKey: string };
 
 /** The line and stops of one trip, or null while none is wanted, it loads, or the timetable lacks it. */
 export function useTripPath(trip: TripRef | null): TripPath | null {

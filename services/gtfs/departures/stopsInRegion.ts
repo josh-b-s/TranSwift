@@ -1,13 +1,12 @@
 import type { Region } from 'react-native-maps';
+import { isZoomedIn } from '@/services/geo/zoom';
 import type { RepoStop } from '@/services/gtfs/core/stopRepo';
 
-/** Zoomed out past this (about 5 km tall) the dots would only be clutter. */
-export const MAX_LATITUDE_DELTA = 0.05;
 const MAX_STOPS = 150;
 
 /** The stops inside the visible map area, nearest the centre first if there are too many to draw. */
 export function stopsInRegion(stops: RepoStop[], region: Region): RepoStop[] {
-    if (region.latitudeDelta > MAX_LATITUDE_DELTA) return [];
+    if (!isZoomedIn(region)) return [];
 
     const halfLat = region.latitudeDelta / 2;
     const halfLon = region.longitudeDelta / 2;

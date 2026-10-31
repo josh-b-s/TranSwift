@@ -29,8 +29,8 @@ const toInfo = (r: RouteRow): RouteInfo => {
     };
 };
 
-const chunks = <T>(items: T[]) => Array.from({ length: Math.ceil(items.length / CHUNK) }, (_, i) => items.slice(i * CHUNK, (i + 1) * CHUNK));
-const marks = (n: number) => Array(n).fill('?').join(',');
+export const chunks = <T>(items: T[]) => Array.from({ length: Math.ceil(items.length / CHUNK) }, (_, i) => items.slice(i * CHUNK, (i + 1) * CHUNK));
+export const marks = (n: number) => Array(n).fill('?').join(',');
 
 /** Looks the feed's trip and route ids up in the timetable. Ids it does not know are left out. */
 export async function loadRouteLookup(db: QueryableDb, fixes: VehicleFix[]): Promise<RouteLookup> {

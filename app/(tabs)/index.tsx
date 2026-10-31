@@ -20,8 +20,10 @@ import VehicleMarkers from '@/components/map/VehicleMarkers';
 import TripPathOverlay from '@/components/map/TripPathOverlay';
 import {useVehicles} from '@/hooks/vehiclePositions';
 import {type TripFocus, useTripPath} from '@/hooks/tripPath';
-import {MAX_LATITUDE_DELTA} from '@/services/gtfs/departures/stopsInRegion';
+import {useLineKeys} from '@/hooks/lineKeys';
+import {isZoomedIn} from '@/services/geo/zoom';
 import {type MapVehicle, routeKey} from '@/services/gtfs/vehicles/vehicleRoutes';
+import {visibleVehicles} from '@/services/gtfs/vehicles/visibleVehicles';
 import MapPickOverlay from '@/components/map/MapPickOverlay';
 import DebugMapOverlay from '@/components/debug/DebugMapOverlay';
 import DebugControls from '@/components/debug/DebugControls';
@@ -88,14 +90,20 @@ export default function Index() {
     const regionRef = useRef<Region | null>(null);
     const [departureStop, setDepartureStop] = useState<RepoStop | null>(null);
     const [stopRouteKeys, setStopRouteKeys] = useState<string[]>([]);
+    // The departures sheet at its lowest snap point: the stop is out of focus, so its vehicles go.
+    const [departuresLowered, setDeparturesLowered] = useState(false);
     // The trip whose whole line and stops are drawn, and whose vehicle is highlighted.
     const [tripFocus, setTripFocus] = useState<TripFocus | null>(null);
     const tripPath = useTripPath(tripFocus?.trip ?? null);
 
-    // Vehicles on the routes of the open stop and of the shown journey.
+    // Vehicles on the routes of the open stop, of the shown trip and of the shown journey.
     const wantedRouteKeys = useMemo(
-        () => [...new Set([...stopRouteKeys, ...(displayedJourney?.legs ?? []).map(l => routeKey(l.routeName, l.routeType))])],
-        [stopRouteKeys, displayedJourney],
+        () => [...new Set([
+            ...(departuresLowered ? [] : stopRouteKeys),
+            ...(tripFocus ? [tripFocus.routeKey] : []),
+            ...(displayedJourney?.legs ?? []).map(l => routeKey(l.routeName, l.routeType)),
+        ])],
+        [stopRouteKeys, departuresLowered, tripFocus, displayedJourney],
     );
 
     const goToUserLocation = useGoToUserLocation(mapRef);
@@ -140,8 +148,19 @@ export default function Index() {
     const stopsTappable = isFocused && selectedPlace === null && pickingField === null && !debugEnabled;
     const stopsInView = useStopsInView(region, stopsTappable);
     const vehicleScope = useSelector((s: RootState) => s.preferences.vehicleScope);
-    const showAllVehicles = vehicleScope === 'nearby' && region !== null && region.latitudeDelta <= MAX_LATITUDE_DELTA;
+    const zoomedIn = isZoomedIn(region);
+    const showAllVehicles = vehicleScope === 'nearby' && zoomedIn;
     const vehicles = useVehicles(wantedRouteKeys, isFocused && !debugEnabled, showAllVehicles);
+    const focusedTripId = tripPath?.tripId ?? null;
+    const lineTripIds = useMemo(
+        () => (focusedTripId === null ? [] : [...new Set([focusedTripId, ...vehicles.flatMap(v => (v.tripId ? [v.tripId] : []))])]),
+        [focusedTripId, vehicles],
+    );
+    const lineKeys = useLineKeys(lineTripIds);
+    const drawnVehicles = useMemo(
+        () => visibleVehicles(vehicles, zoomedIn, focusedTripId === null ? null : {tripId: focusedTripId, lineKeys}),
+        [vehicles, zoomedIn, focusedTripId, lineKeys],
+    );
     const stopColors = useStopColors(stopsInView);
     useEffect(() => {
         if (selectedPlace !== null) setDepartureStop(null);
@@ -161,6 +180,8 @@ export default function Index() {
         follow.release();
         setDepartureStop(stop);
         setTripFocus(null);
+        // A stop picked while the sheet is lowered brings it back up.
+        departuresRef.current?.snapToIndex(1);
         // Aim a little south of the stop so the sheet doesn't cover it.
         const delta = Math.min(regionRef.current?.latitudeDelta ?? STOP_FOCUS_DELTA, STOP_FOCUS_DELTA);
         mapRef.current?.animateToRegion(
@@ -178,7 +199,7 @@ export default function Index() {
     const selectVehicle = useCallback((vehicle: MapVehicle) => {
         const tripId = vehicle.tripId;
         if (!tripId) return;
-        setTripFocus(current => (current && 'tripId' in current.trip && current.trip.tripId === tripId ? null : {trip: {tripId}, color: vehicle.color}));
+        setTripFocus(current => (current && 'tripId' in current.trip && current.trip.tripId === tripId ? null : {trip: {tripId}, color: vehicle.color, routeKey: routeKey(vehicle.routeName, vehicle.routeType)}));
     }, []);
 
     const routeStops = useMemo(
@@ -303,7 +324,7 @@ export default function Index() {
                 {!debugEnabled && tripPath && tripFocus && <TripPathOverlay path={tripPath} color={tripFocus.color} />}
 
                 <StopDots stops={stopsInView} colors={stopColors} />
-                <VehicleMarkers vehicles={vehicles} center={region} selectedTripId={tripPath?.tripId ?? null} onPress={selectVehicle} />
+                <VehicleMarkers vehicles={drawnVehicles} center={region} selectedTripId={focusedTripId} onPress={selectVehicle} />
 
                 {!isCurrentLocation(origin) && (
                     <Marker
@@ -377,6 +398,7 @@ export default function Index() {
                 }}
                 onRoutes={setStopRouteKeys}
                 onTripFocus={setTripFocus}
+                onSnap={index => setDeparturesLowered(index === 0)}
                 vehicles={vehicles}
             />
         </View>

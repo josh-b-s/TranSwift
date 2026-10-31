@@ -42,11 +42,13 @@ type Props = {
     onRoutes?: (keys: string[]) => void;
     /** Told which trip's whole line to show on the map: the departure that is expanded, or null when none is. */
     onTripFocus?: (focus: TripFocus | null) => void;
+    /** Told the snap point the sheet settles on, 0 being the lowest. */
+    onSnap?: (index: number) => void;
     /** The vehicles the map is tracking, used for how many stops away each departure is. */
     vehicles: VehicleFix[];
 };
 
-const StopDeparturesSheet = forwardRef<BottomSheetModal, Props>(({ stop, animatedPosition, onClose, onRoutes, onTripFocus, vehicles }, ref) => {
+const StopDeparturesSheet = forwardRef<BottomSheetModal, Props>(({ stop, animatedPosition, onClose, onRoutes, onTripFocus, onSnap, vehicles }, ref) => {
     const theme = useThemeStyle();
     const tabBarHeight = useBottomTabBarHeight();
     const { departures, loading, error, live } = useStopDepartures(stop);
@@ -78,7 +80,7 @@ const StopDeparturesSheet = forwardRef<BottomSheetModal, Props>(({ stop, animate
     const openDeparture = shown.find(d => departureKey(d) === openKey);
     const openTripPk = openDeparture?.tripPk ?? null;
     useEffect(() => {
-        onTripFocus?.(openDeparture ? { trip: { tripPk: openDeparture.tripPk }, color: openDeparture.routeColor } : null);
+        onTripFocus?.(openDeparture ? { trip: { tripPk: openDeparture.tripPk }, color: openDeparture.routeColor, routeKey: routeKey(openDeparture.routeName, openDeparture.routeType) } : null);
     }, [openTripPk]);
     const now = Date.now();
     const noteStyle = { color: theme.color, opacity: 0.6, fontSize: 14, textAlign: 'center' as const, padding: 24 };
@@ -99,6 +101,7 @@ const StopDeparturesSheet = forwardRef<BottomSheetModal, Props>(({ stop, animate
             index={1}
             snapPoints={['16%', '45%', '100%']}
             enableDynamicSizing={false}
+            onChange={index => onSnap?.(index)}
             onDismiss={onClose}
         >
             <BottomSheetScrollView stickyHeaderIndices={[0]} contentContainerStyle={{ paddingBottom: 24 }}>

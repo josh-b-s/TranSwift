@@ -102,3 +102,15 @@ test('short route names fill the badge and longer ones are cut to three letters'
     assert.equal(badgeText('Frankston'), 'Fra');
     assert.equal(badgeText('Upfield'), 'Upf');
 });
+
+test('zoomed out, only the vehicles on the shown trip\'s route and terminus are drawn', async () => {
+    const { visibleVehicles } = await import('@/services/gtfs/vehicles/visibleVehicles');
+    const all = ['a', 'b', 'c', 'd'].map((key, i) => ({ ...mapVehicle(key, '96', 0, -37.8), tripId: `T${i}` }));
+    // T0 and T1 run to the same end, T2 the other way, and the timetable does not know T3.
+    const lineKeys = new Map([['T0', '1|R|North'], ['T1', '1|R|North'], ['T2', '1|R|South']]);
+    assert.equal(visibleVehicles(all, true, null).length, 4);
+    assert.deepEqual(visibleVehicles(all, false, null), []);
+    assert.deepEqual(visibleVehicles(all, false, { tripId: 'T0', lineKeys }).map(v => v.key), ['a', 'b']);
+    // Its own vehicle stays even before its line is known.
+    assert.deepEqual(visibleVehicles(all, false, { tripId: 'T3', lineKeys }).map(v => v.key), ['d']);
+});
