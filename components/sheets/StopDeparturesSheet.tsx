@@ -16,11 +16,13 @@ import { useServiceAlerts } from '@/hooks/serviceAlerts';
 import { useStopsAway } from '@/hooks/stopsAway';
 import { alertsForStop } from '@/services/gtfs/alerts/serviceAlert';
 import type { VehicleFix } from '@/services/gtfs/vehicles/vehicleFix';
+import type { TripFocus } from '@/hooks/tripPath';
 import { useSavedPlace } from '@/hooks/savedPlace';
 import { stopToPlace } from '@/services/places/endpoints';
 import type { RepoStop } from '@/services/gtfs/core/stopRepo';
 import { routeKey } from '@/services/gtfs/vehicles/vehicleRoutes';
 import { formatClock, formatDepartureIn, formatStopsAway } from '@/services/gtfs/departures/departureFormat';
+import type { Departure } from '@/services/gtfs/departures/stopDepartures';
 import {
     applyDepartureFilter,
     filterLines,
@@ -30,17 +32,21 @@ import {
     type DepartureFilter,
 } from '@/services/gtfs/departures/departureFilter';
 
+const departureKey = (d: Departure) => `${d.dayStartMs}:${d.tripPk}`;
+
 type Props = {
     stop: RepoStop | null;
     animatedPosition: SharedValue<number>;
     onClose: () => void;
     /** Told which routes serve the stop (see `routeKey`), so the map can show their vehicles. */
     onRoutes?: (keys: string[]) => void;
+    /** Told which trip's whole line to show on the map: the departure that is expanded, or null when none is. */
+    onTripFocus?: (focus: TripFocus | null) => void;
     /** The vehicles the map is tracking, used for how many stops away each departure is. */
     vehicles: VehicleFix[];
 };
 
-const StopDeparturesSheet = forwardRef<BottomSheetModal, Props>(({ stop, animatedPosition, onClose, onRoutes, vehicles }, ref) => {
+const StopDeparturesSheet = forwardRef<BottomSheetModal, Props>(({ stop, animatedPosition, onClose, onRoutes, onTripFocus, vehicles }, ref) => {
     const theme = useThemeStyle();
     const tabBarHeight = useBottomTabBarHeight();
     const { departures, loading, error, live } = useStopDepartures(stop);
@@ -69,6 +75,11 @@ const StopDeparturesSheet = forwardRef<BottomSheetModal, Props>(({ stop, animate
     const lines = filterLines(departures);
     const termini = filterTermini(departures, filter.line);
     const shown = applyDepartureFilter(departures, filter);
+    const openDeparture = shown.find(d => departureKey(d) === openKey);
+    const openTripPk = openDeparture?.tripPk ?? null;
+    useEffect(() => {
+        onTripFocus?.(openDeparture ? { trip: { tripPk: openDeparture.tripPk }, color: openDeparture.routeColor } : null);
+    }, [openTripPk]);
     const now = Date.now();
     const noteStyle = { color: theme.color, opacity: 0.6, fontSize: 14, textAlign: 'center' as const, padding: 24 };
 
@@ -137,7 +148,7 @@ const StopDeparturesSheet = forwardRef<BottomSheetModal, Props>(({ stop, animate
                     {shown.map(d => {
                         const relative = formatDepartureIn(d.liveTimeMs, now);
                         const clock = formatClock(d.liveTimeMs);
-                        const key = `${d.dayStartMs}:${d.tripPk}`;
+                        const key = departureKey(d);
                         const away = stopsAway.get(d.tripPk);
                         const open = key === openKey;
                         return (

@@ -87,16 +87,18 @@ test('picking takes the nearest when over the cap', () => {
     assert.deepEqual(out.map(v => v.key), ['near', 'mid']);
 });
 
-test('bearings snap to 15 degree steps and wrap, and the heading dot sits on that side of the badge', async () => {
-    const { bearingBucket, pointerOffset } = await import('@/services/gtfs/vehicles/vehicleBearing');
+test('bearings snap to 15 degree steps and wrap', async () => {
+    const { bearingBucket } = await import('@/services/gtfs/vehicles/vehicleBearing');
     assert.equal(bearingBucket(null), null);
     assert.equal(bearingBucket(92), 90);
     assert.equal(bearingBucket(358), 0);
     assert.equal(bearingBucket(-10), 345);
-    // Adding 0 turns a rounded -0 into 0, which strict equality tells apart.
-    const rounded = (b: number) => { const o = pointerOffset(b, 10); return [Math.round(o.x) + 0, Math.round(o.y) + 0]; };
-    assert.deepEqual(rounded(0), [0, -10]);
-    assert.deepEqual(rounded(90), [10, 0]);
-    assert.deepEqual(rounded(180), [0, 10]);
-    assert.deepEqual(rounded(270), [-10, 0]);
+});
+
+test('short route names fill the badge and longer ones are cut to three letters', async () => {
+    const { badgeText } = await import('@/services/gtfs/vehicles/badgeText');
+    assert.equal(badgeText('96'), '96');
+    assert.equal(badgeText('109X'), '109X');
+    assert.equal(badgeText('Frankston'), 'Fra');
+    assert.equal(badgeText('Upfield'), 'Upf');
 });

@@ -32,3 +32,26 @@ index 69a724d..7b30daa 100644
          if (initialProps != null) {
              if (initialProps.getString("googleMapId") != null) {
                  googleMapOptions.mapId(initialProps.getString("googleMapId"));
+diff --git a/node_modules/react-native-maps/android/src/main/java/com/rnmaps/maps/MapMarker.java b/node_modules/react-native-maps/android/src/main/java/com/rnmaps/maps/MapMarker.java
+index b755f9b..89d3c22 100644
+--- a/node_modules/react-native-maps/android/src/main/java/com/rnmaps/maps/MapMarker.java
++++ b/node_modules/react-native-maps/android/src/main/java/com/rnmaps/maps/MapMarker.java
+@@ -522,8 +522,16 @@ public class MapMarker extends MapFeature {
+   }
+ 
+   private Bitmap createDrawable() {
+-    int width = this.width <= 0 ? 100 : this.width;
+-    int height = this.height <= 0 ? 100 : this.height;
++    // With the new architecture nothing reports the view's size, so it stayed 0 and a larger marker was cropped
++    // to 100x100 px. Use the size the view was laid out at, or where its children end, in pixels.
++    int width = getWidth();
++    int height = getHeight();
++    for (int i = 0; i < getChildCount(); i++) {
++      width = Math.max(width, getChildAt(i).getRight());
++      height = Math.max(height, getChildAt(i).getBottom());
++    }
++    if (width <= 0) width = this.width <= 0 ? 100 : this.width;
++    if (height <= 0) height = this.height <= 0 ? 100 : this.height;
+     this.buildDrawingCache();
+ 
+     // Do not create the doublebuffer-bitmap each time. reuse it to save memory.

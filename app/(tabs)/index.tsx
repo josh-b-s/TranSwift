@@ -17,9 +17,11 @@ import RouteBottomSheetModal from '@/components/sheets/RouteBottomSheetModal';
 import StopDeparturesSheet from '@/components/sheets/StopDeparturesSheet';
 import {StopDots} from '@/components/map/StopDots';
 import VehicleMarkers from '@/components/map/VehicleMarkers';
+import TripPathOverlay from '@/components/map/TripPathOverlay';
 import {useVehicles} from '@/hooks/vehiclePositions';
+import {type TripFocus, useTripPath} from '@/hooks/tripPath';
 import {MAX_LATITUDE_DELTA} from '@/services/gtfs/departures/stopsInRegion';
-import {routeKey} from '@/services/gtfs/vehicles/vehicleRoutes';
+import {type MapVehicle, routeKey} from '@/services/gtfs/vehicles/vehicleRoutes';
 import MapPickOverlay from '@/components/map/MapPickOverlay';
 import DebugMapOverlay from '@/components/debug/DebugMapOverlay';
 import DebugControls from '@/components/debug/DebugControls';
@@ -54,6 +56,8 @@ const EMPTY_COORDS: LatLng[] = [];
 const STOP_FOCUS_DELTA = 0.008;
 // How close to a stop circle a tap counts as hitting it.
 const STOP_TAP_RADIUS_DP = 22;
+// Room left around a route fitted on screen, mostly at the bottom for the sheet.
+const ROUTE_FIT_PADDING = {top: 80, right: 60, bottom: 300, left: 60};
 const EMPTY_SEGMENTS: NonNullable<ReturnType<typeof selectDisplayedJourney>>['segments'] = [];
 
 export default function Index() {
@@ -84,6 +88,9 @@ export default function Index() {
     const regionRef = useRef<Region | null>(null);
     const [departureStop, setDepartureStop] = useState<RepoStop | null>(null);
     const [stopRouteKeys, setStopRouteKeys] = useState<string[]>([]);
+    // The trip whose whole line and stops are drawn, and whose vehicle is highlighted.
+    const [tripFocus, setTripFocus] = useState<TripFocus | null>(null);
+    const tripPath = useTripPath(tripFocus?.trip ?? null);
 
     // Vehicles on the routes of the open stop and of the shown journey.
     const wantedRouteKeys = useMemo(
@@ -153,6 +160,7 @@ export default function Index() {
     const selectStop = useCallback((stop: RepoStop) => {
         follow.release();
         setDepartureStop(stop);
+        setTripFocus(null);
         // Aim a little south of the stop so the sheet doesn't cover it.
         const delta = Math.min(regionRef.current?.latitudeDelta ?? STOP_FOCUS_DELTA, STOP_FOCUS_DELTA);
         mapRef.current?.animateToRegion(
@@ -165,6 +173,13 @@ export default function Index() {
         const stop = findRepoStop(await getAllStopsCached(await getDb()), routeStop);
         if (stop) selectStop(stop);
     }, [selectStop]);
+
+    // A second tap on the same vehicle puts the line away. A vehicle that reports no trip cannot be traced to a line.
+    const selectVehicle = useCallback((vehicle: MapVehicle) => {
+        const tripId = vehicle.tripId;
+        if (!tripId) return;
+        setTripFocus(current => (current && 'tripId' in current.trip && current.trip.tripId === tripId ? null : {trip: {tripId}, color: vehicle.color}));
+    }, []);
 
     const routeStops = useMemo(
         () => (debugEnabled ? [] : routeSegments.flatMap(s => (s.type === 'transit' ? s.stops ?? [] : []))),
@@ -185,6 +200,7 @@ export default function Index() {
         }
         const stop = nearestWithin(stopsInView, point, reach, s => ({latitude: s.stop_lat, longitude: s.stop_lon}));
         if (stop) selectStop(stop);
+        else setTripFocus(null);
     };
 
     useEffect(() => {
@@ -197,7 +213,7 @@ export default function Index() {
 
         if (routeCoords.length > 1) {
             mapRef.current?.fitToCoordinates(routeCoords, {
-                edgePadding: {top: 80, right: 60, bottom: 300, left: 60},
+                edgePadding: ROUTE_FIT_PADDING,
                 animated: true,
             });
         } else {
@@ -213,6 +229,12 @@ export default function Index() {
             );
         }
     }, [routeCoords, follow.release]);
+
+    useEffect(() => {
+        if (!tripPath || tripPath.line.length < 2) return;
+        follow.release();
+        mapRef.current?.fitToCoordinates(tripPath.line, {edgePadding: ROUTE_FIT_PADDING, animated: true});
+    }, [tripPath, follow.release]);
 
     useEffect(() => {
         if (pickingField !== null) follow.release();
@@ -278,8 +300,10 @@ export default function Index() {
                     <RideStopMarkers key={index} segment={segment} color={segment.routeColor ?? routeColor ?? '#2563eb'} />
                 ))}
 
+                {!debugEnabled && tripPath && tripFocus && <TripPathOverlay path={tripPath} color={tripFocus.color} />}
+
                 <StopDots stops={stopsInView} colors={stopColors} />
-                <VehicleMarkers vehicles={vehicles} center={region} />
+                <VehicleMarkers vehicles={vehicles} center={region} selectedTripId={tripPath?.tripId ?? null} onPress={selectVehicle} />
 
                 {!isCurrentLocation(origin) && (
                     <Marker
@@ -347,8 +371,12 @@ export default function Index() {
                 ref={departuresRef}
                 stop={departureStop}
                 animatedPosition={bottomSheetPosition}
-                onClose={() => setDepartureStop(null)}
+                onClose={() => {
+                    setDepartureStop(null);
+                    setTripFocus(null);
+                }}
                 onRoutes={setStopRouteKeys}
+                onTripFocus={setTripFocus}
                 vehicles={vehicles}
             />
         </View>
