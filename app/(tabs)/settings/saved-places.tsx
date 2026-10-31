@@ -3,7 +3,7 @@ import { Alert, Pressable, ScrollView, Text, TextInput, View } from 'react-nativ
 import { Star, Trash2 } from 'lucide-react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch, RootState } from '@/store/store';
-import { ACCENT, useThemeStyle } from '@/constants/themes';
+import { ACCENT, DANGER, RADIUS, useThemeStyle } from '@/constants/themes';
 import { renameSavedPlace, toggleSavedPlace } from '@/store/savedPlaces.slice';
 import type { SavedPlace } from '@/services/places/savedPlaces';
 
@@ -21,12 +21,12 @@ export default function SavedPlaces() {
 
     return (
         <ScrollView style={{ flex: 1, backgroundColor: theme.surfaceColor }} contentContainerStyle={{ padding: 16, gap: 8 }}>
-            <Text style={{ color: theme.color, opacity: 0.5, fontSize: 12, marginBottom: 4 }}>
+            <Text style={{ color: theme.muted, fontSize: 13, lineHeight: 18, marginBottom: 4, paddingHorizontal: 4 }}>
                 Star a place or stop on its sheet to save it. Rename one to "Home" or "Work" here. Saved places show up when you tap an empty start or destination field.
             </Text>
 
             {saved.length === 0 && (
-                <Text style={{ color: theme.color, opacity: 0.6, fontSize: 14, textAlign: 'center', padding: 24 }}>
+                <Text style={{ color: theme.muted, fontSize: 14, textAlign: 'center', padding: 24 }}>
                     No saved places yet.
                 </Text>
             )}
@@ -39,7 +39,7 @@ export default function SavedPlaces() {
                         alignItems: 'center',
                         gap: 10,
                         padding: 14,
-                        borderRadius: 16,
+                        borderRadius: RADIUS.tile,
                         backgroundColor: theme.backgroundColor,
                     }}
                 >
@@ -51,7 +51,7 @@ export default function SavedPlaces() {
                             accessibilityLabel={`Name for ${place.name}`}
                             style={{ color: theme.color, fontSize: 15, fontWeight: '600', paddingVertical: 2 }}
                         />
-                        <Text numberOfLines={1} style={{ color: theme.color, opacity: 0.5, fontSize: 12 }}>
+                        <Text numberOfLines={1} style={{ color: theme.muted, fontSize: 12 }}>
                             {place.address || place.name}
                         </Text>
                     </View>
@@ -62,7 +62,7 @@ export default function SavedPlaces() {
                         accessibilityLabel={`Remove ${place.label}`}
                         style={{ padding: 4 }}
                     >
-                        <Trash2 size={18} color="#ef4444" />
+                        <Trash2 size={18} color={DANGER} />
                     </Pressable>
                 </View>
             ))}

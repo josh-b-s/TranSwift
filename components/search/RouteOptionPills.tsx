@@ -6,7 +6,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch, RootState } from '@/store/store';
 import { setDepartureTime, setWalkingSpeed } from '@/store/search.slice';
 import { useRequestRoute } from '@/hooks/requestRoute';
-import { useThemeStyle } from '@/constants/themes';
+import { ACCENT, useThemeStyle } from '@/constants/themes';
 import DepartureTimeModal from '@/components/search/DepartureTimeModal';
 
 /** Departure time and walking speed for the current route. Changing either recomputes it. */
@@ -43,11 +43,10 @@ export default function RouteOptionPills() {
         flexDirection: 'row' as const,
         alignItems: 'center' as const,
         gap: 6,
-        paddingHorizontal: 12,
-        paddingVertical: 7,
+        paddingHorizontal: 14,
+        paddingVertical: 8,
         borderRadius: 999,
-        borderWidth: 1,
-        borderColor: theme.color + '26',
+        backgroundColor: theme.backgroundColor,
     };
     const textStyle = { color: theme.color, fontSize: 13, fontWeight: '600' as const };
 
@@ -59,7 +58,7 @@ export default function RouteOptionPills() {
                 accessibilityLabel="Set departure time"
                 onPress={() => setShowTimeModal(true)}
             >
-                <Clock size={16} color={theme.color} />
+                <Clock size={16} color={ACCENT} />
                 <Text style={textStyle}>
                     {departureTime
                         ? new Date(departureTime).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
@@ -83,7 +82,7 @@ export default function RouteOptionPills() {
                 accessibilityLabel={`Walking speed: ${speedLabel}. Tap to cycle.`}
                 onPress={cycleWalkingSpeed}
             >
-                <Footprints size={16} color={theme.color} />
+                <Footprints size={16} color={ACCENT} />
                 <Text style={textStyle}>{speedLabel}</Text>
                 {/* Marks it as a cycling control rather than a static label */}
                 <Repeat size={11} color={theme.color} style={{ opacity: 0.45 }} />

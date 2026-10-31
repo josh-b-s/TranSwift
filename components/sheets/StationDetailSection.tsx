@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
-import { useThemeStyle } from '@/constants/themes';
+import { ChevronDown } from 'lucide-react-native';
+import { RADIUS, useThemeStyle } from '@/constants/themes';
 import { useStationDetail } from '@/hooks/stationDetail';
 import type { RepoStop } from '@/services/gtfs/core/stopRepo';
 import { exitSummary, platformSubtitle, platformTitle } from '@/services/gtfs/station/stationFormat';
@@ -15,11 +16,11 @@ export default function StationDetailSection({ stop }: { stop: RepoStop | null }
     if (!result || result.status !== 'ok') return null;
     const { stationName, platforms, exits } = result.detail;
     const current = platforms.find(p => p.isCurrent);
-    const muted = { color: theme.color, opacity: 0.6, fontSize: 12 };
+    const muted = { color: theme.muted, fontSize: 12 };
     const heading = { color: theme.color, fontSize: 13, fontWeight: '700' as const };
 
     return (
-        <View style={{ marginHorizontal: 24, marginBottom: 8, borderRadius: 16, padding: 14, backgroundColor: theme.backgroundColor }}>
+        <View style={{ marginHorizontal: 24, marginBottom: 8, borderRadius: RADIUS.tile, padding: 14, backgroundColor: theme.backgroundColor }}>
             <Pressable
                 accessibilityRole="button"
                 accessibilityState={{ expanded: open }}
@@ -35,7 +36,7 @@ export default function StationDetailSection({ stop }: { stop: RepoStop | null }
                         </Text>
                     )}
                 </View>
-                <Text style={{ color: theme.color, opacity: 0.6, fontSize: 18 }}>{open ? '–' : '+'}</Text>
+                <ChevronDown size={18} color={theme.muted} style={{ transform: [{ rotate: open ? '180deg' : '0deg' }] }} />
             </Pressable>
 
             {open && (

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
 import { History as HistoryIcon, Map as MapIcon, Settings as SettingsIcon } from 'lucide-react-native';
-import { useThemeStyle } from '@/constants/themes';
+import { ACCENT, useThemeStyle } from '@/constants/themes';
 
 export default function TabsLayout() {
     const theme = useThemeStyle();
@@ -10,12 +10,13 @@ export default function TabsLayout() {
         <Tabs
             screenOptions={{
                 headerShown: false,
-                tabBarActiveTintColor: '#2563eb',
-                tabBarInactiveTintColor: theme.color + '88',
+                tabBarActiveTintColor: ACCENT,
+                tabBarInactiveTintColor: theme.muted,
+                tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
                 tabBarStyle: {
                     backgroundColor: theme.surfaceColor,
                     borderTopWidth: 1,
-                    borderTopColor: theme.color + '33',
+                    borderTopColor: theme.hairline,
                     elevation: 0,
                     shadowOpacity: 0,
                 },

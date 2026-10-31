@@ -1,14 +1,13 @@
 import React, { forwardRef, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Text, View } from 'react-native';
 import { BottomSheetModal, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { SharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
-import { ACCENT, SHADOW, TOP_SAFE, useThemeStyle } from '@/constants/themes';
+import { ACCENT, RADIUS, SHADOW, TOP_SAFE, useThemeStyle } from '@/constants/themes';
 import RouteSheetHeader from '@/components/sheets/RouteSheetHeader';
 import DepartureFilterChips from '@/components/sheets/DepartureFilterChips';
-import DepartureTripStops from '@/components/sheets/DepartureTripStops';
-import DepartureDelay from '@/components/sheets/DepartureDelay';
+import DepartureRow from '@/components/sheets/DepartureRow';
 import StationDetailSection from '@/components/sheets/StationDetailSection';
 import ServiceAlertList from '@/components/sheets/ServiceAlertList';
 import { useStopDepartures } from '@/hooks/stopDepartures';
@@ -21,7 +20,6 @@ import { useSavedPlace } from '@/hooks/savedPlace';
 import { stopToPlace } from '@/services/places/endpoints';
 import type { RepoStop } from '@/services/gtfs/core/stopRepo';
 import { routeKey } from '@/services/gtfs/vehicles/vehicleRoutes';
-import { formatClock, formatDepartureIn, formatStopsAway } from '@/services/gtfs/departures/departureFormat';
 import type { Departure } from '@/services/gtfs/departures/stopDepartures';
 import {
     applyDepartureFilter,
@@ -83,7 +81,7 @@ const StopDeparturesSheet = forwardRef<BottomSheetModal, Props>(({ stop, animate
         onTripFocus?.(openDeparture ? { trip: { tripPk: openDeparture.tripPk }, color: openDeparture.routeColor, routeKey: routeKey(openDeparture.routeName, openDeparture.routeType) } : null);
     }, [openTripPk]);
     const now = Date.now();
-    const noteStyle = { color: theme.color, opacity: 0.6, fontSize: 14, textAlign: 'center' as const, padding: 24 };
+    const noteStyle = { color: theme.muted, fontSize: 14, textAlign: 'center' as const, padding: 24 };
 
     return (
         <BottomSheetModal
@@ -91,11 +89,11 @@ const StopDeparturesSheet = forwardRef<BottomSheetModal, Props>(({ stop, animate
             animatedPosition={animatedPosition}
             backgroundStyle={{
                 backgroundColor: theme.surfaceColor,
-                borderTopLeftRadius: 28,
-                borderTopRightRadius: 28,
+                borderTopLeftRadius: RADIUS.sheet,
+                borderTopRightRadius: RADIUS.sheet,
             }}
             handleIndicatorStyle={{ backgroundColor: theme.color + '55', width: 40 }}
-            style={[SHADOW, { borderTopLeftRadius: 28, borderTopRightRadius: 28 }]}
+            style={[SHADOW, { borderTopLeftRadius: RADIUS.sheet, borderTopRightRadius: RADIUS.sheet }]}
             topInset={TOP_SAFE(useSafeAreaInsets())}
             bottomInset={tabBarHeight}
             index={1}
@@ -149,57 +147,16 @@ const StopDeparturesSheet = forwardRef<BottomSheetModal, Props>(({ stop, animate
 
                 <View style={{ gap: 8, paddingHorizontal: 24 }}>
                     {shown.map(d => {
-                        const relative = formatDepartureIn(d.liveTimeMs, now);
-                        const clock = formatClock(d.liveTimeMs);
                         const key = departureKey(d);
-                        const away = stopsAway.get(d.tripPk);
-                        const open = key === openKey;
                         return (
-                            <Pressable
+                            <DepartureRow
                                 key={key}
-                                accessibilityRole={d.added ? 'text' : 'button'}
-                                accessibilityLabel={d.added ? `${d.routeName} to ${d.terminus}, extra service` : `${d.routeName} to ${d.terminus}, ${open ? 'hide' : 'show'} stops`}
-                                accessibilityState={d.added ? undefined : { expanded: open }}
-                                onPress={d.added ? undefined : () => setOpenKey(open ? null : key)}
-                                style={{ borderRadius: 16, padding: 14, backgroundColor: theme.backgroundColor }}
-                            >
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                                    <View style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, backgroundColor: d.routeColor }}>
-                                        <Text style={{ color: d.routeTextColor, fontSize: 13, fontWeight: '700' }}>{d.routeName}</Text>
-                                    </View>
-                                    <View style={{ flex: 1 }}>
-                                        <Text
-                                            numberOfLines={1}
-                                            style={{ color: theme.color, fontSize: 14, textDecorationLine: d.cancelled ? 'line-through' : 'none' }}
-                                        >
-                                            {d.terminus ? `to ${d.terminus}` : ''}
-                                        </Text>
-                                        {d.added && (
-                                            <Text style={{ color: theme.color, opacity: 0.6, fontSize: 12 }}>Extra service</Text>
-                                        )}
-                                        {d.skipped && !d.cancelled && (
-                                            <Text style={{ color: '#ef4444', fontSize: 12, fontWeight: '600' }}>Not stopping here</Text>
-                                        )}
-                                        {away !== undefined && !d.cancelled && !d.skipped && (
-                                            <Text style={{ color: theme.color, opacity: 0.6, fontSize: 12 }}>{formatStopsAway(away)}</Text>
-                                        )}
-                                    </View>
-                                    <View style={{ alignItems: 'flex-end' }}>
-                                        {d.cancelled ? (
-                                            <Text style={{ color: '#ef4444', fontSize: 15, fontWeight: '700' }}>Cancelled</Text>
-                                        ) : (
-                                            <>
-                                                <Text style={{ color: theme.color, fontSize: 15, fontWeight: '700' }}>{relative}</Text>
-                                                {relative !== clock && (
-                                                    <Text style={{ color: theme.color, opacity: 0.55, fontSize: 12 }}>{clock}</Text>
-                                                )}
-                                                {d.delaySec !== null && <DepartureDelay delaySec={d.delaySec} />}
-                                            </>
-                                        )}
-                                    </View>
-                                </View>
-                                {open && !d.added && <DepartureTripStops departure={d} />}
-                            </Pressable>
+                                departure={d}
+                                open={key === openKey}
+                                stopsAway={stopsAway.get(d.tripPk)}
+                                nowMs={now}
+                                onToggle={() => setOpenKey(key === openKey ? null : key)}
+                            />
                         );
                     })}
                 </View>

@@ -1,6 +1,6 @@
 import React, { RefObject } from 'react';
 import { Pressable, Text, View } from 'react-native';
-import { MapPin, X } from 'lucide-react-native';
+import { X } from 'lucide-react-native';
 import MapView from 'react-native-maps';
 import { useDispatch, useSelector } from 'react-redux';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -9,11 +9,12 @@ import { AppDispatch, RootState } from '@/store/store';
 import { selectPlace, setOrigin, stopPicking } from '@/store/search.slice';
 import { makePinPlace } from '@/services/places/endpoints';
 import { useRequestRoute } from '@/hooks/requestRoute';
-import { ACCENT, SHADOW, TOP_SAFE, useThemeStyle } from '@/constants/themes';
+import { ACCENT, RADIUS, SHADOW, TOP_SAFE, useThemeStyle } from '@/constants/themes';
+import PlacePin, { DESTINATION_PIN_COLOR, ORIGIN_PIN_COLOR } from '@/components/map/PlacePin';
 
-const PIN_SIZE = 40;
-const ORIGIN_COLOR = '#16a34a';
-const DESTINATION_COLOR = '#ef4444';
+// Matches the drawing's own height, so the pin's tip sits on the map's centre.
+const PIN_WIDTH = 36;
+const PIN_HEIGHT = 44;
 
 // Leaves room for the speedometer and locate buttons in the bottom corners.
 const CONFIRM_SIDE_MARGIN = 84;
@@ -29,7 +30,7 @@ export default function MapPickOverlay({ mapRef }: { mapRef: RefObject<MapView |
     if (!field) return null;
 
     const isOrigin = field === 'origin';
-    const color = isOrigin ? ORIGIN_COLOR : DESTINATION_COLOR;
+    const color = isOrigin ? ORIGIN_PIN_COLOR : DESTINATION_PIN_COLOR;
 
     async function confirm() {
         const camera = await mapRef.current?.getCamera();
@@ -52,10 +53,10 @@ export default function MapPickOverlay({ mapRef }: { mapRef: RefObject<MapView |
                 pointerEvents="none"
                 style={{
                     position: 'absolute', top: '50%', left: '50%',
-                    marginLeft: -PIN_SIZE / 2, marginTop: -PIN_SIZE,
+                    marginLeft: -PIN_WIDTH / 2, marginTop: -PIN_HEIGHT,
                 }}
             >
-                <MapPin size={PIN_SIZE} color={color} fill={color + '33'} strokeWidth={2.5} />
+                <PlacePin color={color} />
             </View>
 
             <View
@@ -64,7 +65,7 @@ export default function MapPickOverlay({ mapRef }: { mapRef: RefObject<MapView |
                         position: 'absolute', left: 16, right: 16, top: TOP_SAFE(insets),
                         flexDirection: 'row', alignItems: 'center', gap: 12,
                         paddingVertical: 12, paddingLeft: 20, paddingRight: 12,
-                        borderRadius: 24, backgroundColor: theme.backgroundColor,
+                        borderRadius: RADIUS.card + 4, backgroundColor: theme.backgroundColor,
                     },
                     SHADOW,
                 ]}
@@ -79,7 +80,7 @@ export default function MapPickOverlay({ mapRef }: { mapRef: RefObject<MapView |
                     accessibilityLabel="Cancel choosing on map"
                     style={{
                         width: 32, height: 32, borderRadius: 16,
-                        backgroundColor: theme.color + '14',
+                        backgroundColor: theme.hairline,
                         alignItems: 'center', justifyContent: 'center',
                     }}
                 >
@@ -93,7 +94,7 @@ export default function MapPickOverlay({ mapRef }: { mapRef: RefObject<MapView |
                 style={[
                     {
                         position: 'absolute', left: CONFIRM_SIDE_MARGIN, right: CONFIRM_SIDE_MARGIN, bottom: 20,
-                        paddingVertical: 16, borderRadius: 20, alignItems: 'center',
+                        paddingVertical: 16, borderRadius: RADIUS.card, alignItems: 'center',
                         backgroundColor: ACCENT,
                     },
                     SHADOW,

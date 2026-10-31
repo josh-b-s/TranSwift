@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import MapView, { LatLng, MapPressEvent, Marker, Polyline, PROVIDER_GOOGLE, Region} from 'react-native-maps';
+import MapView, { LatLng, MapPressEvent, Polyline, PROVIDER_GOOGLE, Region} from 'react-native-maps';
 import {ActivityIndicator, Keyboard, StyleSheet, Text, useWindowDimensions, View} from 'react-native';
 import * as Location from 'expo-location';
 import {useSelector} from 'react-redux';
@@ -30,7 +30,7 @@ import DebugControls from '@/components/debug/DebugControls';
 import DebugMovementControls from '@/components/debug/DebugMovementControls';
 import UserLocationMarker from '@/components/map/UserLocationMarker';
 import SimulatedLocationMarker from '@/components/debug/SimulatedLocationMarker';
-import {SHADOW, TOP_SAFE, useThemeStyle} from '@/constants/themes';
+import {ACCENT, SHADOW, TOP_SAFE, useThemeStyle} from '@/constants/themes';
 import {selectDisplayedJourney} from '@/store/route.slice';
 import {isCurrentLocation} from '@/services/places/endpoints';
 import {useGoToUserLocation} from '../../hooks/goToUserLocation';
@@ -52,7 +52,12 @@ import {getDb} from '@/services/db/sqliteDb';
 import type {RouteStop} from '@/services/gtfs/router/routeTypes';
 import {RIDE_LINE_WIDTH, RideStopMarkers} from '@/components/map/RideStopMarkers';
 import {HIDE_GOOGLE_TRANSIT} from '@/constants/mapStyle';
+import {darken} from '@/services/color/darken';
+import PlaceMarker from '@/components/map/PlaceMarker';
+import {DESTINATION_PIN_COLOR, ORIGIN_PIN_COLOR} from '@/components/map/PlacePin';
 
+// How much darker than the route colour its outline is.
+const CASING_DARKEN = 0.4;
 const EMPTY_COORDS: LatLng[] = [];
 // Latitude span the map zooms in to when a stop is tapped, at most.
 const STOP_FOCUS_DELTA = 0.008;
@@ -296,13 +301,26 @@ export default function Index() {
                     setRegion(r);
                 }}
             >
+                {/* A darker shade of the route colour under each ride, as an outline. */}
+                {!debugEnabled && routeSegments.map((segment, index) => segment.type === 'transit' && (
+                    <Polyline
+                        key={`casing-${index}`}
+                        coordinates={segment.coords}
+                        strokeWidth={RIDE_LINE_WIDTH + 4}
+                        strokeColor={darken(segment.routeColor ?? routeColor ?? ACCENT, CASING_DARKEN)}
+                        lineCap="round"
+                        lineJoin="round"
+                        geodesic={false}
+                    />
+                ))}
+
                 {!debugEnabled && (routeSegments.length > 0 ? (
                     routeSegments.map((segment, index) => (
                         <Polyline
                             key={index}
                             coordinates={segment.coords}
                             strokeWidth={segment.type === 'walk' ? 4 : RIDE_LINE_WIDTH}
-                            strokeColor={segment.routeColor ?? routeColor ?? '#2563eb'}
+                            strokeColor={segment.routeColor ?? routeColor ?? ACCENT}
                             lineDashPattern={segment.type === 'walk' ? [8, 8] : undefined}
                             lineCap="round"
                             lineJoin="round"
@@ -313,7 +331,7 @@ export default function Index() {
                     <Polyline
                         coordinates={routeCoords}
                         strokeWidth={4}
-                        strokeColor={routeColor ?? '#2563eb'}
+                        strokeColor={routeColor ?? ACCENT}
                     />
                 ) : null)}
 
@@ -327,17 +345,10 @@ export default function Index() {
                 <VehicleMarkers vehicles={drawnVehicles} center={region} selectedTripId={focusedTripId} onPress={selectVehicle} />
 
                 {!isCurrentLocation(origin) && (
-                    <Marker
-                        coordinate={{latitude: origin.latitude, longitude: origin.longitude}}
-                        title={origin.name}
-                        pinColor="green"
-                    />
+                    <PlaceMarker latitude={origin.latitude} longitude={origin.longitude} color={ORIGIN_PIN_COLOR} title={origin.name} />
                 )}
                 {selectedPlace && !isCurrentLocation(selectedPlace) && (
-                    <Marker
-                        coordinate={{latitude: selectedPlace.latitude, longitude: selectedPlace.longitude}}
-                        title={selectedPlace.name}
-                    />
+                    <PlaceMarker latitude={selectedPlace.latitude} longitude={selectedPlace.longitude} color={DESTINATION_PIN_COLOR} title={selectedPlace.name} />
                 )}
 
                 <UserLocationMarker position={position} heading={compass} poseFeed={follow.poseFeed} tilted={follow.mode === 'heading'}/>
@@ -374,7 +385,7 @@ export default function Index() {
                             SHADOW,
                         ]}
                     >
-                        <ActivityIndicator size="small" color="#2563eb" />
+                        <ActivityIndicator size="small" color={ACCENT} />
                         <Text style={{ color: theme.color, fontSize: 13, fontWeight: '600' }}>
                             Finding your route…
                         </Text>

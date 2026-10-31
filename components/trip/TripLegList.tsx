@@ -1,7 +1,7 @@
 import React from 'react';
 import { Text, View } from 'react-native';
 import { Footprints } from 'lucide-react-native';
-import { ACCENT, useThemeStyle } from '@/constants/themes';
+import { ACCENT, RADIUS, useThemeStyle } from '@/constants/themes';
 import type { SpeedUnit } from '@/services/preferences/preferencesStore';
 import { formatDistance, formatDuration, formatSpeed } from '@/services/trips/tripFormat';
 import type { LegSummary } from '@/services/trips/tripSummary';
@@ -14,7 +14,7 @@ export default function TripLegList({ legs, newBestKeys, unit }: Props) {
         flexDirection: 'row' as const,
         alignItems: 'center' as const,
         gap: 10,
-        borderRadius: 16,
+        borderRadius: RADIUS.tile,
         padding: 14,
         backgroundColor: theme.backgroundColor,
     };
@@ -26,8 +26,8 @@ export default function TripLegList({ legs, newBestKeys, unit }: Props) {
                     const { leg } = item;
                     return (
                         <View key={leg.stepIndex} style={rowStyle}>
-                            <View style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, backgroundColor: leg.routeColor ?? ACCENT }}>
-                                <Text style={{ color: leg.routeTextColor ?? '#fff', fontSize: 13, fontWeight: '700' }}>{leg.routeName}</Text>
+                            <View style={{ minWidth: 48, height: 32, paddingHorizontal: 8, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: leg.routeColor ?? ACCENT }}>
+                                <Text style={{ color: leg.routeTextColor ?? '#fff', fontSize: 14, fontWeight: '800' }}>{leg.routeName}</Text>
                             </View>
                             <Text numberOfLines={1} style={{ flex: 1, color: theme.color, fontSize: 14 }}>
                                 {leg.from} to {leg.to}
@@ -40,10 +40,12 @@ export default function TripLegList({ legs, newBestKeys, unit }: Props) {
                 const isNewBest = leg.bestKey !== undefined && newBestKeys.has(leg.bestKey);
                 return (
                     <View key={leg.stepIndex} style={rowStyle}>
-                        <Footprints size={18} color={theme.color} />
+                        <View style={{ minWidth: 48, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.hairline }}>
+                            <Footprints size={16} color={theme.color} />
+                        </View>
                         <View style={{ flex: 1, gap: 2 }}>
                             <Text numberOfLines={1} style={{ color: theme.color, fontSize: 14 }}>{leg.from} to {leg.to}</Text>
-                            <Text style={{ color: theme.color, opacity: 0.6, fontSize: 12 }}>
+                            <Text style={{ color: theme.muted, fontSize: 12 }}>
                                 {formatDistance(stats.distanceM)} · {formatDuration(stats.durationS)} · {formatSpeed(stats.avgSpeedMps, unit)}
                             </Text>
                         </View>

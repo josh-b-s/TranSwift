@@ -1,7 +1,7 @@
 import React from 'react';
 import { Pressable, Text, View } from 'react-native';
 import type { LucideIcon } from 'lucide-react-native';
-import { ACCENT, useThemeStyle } from '@/constants/themes';
+import { ACCENT, RADIUS, useThemeStyle } from '@/constants/themes';
 
 type Option<T extends string> = { value: T; label: string; icon?: LucideIcon };
 
@@ -15,7 +15,7 @@ export default function SegmentedControl<T extends string>({ options, value, onC
     const theme = useThemeStyle();
 
     return (
-        <View style={{ flexDirection: 'row', borderRadius: 16, overflow: 'hidden', backgroundColor: theme.backgroundColor }}>
+        <View style={{ flexDirection: 'row', borderRadius: RADIUS.tile, padding: 4, gap: 4, backgroundColor: theme.backgroundColor }}>
             {options.map((opt) => {
                 const active = opt.value === value;
                 const Icon = opt.icon;
@@ -29,13 +29,14 @@ export default function SegmentedControl<T extends string>({ options, value, onC
                             flex: 1,
                             alignItems: 'center',
                             justifyContent: 'center',
-                            paddingVertical: 14,
+                            paddingVertical: 11,
                             gap: 4,
+                            borderRadius: RADIUS.tile - 4,
                             backgroundColor: active ? ACCENT : 'transparent',
                         }}
                     >
                         {Icon && <Icon size={18} color={active ? '#fff' : theme.color} />}
-                        <Text style={{ color: active ? '#fff' : theme.color, fontSize: 12, fontWeight: '600' }}>
+                        <Text style={{ color: active ? '#fff' : theme.color, fontSize: 13, fontWeight: '600' }}>
                             {opt.label}
                         </Text>
                     </Pressable>

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Text, View } from 'react-native';
-import { ACCENT, useThemeStyle } from '@/constants/themes';
+import { ACCENT, RADIUS, useThemeStyle } from '@/constants/themes';
 
 const BAR_AREA_HEIGHT = 96;
 
@@ -18,10 +18,10 @@ type Props = {
 export default function TripBarChart({ title, values, peakLabel, startLabel, endLabel }: Props) {
     const theme = useThemeStyle();
     const peak = Math.max(0, ...values);
-    const caption = { color: theme.color, opacity: 0.5, fontSize: 12 };
+    const caption = { color: theme.muted, fontSize: 12 };
 
     return (
-        <View style={{ borderRadius: 16, padding: 14, backgroundColor: theme.backgroundColor, gap: 10 }}>
+        <View style={{ borderRadius: RADIUS.tile, padding: 14, backgroundColor: theme.backgroundColor, gap: 10 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                 <Text style={{ color: theme.color, fontSize: 14, fontWeight: '700' }}>{title}</Text>
                 <Text style={caption}>Peak {peakLabel}</Text>
@@ -37,8 +37,12 @@ export default function TripBarChart({ title, values, peakLabel, startLabel, end
                         style={{
                             flex: 1,
                             height: peak > 0 ? Math.max(3, (value / peak) * BAR_AREA_HEIGHT) : 3,
-                            borderRadius: 4,
-                            backgroundColor: ACCENT,
+                            borderTopLeftRadius: 4,
+                            borderTopRightRadius: 4,
+                            borderBottomLeftRadius: 1,
+                            borderBottomRightRadius: 1,
+                            // The newest bar stands out; the rest read as history.
+                            backgroundColor: i === values.length - 1 ? ACCENT : ACCENT + '66',
                         }}
                     />
                 ))}

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Pressable, Text, View } from 'react-native';
-import { Trash2 } from 'lucide-react-native';
-import { useThemeStyle } from '@/constants/themes';
+import { Footprints, Trash2 } from 'lucide-react-native';
+import { ACCENT, RADIUS, useThemeStyle } from '@/constants/themes';
 import { formatDistance, tripTitle } from '@/services/trips/tripFormat';
 import { rideCount, type HistoryTrip } from '@/services/trips/tripHistory';
 
@@ -16,18 +16,23 @@ export default function TripHistoryRow({ trip, onOpen, onDelete }: { trip: Histo
     ].filter(Boolean);
 
     return (
-        <View style={{ flexDirection: 'row', alignItems: 'center', borderRadius: 16, backgroundColor: theme.backgroundColor }}>
-            <Pressable accessibilityRole="button" onPress={onOpen} style={{ flex: 1, padding: 14, gap: 2 }}>
-                <Text numberOfLines={1} style={{ color: theme.color, fontSize: 15, fontWeight: '600' }}>{tripTitle(trip.legs)}</Text>
-                <Text style={{ color: theme.color, opacity: 0.5, fontSize: 13 }}>{details.join(' · ')}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', borderRadius: RADIUS.tile, backgroundColor: theme.backgroundColor }}>
+            <Pressable accessibilityRole="button" onPress={onOpen} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 }}>
+                <View style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.accentSoft }}>
+                    <Footprints size={18} color={ACCENT} />
+                </View>
+                <View style={{ flex: 1, gap: 2 }}>
+                    <Text numberOfLines={1} style={{ color: theme.color, fontSize: 15, fontWeight: '600' }}>{tripTitle(trip.legs)}</Text>
+                    <Text numberOfLines={1} style={{ color: theme.muted, fontSize: 13 }}>{details.join(' · ')}</Text>
+                </View>
             </Pressable>
             <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Delete trip"
                 onPress={onDelete}
-                style={{ width: 48, height: 48, alignItems: 'center', justifyContent: 'center' }}
+                style={{ width: 48, height: 56, alignItems: 'center', justifyContent: 'center' }}
             >
-                <Trash2 size={18} color="#ef4444" />
+                <Trash2 size={18} color={theme.muted} />
             </Pressable>
         </View>
     );

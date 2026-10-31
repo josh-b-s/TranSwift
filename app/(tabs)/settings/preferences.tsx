@@ -1,15 +1,17 @@
 import React, { useState } from 'react';
 import { Alert, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
-import { CircleCheck, CirclePlus, CircleX, Footprints, type LucideIcon, Minus, Moon, Pencil, Plus, RotateCcw, Smartphone, Sun, Trash2 } from 'lucide-react-native';
+import { CircleCheck, CirclePlus, CircleX, Footprints, type LucideIcon, Moon, Pencil, RotateCcw, Smartphone, Sun, Trash2 } from 'lucide-react-native';
 import { nanoid } from '@reduxjs/toolkit';
 import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch, RootState } from '@/store/store';
-import { useThemeStyle } from '@/constants/themes';
+import { ACCENT, DANGER, RADIUS, useThemeStyle } from '@/constants/themes';
 import { SPEED_UNITS } from '@/constants/speedUnits';
 import { MAX_MAX_WALK_DISTANCE_M, MIN_MAX_WALK_DISTANCE_M, WALK_DISTANCE_STEP_M } from '@/constants/walkLimit';
 import { MAX_WEEKLY_GOAL_M, NO_WEEKLY_GOAL_M, WEEKLY_GOAL_STEP_M } from '@/constants/walkGoal';
 import { formatDistance } from '@/services/trips/tripFormat';
 import SegmentedControl from '@/components/ui/SegmentedControl';
+import SettingsSection from '@/components/ui/SettingsSection';
+import StepperRow from '@/components/ui/StepperRow';
 import {
     addWalkingSpeed,
     removeWalkingSpeed,
@@ -40,14 +42,6 @@ const VEHICLE_SCOPE_OPTIONS: { value: VehicleScope; label: string }[] = [
     { value: 'routes', label: 'Route only' },
     { value: 'nearby', label: 'All nearby' },
 ];
-
-function SectionLabel({ text, theme }: { text: string; theme: ReturnType<typeof useThemeStyle> }) {
-    return (
-        <Text style={{ color: theme.color, opacity: 0.5, fontSize: 13, fontWeight: '600', marginBottom: 4, marginTop: 4 }}>
-            {text}
-        </Text>
-    );
-}
 
 export default function Preferences() {
     const theme = useThemeStyle();
@@ -119,229 +113,182 @@ export default function Preferences() {
     }
 
     return (
-        <ScrollView style={{ flex: 1, backgroundColor: theme.surfaceColor }} contentContainerStyle={{ padding: 16, gap: 8 }}>
-            <SectionLabel text="Theme" theme={theme} />
-            <SegmentedControl
-                options={THEME_OPTIONS}
-                value={themeMode}
-                onChange={(mode) => dispatch(setThemeMode(mode))}
-            />
+        <ScrollView style={{ flex: 1, backgroundColor: theme.surfaceColor }} contentContainerStyle={{ padding: 16, gap: 8, paddingBottom: 40 }}>
+            <SettingsSection title="Theme">
+                <SegmentedControl
+                    options={THEME_OPTIONS}
+                    value={themeMode}
+                    onChange={(mode) => dispatch(setThemeMode(mode))}
+                />
+            </SettingsSection>
 
-            <SectionLabel text="Speedometer unit" theme={theme} />
-            <SegmentedControl
-                options={SPEED_UNIT_OPTIONS}
-                value={speedUnit}
-                onChange={(unit) => dispatch(setSpeedUnit(unit))}
-            />
+            <SettingsSection title="Speedometer unit">
+                <SegmentedControl
+                    options={SPEED_UNIT_OPTIONS}
+                    value={speedUnit}
+                    onChange={(unit) => dispatch(setSpeedUnit(unit))}
+                />
+            </SettingsSection>
 
-            <SectionLabel text="Vehicles on the map" theme={theme} />
-            <Text style={{ color: theme.color, opacity: 0.5, fontSize: 12, marginBottom: 4 }}>
-                Route only shows vehicles on the routes you are looking at. All nearby also shows every tracked vehicle in view once you zoom in as far as the stop dots, up to the 60 closest to the centre.
-            </Text>
-            <SegmentedControl
-                options={VEHICLE_SCOPE_OPTIONS}
-                value={vehicleScope}
-                onChange={(scope) => dispatch(setVehicleScope(scope))}
-            />
-
-            <SectionLabel text="Maximum walk" theme={theme} />
-            <Text style={{ color: theme.color, opacity: 0.5, fontSize: 12, marginBottom: 4 }}>
-                The farthest the router may send you on foot in one search. Applies to your next search.
-            </Text>
-            <View
-                style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: 14,
-                    borderRadius: 16,
-                    backgroundColor: theme.backgroundColor,
-                }}
+            <SettingsSection
+                title="Vehicles on the map"
+                hint="Route only shows vehicles on the routes you are looking at. All nearby also shows every tracked vehicle in view once you zoom in as far as the stop dots, up to the 60 closest to the centre."
             >
-                <Pressable
-                    onPress={() => dispatch(setMaxWalkDistance(maxWalkDistanceM - WALK_DISTANCE_STEP_M))}
-                    disabled={maxWalkDistanceM <= MIN_MAX_WALK_DISTANCE_M}
-                    hitSlop={8}
-                    accessibilityLabel="Decrease maximum walk"
-                    style={{ padding: 4, opacity: maxWalkDistanceM <= MIN_MAX_WALK_DISTANCE_M ? 0.3 : 1 }}
-                >
-                    <Minus size={22} color={theme.color} />
-                </Pressable>
-                <Text style={{ color: theme.color, fontSize: 17, fontWeight: '600' }}>{formatDistance(maxWalkDistanceM)}</Text>
-                <Pressable
-                    onPress={() => dispatch(setMaxWalkDistance(maxWalkDistanceM + WALK_DISTANCE_STEP_M))}
-                    disabled={maxWalkDistanceM >= MAX_MAX_WALK_DISTANCE_M}
-                    hitSlop={8}
-                    accessibilityLabel="Increase maximum walk"
-                    style={{ padding: 4, opacity: maxWalkDistanceM >= MAX_MAX_WALK_DISTANCE_M ? 0.3 : 1 }}
-                >
-                    <Plus size={22} color={theme.color} />
-                </Pressable>
-            </View>
+                <SegmentedControl
+                    options={VEHICLE_SCOPE_OPTIONS}
+                    value={vehicleScope}
+                    onChange={(scope) => dispatch(setVehicleScope(scope))}
+                />
+            </SettingsSection>
 
-            <SectionLabel text="Weekly walking goal" theme={theme} />
-            <Text style={{ color: theme.color, opacity: 0.5, fontSize: 12, marginBottom: 4 }}>
-                Shown with your progress on the History tab. Leave it off for no goal.
-            </Text>
-            <View
-                style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: 14,
-                    borderRadius: 16,
-                    backgroundColor: theme.backgroundColor,
-                }}
-            >
-                <Pressable
-                    onPress={() => dispatch(setWeeklyGoal(weeklyGoalM - WEEKLY_GOAL_STEP_M))}
-                    disabled={weeklyGoalM <= NO_WEEKLY_GOAL_M}
-                    hitSlop={8}
-                    accessibilityLabel="Decrease weekly goal"
-                    style={{ padding: 4, opacity: weeklyGoalM <= NO_WEEKLY_GOAL_M ? 0.3 : 1 }}
-                >
-                    <Minus size={22} color={theme.color} />
-                </Pressable>
-                <Text style={{ color: theme.color, fontSize: 17, fontWeight: '600' }}>
-                    {weeklyGoalM > NO_WEEKLY_GOAL_M ? formatDistance(weeklyGoalM) : 'Off'}
-                </Text>
-                <Pressable
-                    onPress={() => dispatch(setWeeklyGoal(weeklyGoalM + WEEKLY_GOAL_STEP_M))}
-                    disabled={weeklyGoalM >= MAX_WEEKLY_GOAL_M}
-                    hitSlop={8}
-                    accessibilityLabel="Increase weekly goal"
-                    style={{ padding: 4, opacity: weeklyGoalM >= MAX_WEEKLY_GOAL_M ? 0.3 : 1 }}
-                >
-                    <Plus size={22} color={theme.color} />
-                </Pressable>
-            </View>
+            <SettingsSection title="Maximum walk" hint="The farthest the router may send you on foot in one search. Applies to your next search.">
+                <StepperRow
+                    label={formatDistance(maxWalkDistanceM)}
+                    onDecrease={() => dispatch(setMaxWalkDistance(maxWalkDistanceM - WALK_DISTANCE_STEP_M))}
+                    onIncrease={() => dispatch(setMaxWalkDistance(maxWalkDistanceM + WALK_DISTANCE_STEP_M))}
+                    canDecrease={maxWalkDistanceM > MIN_MAX_WALK_DISTANCE_M}
+                    canIncrease={maxWalkDistanceM < MAX_MAX_WALK_DISTANCE_M}
+                    decreaseLabel="Decrease maximum walk"
+                    increaseLabel="Increase maximum walk"
+                />
+            </SettingsSection>
 
-            <SectionLabel text="Walking speeds" theme={theme} />
-            <Text style={{ color: theme.color, opacity: 0.5, fontSize: 12, marginBottom: 4 }}>
-                These are the presets the walking-speed pill on the route sheet cycles through.
-            </Text>
+            <SettingsSection title="Weekly walking goal" hint="Shown with your progress on the History tab. Leave it off for no goal.">
+                <StepperRow
+                    label={weeklyGoalM > NO_WEEKLY_GOAL_M ? formatDistance(weeklyGoalM) : 'Off'}
+                    onDecrease={() => dispatch(setWeeklyGoal(weeklyGoalM - WEEKLY_GOAL_STEP_M))}
+                    onIncrease={() => dispatch(setWeeklyGoal(weeklyGoalM + WEEKLY_GOAL_STEP_M))}
+                    canDecrease={weeklyGoalM > NO_WEEKLY_GOAL_M}
+                    canIncrease={weeklyGoalM < MAX_WEEKLY_GOAL_M}
+                    decreaseLabel="Decrease weekly goal"
+                    increaseLabel="Increase weekly goal"
+                />
+            </SettingsSection>
 
-            {walkingSpeeds.map((option) => {
-                const isEditing = editingId === option.id;
-                return (
-                    <View
-                        key={option.id}
-                        style={{
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            gap: 10,
-                            padding: 14,
-                            borderRadius: 16,
-                            backgroundColor: theme.backgroundColor,
-                        }}
-                    >
+            <SettingsSection title="Walking speeds" hint="These are the presets the walking-speed pill on the route sheet cycles through.">
+                {walkingSpeeds.map((option) => {
+                    const isEditing = editingId === option.id;
+                    return (
                         <View
+                            key={option.id}
                             style={{
-                                width: 36, height: 36, borderRadius: 10,
-                                backgroundColor: '#2563eb22',
-                                alignItems: 'center', justifyContent: 'center',
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                gap: 10,
+                                padding: 14,
+                                borderRadius: RADIUS.tile,
+                                backgroundColor: theme.backgroundColor,
                             }}
                         >
-                            <Footprints size={18} color="#2563eb" />
-                        </View>
+                            <View
+                                style={{
+                                    width: 36, height: 36, borderRadius: 10,
+                                    backgroundColor: theme.accentSoft,
+                                    alignItems: 'center', justifyContent: 'center',
+                                }}
+                            >
+                                <Footprints size={18} color={ACCENT} />
+                            </View>
 
-                        {isEditing ? (
-                            <>
-                                <View style={{ flex: 1, gap: 6 }}>
-                                    <TextInput
-                                        value={draftLabel}
-                                        onChangeText={setDraftLabel}
-                                        placeholder="Name"
-                                        placeholderTextColor={theme.color + '66'}
-                                        style={{
-                                            color: theme.color, fontSize: 15, fontWeight: '600',
-                                            borderBottomWidth: 1, borderBottomColor: theme.color + '33', paddingVertical: 2,
-                                        }}
-                                    />
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            {isEditing ? (
+                                <>
+                                    <View style={{ flex: 1, gap: 6 }}>
                                         <TextInput
-                                            value={draftMps}
-                                            onChangeText={setDraftMps}
-                                            placeholder="1.4"
+                                            value={draftLabel}
+                                            onChangeText={setDraftLabel}
+                                            placeholder="Name"
                                             placeholderTextColor={theme.color + '66'}
-                                            keyboardType="decimal-pad"
                                             style={{
-                                                color: theme.color, fontSize: 13, opacity: 0.8, width: 64,
+                                                color: theme.color, fontSize: 15, fontWeight: '600',
                                                 borderBottomWidth: 1, borderBottomColor: theme.color + '33', paddingVertical: 2,
                                             }}
                                         />
-                                        <Text style={{ color: theme.color, opacity: 0.5, fontSize: 12 }}>m/s</Text>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                            <TextInput
+                                                value={draftMps}
+                                                onChangeText={setDraftMps}
+                                                placeholder="1.4"
+                                                placeholderTextColor={theme.color + '66'}
+                                                keyboardType="decimal-pad"
+                                                style={{
+                                                    color: theme.color, fontSize: 13, opacity: 0.8, width: 64,
+                                                    borderBottomWidth: 1, borderBottomColor: theme.color + '33', paddingVertical: 2,
+                                                }}
+                                            />
+                                            <Text style={{ color: theme.color, opacity: 0.5, fontSize: 12 }}>m/s</Text>
+                                        </View>
                                     </View>
-                                </View>
-                                <Pressable onPress={saveEditing} hitSlop={8} style={{ padding: 4 }}>
-                                    <CircleCheck size={24} color="#22c55e" />
-                                </Pressable>
-                                <Pressable onPress={cancelEditing} hitSlop={8} style={{ padding: 4 }}>
-                                    <CircleX size={24} color={theme.color} style={{ opacity: 0.4 }} />
-                                </Pressable>
-                            </>
-                        ) : (
-                            <>
-                                <View style={{ flex: 1 }}>
-                                    <Text style={{ color: theme.color, fontSize: 15, fontWeight: '600' }}>{option.label}</Text>
-                                    <Text style={{ color: theme.color, opacity: 0.5, fontSize: 12, marginTop: 1 }}>
-                                        {option.mps.toFixed(1)} m/s
-                                    </Text>
-                                </View>
-                                <Pressable
-                                    onPress={() => startEditing(option.id, option.label, option.mps)}
-                                    hitSlop={8}
-                                    style={{ padding: 4 }}
-                                >
-                                    <Pencil size={18} color={theme.color} style={{ opacity: 0.6 }} />
-                                </Pressable>
-                                <Pressable
-                                    onPress={() => handleRemoveSpeed(option.id)}
-                                    hitSlop={8}
-                                    style={{ padding: 4, opacity: walkingSpeeds.length <= 1 ? 0.3 : 1 }}
-                                >
-                                    <Trash2 size={18} color="#ef4444" />
-                                </Pressable>
-                            </>
-                        )}
-                    </View>
-                );
-            })}
+                                    <Pressable onPress={saveEditing} hitSlop={8} style={{ padding: 4 }}>
+                                        <CircleCheck size={24} color="#22c55e" />
+                                    </Pressable>
+                                    <Pressable onPress={cancelEditing} hitSlop={8} style={{ padding: 4 }}>
+                                        <CircleX size={24} color={theme.color} style={{ opacity: 0.4 }} />
+                                    </Pressable>
+                                </>
+                            ) : (
+                                <>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={{ color: theme.color, fontSize: 15, fontWeight: '600' }}>{option.label}</Text>
+                                        <Text style={{ color: theme.muted, fontSize: 12, marginTop: 1 }}>
+                                            {option.mps.toFixed(1)} m/s
+                                        </Text>
+                                    </View>
+                                    <Pressable
+                                        onPress={() => startEditing(option.id, option.label, option.mps)}
+                                        hitSlop={8}
+                                        style={{ padding: 4 }}
+                                    >
+                                        <Pencil size={18} color={theme.color} style={{ opacity: 0.6 }} />
+                                    </Pressable>
+                                    <Pressable
+                                        onPress={() => handleRemoveSpeed(option.id)}
+                                        hitSlop={8}
+                                        style={{ padding: 4, opacity: walkingSpeeds.length <= 1 ? 0.3 : 1 }}
+                                    >
+                                        <Trash2 size={18} color={DANGER} />
+                                    </Pressable>
+                                </>
+                            )}
+                        </View>
+                    );
+                })}
 
-            <Pressable
-                onPress={handleAddSpeed}
-                style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 8,
-                    padding: 14,
-                    borderRadius: 16,
-                    borderWidth: 1,
-                    borderStyle: 'dashed',
-                    borderColor: theme.color + '55',
-                }}
-            >
-                <CirclePlus size={18} color={theme.color} />
-                <Text style={{ color: theme.color, fontSize: 14, fontWeight: '600' }}>Add speed</Text>
-            </Pressable>
+                <Pressable
+                    onPress={handleAddSpeed}
+                    style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 8,
+                        padding: 14,
+                        borderRadius: RADIUS.tile,
+                        borderWidth: 1.5,
+                        borderStyle: 'dashed',
+                        borderColor: ACCENT + '88',
+                    }}
+                >
+                    <CirclePlus size={18} color={ACCENT} />
+                    <Text style={{ color: ACCENT, fontSize: 14, fontWeight: '600' }}>Add speed</Text>
+                </Pressable>
+            </SettingsSection>
 
-            <SectionLabel text="Reset" theme={theme} />
-            <Pressable
-                onPress={handleReset}
-                style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 8,
-                    padding: 14,
-                    borderRadius: 16,
-                    backgroundColor: theme.backgroundColor,
-                }}
-            >
-                <RotateCcw size={18} color="#ef4444" />
-                <Text style={{ color: '#ef4444', fontSize: 14, fontWeight: '600' }}>Reset settings to default</Text>
-            </Pressable>
+            <SettingsSection title="Reset">
+                <Pressable
+                    onPress={handleReset}
+                    style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 8,
+                        padding: 14,
+                        borderRadius: RADIUS.tile,
+                        backgroundColor: theme.backgroundColor,
+                    }}
+                >
+                    <RotateCcw size={18} color={DANGER} />
+                    <Text style={{ color: DANGER, fontSize: 14, fontWeight: '600' }}>Reset settings to default</Text>
+                </Pressable>
+            </SettingsSection>
         </ScrollView>
     );
 }

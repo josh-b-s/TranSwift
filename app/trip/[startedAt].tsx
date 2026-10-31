@@ -1,12 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
+import { Trophy } from 'lucide-react-native';
 import MapView, { Polyline } from 'react-native-maps';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useColorScheme } from 'nativewind';
 import { useSelector } from 'react-redux';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootState } from '@/store/store';
-import { ACCENT, MAP_STYLE_DARK, TOP_SAFE, useThemeStyle } from '@/constants/themes';
+import { ACCENT, DANGER, RADIUS, SUCCESS, TOP_SAFE, useThemeStyle } from '@/constants/themes';
 import { SPEED_UNITS } from '@/constants/speedUnits';
 import TripStats from '@/components/trip/TripStats';
 import TripLegList from '@/components/trip/TripLegList';
@@ -80,25 +81,32 @@ export default function TripSummaryScreen() {
                 }}
             >
                 <View>
-                    <Text style={{ color: theme.color, fontSize: 22, fontWeight: '700' }}>Trip complete</Text>
+                    <Text style={{ color: theme.color, fontSize: 28, fontWeight: '800', letterSpacing: -0.5 }}>Trip complete</Text>
                     {trip && (
-                        <Text style={{ color: theme.color, opacity: 0.5, fontSize: 13 }}>
+                        <Text style={{ color: theme.muted, fontSize: 13 }}>
                             {new Date(trip.startedAt).toLocaleString([], { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}
                         </Text>
                     )}
                 </View>
-                <Pressable accessibilityRole="button" accessibilityLabel="Done" hitSlop={8} onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}>
-                    <Text style={{ color: ACCENT, fontSize: 16, fontWeight: '700' }}>Done</Text>
+                <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Done"
+                    hitSlop={8}
+                    onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
+                    style={{ paddingHorizontal: 18, paddingVertical: 9, borderRadius: 999, backgroundColor: ACCENT }}
+                >
+                    <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700' }}>Done</Text>
                 </Pressable>
             </View>
 
             {error ? (
-                <Text style={{ color: '#ef4444', padding: 24, textAlign: 'center' }}>Could not open this trip. {error}</Text>
+                <Text style={{ color: DANGER, padding: 24, textAlign: 'center' }}>Could not open this trip. {error}</Text>
             ) : !trip || !summary ? (
                 <ActivityIndicator color={ACCENT} style={{ marginTop: 48 }} />
             ) : (
                 <>
                     {lines.some(line => line.coords.length > 0) && (
+                        <View style={{ flex: 1, marginHorizontal: 24, marginBottom: 12, borderRadius: RADIUS.card + 4, overflow: 'hidden' }}>
                         <MapView
                             ref={mapRef}
                             key={colorScheme}
@@ -118,14 +126,18 @@ export default function TripSummaryScreen() {
                                 />
                             ))}
                         </MapView>
+                        </View>
                     )}
                     <ScrollView style={{ flex: 1.4 }} contentContainerStyle={{ padding: 24, paddingBottom: insets.bottom + 24, gap: 16 }}>
                         <TripStats summary={summary} unit={unit} />
                         {records.length > 0 && (
-                            <View style={{ borderRadius: 16, padding: 14, backgroundColor: theme.backgroundColor, gap: 6 }}>
-                                <Text style={{ color: theme.color, fontSize: 14, fontWeight: '700' }}>Records</Text>
+                            <View style={{ borderRadius: RADIUS.tile, padding: 14, backgroundColor: theme.backgroundColor, gap: 8 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                    <Trophy size={18} color={SUCCESS} />
+                                    <Text style={{ color: theme.color, fontSize: 15, fontWeight: '700' }}>New records</Text>
+                                </View>
                                 {records.map(line => (
-                                    <Text key={line} style={{ color: theme.color, fontSize: 13 }}>{line}</Text>
+                                    <Text key={line} style={{ color: theme.color, fontSize: 14 }}>{line}</Text>
                                 ))}
                             </View>
                         )}

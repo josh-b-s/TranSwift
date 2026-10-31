@@ -4,7 +4,7 @@ import { LocateFixed } from 'lucide-react-native';
 import ArrowLogo from '@/components/ui/ArrowLogo';
 import Animated, { SharedValue } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
-import { SHADOW, useThemeStyle } from '@/constants/themes';
+import { ACCENT, SHADOW, useThemeStyle } from '@/constants/themes';
 import { useSheetFollowTop } from '@/hooks/sheetFollowTop';
 import type { FollowMode } from '@/hooks/mapFollow';
 
@@ -26,8 +26,16 @@ export default function LocationButton({ mode, onPress, animatedPosition }: {
     return (
         <Animated.View style={{ top: clampedTop }}>
             <TouchableOpacity
-                className="absolute bottom-5 right-4 w-14 h-14 rounded-full items-center justify-center"
-                style={[{ backgroundColor: theme.backgroundColor }, SHADOW]}
+                style={[
+                    {
+                        position: 'absolute', bottom: 20, right: 16, width: 56, height: 56, borderRadius: 28,
+                        alignItems: 'center', justifyContent: 'center',
+                        backgroundColor: theme.backgroundColor,
+                        // Ringed while the map is following the user.
+                        borderWidth: 2, borderColor: mode === 'free' ? 'transparent' : ACCENT,
+                    },
+                    SHADOW,
+                ]}
                 accessibilityRole="button"
                 accessibilityLabel={LABELS[mode]}
                 onPress={() => {

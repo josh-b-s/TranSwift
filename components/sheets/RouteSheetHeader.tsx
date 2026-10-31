@@ -19,17 +19,17 @@ export default function RouteSheetHeader({ name, address, closeLabel = 'Close ro
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 24, paddingBottom: 12 }}>
             <View
                 style={{
-                    width: 36, height: 36, borderRadius: 18,
-                    backgroundColor: ACCENT + '1f',
+                    width: 40, height: 40, borderRadius: 20,
+                    backgroundColor: theme.accentSoft,
                     alignItems: 'center', justifyContent: 'center',
                 }}
             >
                 <MapPin size={18} color={ACCENT} />
             </View>
             <View style={{ flex: 1 }}>
-                <Text numberOfLines={1} style={{ color: theme.color, fontSize: 17, fontWeight: '700' }}>{name}</Text>
+                <Text numberOfLines={1} style={{ color: theme.color, fontSize: 19, fontWeight: '800', letterSpacing: -0.3 }}>{name}</Text>
                 {!!address && (
-                    <Text numberOfLines={1} style={{ color: theme.color, opacity: 0.55, fontSize: 13, marginTop: 1 }}>
+                    <Text numberOfLines={1} style={{ color: theme.muted, fontSize: 13, marginTop: 1 }}>
                         {address}
                     </Text>
                 )}
@@ -52,7 +52,7 @@ export default function RouteSheetHeader({ name, address, closeLabel = 'Close ro
                 accessibilityLabel={closeLabel}
                 style={{
                     width: 32, height: 32, borderRadius: 16,
-                    backgroundColor: theme.color + '14',
+                    backgroundColor: theme.hairline,
                     alignItems: 'center', justifyContent: 'center',
                 }}
             >

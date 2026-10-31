@@ -31,8 +31,8 @@ export default function DepartureFilterChips({ label, options, selected, onSelec
                         accessibilityState={{ selected: active }}
                         onPress={() => onSelect(active ? null : option)}
                         style={{
-                            paddingHorizontal: 12,
-                            paddingVertical: 6,
+                            paddingHorizontal: 14,
+                            paddingVertical: 7,
                             borderRadius: 999,
                             backgroundColor: active ? ACCENT : theme.backgroundColor,
                         }}

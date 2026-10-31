@@ -2,17 +2,29 @@ import { useColorScheme } from 'nativewind';
 import { EdgeInsets } from 'react-native-safe-area-context';
 
 export const ACCENT = '#2563eb';
+export const DANGER = '#ef4444';
+export const WARNING = '#f59e0b';
+export const SUCCESS = '#16a34a';
+
+/** Corner radii, so cards, chips and sheets round the same way everywhere. */
+export const RADIUS = { chip: 999, card: 20, tile: 16, sheet: 28 } as const;
 
 export function useThemeStyle() {
     const { colorScheme } = useColorScheme();
     const dark = colorScheme === 'dark';
+    const color = dark ? '#ffffff' : '#000000';
     return {
         backgroundColor: dark ? '#262b33' : '#ffffff',
-        color: dark ? '#ffffff' : '#000000',
+        color,
         // A step darker than backgroundColor in both modes — for surfaces
         // that need to visually separate from the sheet/card they sit on
         // (inactive pills, chips) instead of blending flat into it.
         surfaceColor: dark ? '#16191e' : '#f1f3f5',
+        /** Secondary text. */
+        muted: color + (dark ? '99' : '8c'),
+        /** Hairline dividers and card outlines. */
+        hairline: color + (dark ? '1f' : '14'),
+        accentSoft: ACCENT + (dark ? '33' : '1a'),
     };
 }
 

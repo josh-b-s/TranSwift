@@ -1,10 +1,11 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Pressable, Text, View } from 'react-native';
+import { Footprints, Map as MapIcon } from 'lucide-react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { useSelector } from 'react-redux';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootState } from '@/store/store';
-import { ACCENT, TOP_SAFE, useThemeStyle } from '@/constants/themes';
+import { ACCENT, DANGER, TOP_SAFE, useThemeStyle } from '@/constants/themes';
 import HistoryStats from '@/components/trip/HistoryStats';
 import HistoryCharts from '@/components/trip/HistoryCharts';
 import WalkingGoal from '@/components/trip/WalkingGoal';
@@ -51,22 +52,35 @@ export default function HistoryScreen() {
     return (
         <View style={{ flex: 1, backgroundColor: theme.surfaceColor }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: TOP_SAFE(insets), paddingHorizontal: 24, paddingBottom: 12 }}>
-                <Text style={{ color: theme.color, fontSize: 22, fontWeight: '700' }}>History</Text>
+                <Text style={{ color: theme.color, fontSize: 30, fontWeight: '800', letterSpacing: -0.5 }}>History</Text>
                 {!!trips?.length && (
-                    <Pressable accessibilityRole="button" accessibilityLabel="Open heatmap" hitSlop={8} onPress={() => router.push('/heatmap')}>
-                        <Text style={{ color: ACCENT, fontSize: 16, fontWeight: '700' }}>Heatmap</Text>
+                    <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel="Open heatmap"
+                        hitSlop={8}
+                        onPress={() => router.push('/heatmap')}
+                        style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, backgroundColor: theme.accentSoft }}
+                    >
+                        <MapIcon size={16} color={ACCENT} />
+                        <Text style={{ color: ACCENT, fontSize: 14, fontWeight: '700' }}>Heatmap</Text>
                     </Pressable>
                 )}
             </View>
 
             {error ? (
-                <Text style={{ color: '#ef4444', padding: 24, textAlign: 'center' }}>Could not load your trips. {error}</Text>
+                <Text style={{ color: DANGER, padding: 24, textAlign: 'center' }}>Could not load your trips. {error}</Text>
             ) : !trips ? (
                 <ActivityIndicator color={ACCENT} style={{ marginTop: 48 }} />
             ) : trips.length === 0 ? (
-                <Text style={{ color: theme.color, opacity: 0.5, padding: 24, textAlign: 'center' }}>
-                    No trips yet. Start one from a route on the map and it will show up here.
-                </Text>
+                <View style={{ alignItems: 'center', gap: 8, padding: 40 }}>
+                    <View style={{ width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.accentSoft, marginBottom: 4 }}>
+                        <Footprints size={28} color={ACCENT} />
+                    </View>
+                    <Text style={{ color: theme.color, fontSize: 17, fontWeight: '700' }}>No trips yet</Text>
+                    <Text style={{ color: theme.muted, fontSize: 14, textAlign: 'center' }}>
+                        Start one from a route on the map and it will show up here.
+                    </Text>
+                </View>
             ) : (
                 <FlatList
                     data={trips}
