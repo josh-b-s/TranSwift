@@ -62,6 +62,11 @@ export function recordLines(records: BrokenRecord[], unit: SpeedUnit): string[] 
     });
 }
 
+/** The legs the rider finished, leaving out a walk cut short by ending the trip. */
+export const finishedLegs = (legs: SavedLeg[]) => legs.filter(leg => !(leg.kind === 'walk' && leg.incomplete));
+
 export function tripTitle(legs: SavedLeg[]): string {
-    return legs.length === 0 ? 'Trip' : `${legs[0].from} to ${legs[legs.length - 1].to}`;
+    const done = finishedLegs(legs);
+    return done.length === 0 ? 'Trip' : `${done[0].from} to ${done[done.length - 1].to}`;
 }
+export const stopsToGo = (stopsLeft: number) => (stopsLeft === 1 ? 'Next stop' : `${stopsLeft} stops to go`);

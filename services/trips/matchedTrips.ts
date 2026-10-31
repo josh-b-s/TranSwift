@@ -1,3 +1,4 @@
+import { finishedLegs } from './tripFormat';
 import type { HistoryTrip } from './tripHistory';
 
 export type MatchedRun = {
@@ -17,8 +18,10 @@ export type TripMatches = {
 };
 
 /** Where a trip began and ended, by stop name. Null for a trip with no steps. */
-export const journeyKey = (trip: Pick<HistoryTrip, 'legs'>): string | null =>
-    trip.legs.length === 0 ? null : `${trip.legs[0].from}>${trip.legs[trip.legs.length - 1].to}`;
+export const journeyKey = (trip: Pick<HistoryTrip, 'legs'>): string | null => {
+    const done = finishedLegs(trip.legs);
+    return done.length === 0 ? null : `${done[0].from}>${done[done.length - 1].to}`;
+};
 
 /** The trips that started and ended at the same places as `current`. History is expected newest first. */
 export function matchTrips(history: HistoryTrip[], current: HistoryTrip): TripMatches {

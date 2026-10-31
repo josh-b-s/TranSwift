@@ -54,3 +54,11 @@ test('longest walk counts all walks in the trip and does not mutate the old best
     const shorter = applyTrip(bests, { startedAt: 2, legs: [walk(undefined, 200, 1.4)] });
     assert.equal(shorter.broken.length, 0);
 });
+
+test('a walk cut short adds to the longest walk but sets no speed best', () => {
+    const cut = { ...walk(undefined, 800, 1.4), incomplete: true };
+    const { bests, broken } = applyTrip(NO_BESTS, { startedAt: 1, legs: [cut] });
+    assert.deepEqual(bests.legs, {});
+    assert.ok(Math.abs(bests.longestWalkM - 800) < 20);
+    assert.equal(broken.filter(r => r.kind === 'speed').length, 0);
+});

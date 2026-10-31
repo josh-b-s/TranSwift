@@ -11,6 +11,7 @@ export default function TripHistoryRow({ trip, onOpen, onDelete }: { trip: Histo
     const when = new Date(trip.startedAt).toLocaleString([], { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
     const details = [
         when,
+        trip.partial ? 'Partial' : null,
         trip.totals.distanceM > 0 ? formatDistance(trip.totals.distanceM) : null,
         rides > 0 ? `${rides} ${rides === 1 ? 'ride' : 'rides'}` : null,
     ].filter(Boolean);

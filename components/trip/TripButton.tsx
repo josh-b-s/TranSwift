@@ -1,53 +1,30 @@
 import React from 'react';
 import { Pressable, Text, View } from 'react-native';
-import { Play, Square } from 'lucide-react-native';
+import { Play } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
-import { useDispatch, useSelector } from 'react-redux';
-import { AppDispatch, RootState } from '@/store/store';
+import { useSelector } from 'react-redux';
+import { RootState } from '@/store/store';
 import { selectDisplayedJourney } from '@/store/route.slice';
-import { endTrip } from '@/store/trip.slice';
 import { useStartTrip } from '@/hooks/startTrip';
-import { formatPaceDelta } from '@/services/trips/tripFormat';
-import { SPEED_UNITS } from '@/constants/speedUnits';
-import { ACCENT, useThemeStyle } from '@/constants/themes';
+import { ACCENT } from '@/constants/themes';
 
-/** Starts the selected journey as a trip, or shows the current step of the running one. */
+/** Starts the selected journey as a trip. Hidden while a trip runs, when ActiveTripPanel takes its place. */
 export default function TripButton() {
-    const dispatch = useDispatch<AppDispatch>();
     const startTrip = useStartTrip();
-    const theme = useThemeStyle();
-    const unit = SPEED_UNITS[useSelector((s: RootState) => s.preferences.speedUnit)];
     const journey = useSelector(selectDisplayedJourney);
-    const { startedAt, steps, stepIndex, bests, paceS } = useSelector((s: RootState) => s.trip);
+    const running = useSelector((s: RootState) => s.trip.startedAt !== null);
 
-    const running = startedAt !== null;
-    if (!running && !journey?.segments.length) return null;
-
-    const step = steps[stepIndex];
-    const label = running
-        ? `${step.type === 'walk' ? 'Walk' : 'Ride'} to ${step.to}`
-        : 'Start trip';
-    const best = running && step.type === 'walk' && step.bestKey ? bests.legs[step.bestKey] : undefined;
-    const pace = paceS === null ? '' : `${formatPaceDelta(paceS)} · `;
-    const hint = best ? `${pace}Beat ${(best.avgSpeedMps * unit.perMps).toFixed(1)} ${unit.label} · tap to end` : 'Tap to end';
-    const Icon = running ? Square : Play;
-    const color = running ? theme.color : '#fff';
-
-    const onPress = () => {
-        Haptics.selectionAsync();
-        if (running) {
-            dispatch(endTrip());
-        } else if (journey) {
-            startTrip(journey);
-        }
-    };
+    if (running || !journey?.segments.length) return null;
 
     return (
         <View style={{ paddingHorizontal: 24, paddingBottom: 12 }}>
             <Pressable
                 accessibilityRole="button"
-                accessibilityLabel={running ? `End trip. ${label}. ${hint}` : 'Start trip'}
-                onPress={onPress}
+                accessibilityLabel="Start trip"
+                onPress={() => {
+                    Haptics.selectionAsync();
+                    startTrip(journey);
+                }}
                 style={{
                     flexDirection: 'row',
                     alignItems: 'center',
@@ -56,14 +33,11 @@ export default function TripButton() {
                     paddingVertical: 12,
                     paddingHorizontal: 16,
                     borderRadius: 24,
-                    backgroundColor: running ? theme.backgroundColor : ACCENT,
+                    backgroundColor: ACCENT,
                 }}
             >
-                <Icon size={16} color={color} />
-                <View style={{ flexShrink: 1, alignItems: 'center' }}>
-                    <Text numberOfLines={1} style={{ color, fontSize: 15, fontWeight: '700' }}>{label}</Text>
-                    {running && <Text style={{ color, opacity: 0.5, fontSize: 12 }}>{hint}</Text>}
-                </View>
+                <Play size={16} color="#fff" />
+                <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700' }}>Start trip</Text>
             </Pressable>
         </View>
     );

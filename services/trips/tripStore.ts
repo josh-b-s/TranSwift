@@ -10,6 +10,8 @@ export type WalkLeg = {
     to: string;
     bestKey?: string;
     path: EncodedPath;
+    /** A walk cut short by ending the trip. It never has a `bestKey`, since a part of a walk can't set a best for the whole. */
+    incomplete?: boolean;
 };
 
 /** A ride with the line it followed, not the rider's own movement. */
@@ -39,6 +41,8 @@ export type SavedTrip = {
     records: BrokenRecord[];
     /** Missing on trips saved before it existed; see loadHistory. */
     totals?: WalkTotals;
+    /** Set when the rider ended the trip before its last step, so `legs` stop short of the destination. */
+    partial?: boolean;
 };
 
 const TRIPS_DIR = `${FileSystem.documentDirectory}trips/`;

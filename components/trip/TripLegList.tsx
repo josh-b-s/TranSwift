@@ -44,7 +44,7 @@ export default function TripLegList({ legs, newBestKeys, unit }: Props) {
                             <Footprints size={16} color={theme.color} />
                         </View>
                         <View style={{ flex: 1, gap: 2 }}>
-                            <Text numberOfLines={1} style={{ color: theme.color, fontSize: 14 }}>{leg.from} to {leg.to}</Text>
+                            <Text numberOfLines={1} style={{ color: theme.color, fontSize: 14 }}>{leg.from} {leg.incomplete ? 'toward' : 'to'} {leg.to}</Text>
                             <Text style={{ color: theme.muted, fontSize: 12 }}>
                                 {formatDistance(stats.distanceM)} · {formatDuration(stats.durationS)} · {formatSpeed(stats.avgSpeedMps, unit)}
                             </Text>

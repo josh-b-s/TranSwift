@@ -9,7 +9,8 @@ type Props = {
     closeLabel?: string;
     /** When given, a star button saves or unsaves the place. */
     saved?: { active: boolean; onToggle: () => void };
-    onClose: () => void;
+    /** Without it there is no close button. */
+    onClose?: () => void;
 };
 
 export default function RouteSheetHeader({ name, address, closeLabel = 'Close route', saved, onClose }: Props) {
@@ -45,7 +46,7 @@ export default function RouteSheetHeader({ name, address, closeLabel = 'Close ro
                     <Star size={22} color={ACCENT} fill={saved.active ? ACCENT : 'none'} />
                 </Pressable>
             )}
-            <Pressable
+            {onClose && <Pressable
                 onPress={onClose}
                 hitSlop={8}
                 accessibilityRole="button"
@@ -57,7 +58,7 @@ export default function RouteSheetHeader({ name, address, closeLabel = 'Close ro
                 }}
             >
                 <X size={18} color={theme.color} />
-            </Pressable>
+            </Pressable>}
         </View>
     );
 }

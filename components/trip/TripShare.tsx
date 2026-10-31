@@ -6,7 +6,7 @@ import TripShareCard, { CARD_HEIGHT, CARD_MAP, CARD_WIDTH } from '@/components/t
 import type { SpeedUnit } from '@/services/preferences/preferencesStore';
 import { projectLines } from '@/services/trips/shareCard';
 import { shareTripCard, shareTripGpx } from '@/services/trips/shareTrip';
-import { formatDistance, formatDuration, formatSpeed } from '@/services/trips/tripFormat';
+import { finishedLegs, formatDistance, formatDuration, formatSpeed } from '@/services/trips/tripFormat';
 import { tripLines } from '@/services/trips/tripLines';
 import type { TripSummary } from '@/services/trips/tripSummary';
 import type { SavedTrip } from '@/services/trips/tripStore';
@@ -21,7 +21,8 @@ export default function TripShare({ trip, summary, unit }: Props) {
 
     const lines = useMemo(() => projectLines(tripLines(trip), CARD_MAP.width, CARD_MAP.height), [trip]);
     const first = trip.legs[0];
-    const last = trip.legs[trip.legs.length - 1];
+    const finished = finishedLegs(trip.legs);
+    const last = finished[finished.length - 1];
     const stats = [
         { label: 'Walked', value: formatDistance(summary.distanceM) },
         { label: 'Walking time', value: formatDuration(summary.durationS) },

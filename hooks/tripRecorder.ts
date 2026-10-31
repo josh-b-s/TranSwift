@@ -3,18 +3,19 @@ import { Alert, AppState } from 'react-native';
 import { router } from 'expo-router';
 import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch, RootState } from '@/store/store';
-import { endTrip, setTripPace, setTripStep } from '@/store/trip.slice';
+import { endTrip, setTripPace, setTripStep, setTripStopsLeft } from '@/store/trip.slice';
 import { createTripSession } from '@/services/trips/tripSession';
 import { getDb } from '@/services/db/sqliteDb';
 import { createAlightAlert } from '@/services/trips/alightAlert';
 import { refreshedArrivalMs } from '@/services/trips/liveArrival';
 import { paceAgainstBest } from '@/services/trips/livePace';
+import { createRideProgress } from '@/services/trips/rideProgress';
 import { startTracking } from '@/services/trips/locationTracking';
 import { applyTrip } from '@/services/trips/personalBests';
 import { saveTrip, type SavedTrip } from '@/services/trips/tripStore';
 import { saveBests } from '@/services/trips/bestsStore';
 import { summarizeTrip, walkTotals } from '@/services/trips/tripSummary';
-import { notifyGetOff, notifyTripDone, requestNotificationPermission } from '@/services/trips/tripNotification';
+import { clearRideProgress, notifyGetOff, notifyTripDone, requestNotificationPermission, showRideProgress } from '@/services/trips/tripNotification';
 
 const ARRIVAL_REFRESH_MS = 30_000;
 
@@ -28,6 +29,15 @@ export function useTripRecorder() {
     // A ref so changing the unit mid-trip doesn't restart the session.
     const speedUnitRef = useRef(speedUnit);
     speedUnitRef.current = speedUnit;
+    const endRequested = useSelector((s: RootState) => s.trip.endRequested);
+    // The running session's way to end early, set by the effect below.
+    const endEarlyRef = useRef<(() => void) | null>(null);
+
+    useEffect(() => {
+        if (!endRequested) return;
+        if (endEarlyRef.current) endEarlyRef.current();
+        else dispatch(endTrip());
+    }, [endRequested, dispatch]);
 
     useEffect(() => {
         if (startedAt === null) return;
@@ -54,19 +64,37 @@ export function useTripRecorder() {
         let finished = false;
         let stopTracking: (() => void) | undefined;
 
+        const persist = (partial: boolean): Promise<SavedTrip> => {
+            // A walk cut short adds to the distance totals, but sets no per-stop best.
+            const unfinished = partial ? session.unfinishedWalk : null;
+            const legs = unfinished ? [...session.legs, unfinished] : session.legs;
+            const { bests: updated, broken } = applyTrip(bests, { startedAt, legs });
+            const trip: SavedTrip = { startedAt, endedAt: Date.now(), legs, records: broken };
+            if (partial) trip.partial = true;
+            trip.totals = walkTotals(trip);
+            return Promise.all([saveTrip(trip), saveBests(updated)]).then(() => trip);
+        };
+
         const finish = () => {
             finished = true;
             dispatch(endTrip());
-            const { bests: updated, broken } = applyTrip(bests, { startedAt, legs: session.legs });
-            const trip: SavedTrip = { startedAt, endedAt: Date.now(), legs: session.legs, records: broken };
-            trip.totals = walkTotals(trip);
-            Promise.all([saveTrip(trip), saveBests(updated)])
-                .then(() => {
+            persist(false)
+                .then(trip => {
                     if (AppState.currentState === 'active') router.push(`/trip/${startedAt}`);
                     else return notifyTripDone(startedAt, summarizeTrip(trip), speedUnitRef.current);
                 })
                 .catch(err => Alert.alert('Could not save trip', String(err)));
         };
+
+        // Saves the trip once the rider has finished a leg, without opening the summary.
+        const endEarly = () => {
+            if (finished) return;
+            finished = true;
+            dispatch(endTrip());
+            if (session.legs.length === 0) return;
+            persist(true).catch(err => Alert.alert('Could not save trip', String(err)));
+        };
+        endEarlyRef.current = endEarly;
 
         // Only dispatches when the whole-second reading changes. Also clears it when a step ends.
         const updatePace = () => {
@@ -80,6 +108,28 @@ export function useTripRecorder() {
             dispatch(setTripPace(rounded));
         };
 
+        let ride: { stepIndex: number; progress: ReturnType<typeof createRideProgress> } | null = null;
+        let lastStopsLeft: number | null = null;
+        // Stops left on the current ride, for the sheet and the pinned notification. Clears both once the ride is over.
+        const updateRide = (stepIndex: number, fix: { latitude: number; longitude: number }, boarded: boolean) => {
+            const step = steps[stepIndex];
+            if (step?.type !== 'transit' || step.stops.length < 2) {
+                if (lastStopsLeft === null) return;
+                lastStopsLeft = null;
+                dispatch(setTripStopsLeft(null));
+                clearRideProgress().catch(err => console.warn('[trip] could not clear the ride notification:', err));
+                return;
+            }
+            if (ride?.stepIndex !== stepIndex) ride = { stepIndex, progress: createRideProgress(step.stops) };
+            // Counting only starts once the rider is on the vehicle, so waiting at the stop doesn't tick stops off.
+            const left = boarded ? ride.progress.update(fix) : null;
+            if (left === lastStopsLeft) return;
+            lastStopsLeft = left;
+            dispatch(setTripStopsLeft(left));
+            if (left === null) clearRideProgress().catch(err => console.warn('[trip] could not clear the ride notification:', err));
+            else showRideProgress(step.routeName, step.to, left).catch(err => console.warn('[trip] ride notification failed:', err));
+        };
+
         startTracking(locations => {
             if (finished) return;
             const before = session.stepIndex;
@@ -89,6 +139,7 @@ export function useTripRecorder() {
                     longitude: coords.longitude,
                     time: timestamp,
                     accuracy: coords.accuracy,
+                    speed: coords.speed,
                 });
             }
             if (session.done) {
@@ -98,6 +149,7 @@ export function useTripRecorder() {
             if (session.stepIndex !== before) dispatch(setTripStep(session.stepIndex));
             const { coords } = locations[locations.length - 1];
             refreshArrival(session.stepIndex);
+            updateRide(session.stepIndex, coords, session.boarded);
             checkAlight(session.stepIndex, coords, Date.now(), liveArrival?.stepIndex === session.stepIndex ? liveArrival.ms : undefined);
             updatePace();
         })
@@ -116,7 +168,9 @@ export function useTripRecorder() {
 
         return () => {
             cancelled = true;
+            endEarlyRef.current = null;
             stopTracking?.();
+            clearRideProgress().catch(err => console.warn('[trip] could not clear the ride notification:', err));
         };
     }, [startedAt, steps, bests, dispatch]);
 }

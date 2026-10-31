@@ -1,5 +1,6 @@
 import type { LatLng } from '@/services/places/places';
 import type { GtfsJourney, RouteStop } from '@/services/gtfs/router/routeTypes';
+import { clockToMs } from './clock';
 import { encodeLine } from './lineCodec';
 
 type StepBase = { from: string; to: string; end: LatLng };
@@ -25,14 +26,6 @@ export type RideStep = StepBase & {
 };
 
 export type TripStep = WalkStep | RideStep;
-
-/** Today at a "HH:MM:SS" time of day. A time hours in the past is taken to be tomorrow, for a trip that crosses midnight. */
-function clockToMs(clock: string, now: Date): number {
-    const [h, m, s] = clock.split(':').map(Number);
-    const d = new Date(now);
-    d.setHours(h, m, s, 0);
-    return d.getTime() < now.getTime() - 6 * 3_600_000 ? d.getTime() + 24 * 3_600_000 : d.getTime();
-}
 
 export function stepsFromJourney(journey: GtfsJourney, now = new Date()): TripStep[] {
     const last = journey.segments.length - 1;

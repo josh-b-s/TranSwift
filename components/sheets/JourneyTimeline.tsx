@@ -4,7 +4,7 @@ import { ACCENT, WARNING, useThemeStyle } from '@/constants/themes';
 import { formatBoardingDelay, formatJourneyClock } from '@/services/gtfs/router/journeyFormat';
 import type { GtfsJourney } from '@/services/gtfs/router/routeTypes';
 
-/** Board and alight stops of every ride, joined by a line in the route's colour, with the transfers between. */
+/** Board and alight stops of every ride, joined by a line in the route's colour. */
 export default function JourneyTimeline({ legs }: { legs: GtfsJourney['legs'] }) {
     const theme = useThemeStyle();
     const gapLine = theme.color + '22';
@@ -33,7 +33,6 @@ export default function JourneyTimeline({ legs }: { legs: GtfsJourney['legs'] })
                             title={leg.destStopName}
                             caption="Get off"
                         />
-                        {!isLast && <Row dot={WARNING} hollow line={gapLine} title="Transfer" titleColor={WARNING} />}
                     </React.Fragment>
                 );
             })}
@@ -44,15 +43,13 @@ export default function JourneyTimeline({ legs }: { legs: GtfsJourney['legs'] })
 const TIME_WIDTH = 66;
 const RAIL_WIDTH = 16;
 
-function Row({ dot, hollow, line, time, note, noteColor, title, titleColor, caption }: {
+function Row({ dot, line, time, note, noteColor, title, caption }: {
     dot: string;
-    hollow?: boolean;
     line?: string;
     time?: string;
     note?: string;
     noteColor?: string;
     title: string;
-    titleColor?: string;
     caption?: string;
 }) {
     const theme = useThemeStyle();
@@ -66,13 +63,13 @@ function Row({ dot, hollow, line, time, note, noteColor, title, titleColor, capt
                 <View
                     style={{
                         width: 12, height: 12, borderRadius: 6, marginTop: 2,
-                        borderWidth: 3, borderColor: dot, backgroundColor: hollow ? theme.backgroundColor : dot,
+                        borderWidth: 3, borderColor: dot, backgroundColor: dot,
                     }}
                 />
                 {line && <View style={{ width: 3, flex: 1, borderRadius: 2, backgroundColor: line, marginVertical: 2 }} />}
             </View>
             <View style={{ flex: 1, paddingLeft: 10, paddingBottom: line ? 14 : 0, minHeight: 20 }}>
-                <Text numberOfLines={2} style={{ color: titleColor ?? theme.color, fontSize: 14, fontWeight: titleColor ? '700' : '600' }}>
+                <Text numberOfLines={2} style={{ color: theme.color, fontSize: 14, fontWeight: '600' }}>
                     {title}
                 </Text>
                 {!!caption && <Text style={{ color: theme.muted, fontSize: 12, marginTop: 1 }}>{caption}</Text>}

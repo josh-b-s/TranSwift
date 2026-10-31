@@ -88,6 +88,7 @@ export default function Index() {
     const selectedPlace = useSelector((s: RootState) => s.search.selected);
     const origin = useSelector((s: RootState) => s.search.origin);
     const pickingField = useSelector((s: RootState) => s.search.pickingField);
+    const tripRunning = useSelector((s: RootState) => s.trip.startedAt !== null);
     const debugEnabled = useSelector((s: RootState) => s.debug.enabled);
 
     const [region, setRegion] = useState<Region | null>(null);
@@ -268,7 +269,7 @@ export default function Index() {
 
     return (
         <View style={{flex: 1}}>
-            {pickingField === null && <Search/>}
+            {pickingField === null && !tripRunning && <Search/>}
 
             <MapView
                 ref={mapRef}

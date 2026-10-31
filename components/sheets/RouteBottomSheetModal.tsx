@@ -15,11 +15,11 @@ import { useSavedPlace } from '@/hooks/savedPlace';
 import { isCurrentLocation } from '@/services/places/endpoints';
 import RouteOptionPills from '@/components/search/RouteOptionPills';
 import TripButton from '@/components/trip/TripButton';
+import ActiveTripPanel from '@/components/trip/ActiveTripPanel';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { Bus, CircleAlert } from 'lucide-react-native';
 import { clearRoute, selectJourney } from '@/store/route.slice';
-import { endTrip } from '@/store/trip.slice';
 import { selectPlace, setQuery } from '@/store/search.slice';
 import { routeErrorMessage } from '@/services/gtfs/router/routeErrorMessage';
 
@@ -38,11 +38,11 @@ const RouteBottomSheetModal = forwardRef<BottomSheetModal, Props>(
         const savedPlace = useSavedPlace(selectedPlace && !isCurrentLocation(selectedPlace) ? selectedPlace : null);
         const [sortKey, setSortKey] = useState<SortKey>('arrival');
         const tabBarHeight = useBottomTabBarHeight();
+        const running = useSelector((s: RootState) => s.trip.startedAt !== null);
 
         const closeRoute = () => {
             dispatch(selectPlace(null));
             dispatch(clearRoute());
-            dispatch(endTrip());
             dispatch(setQuery(''));
         };
 
@@ -50,6 +50,8 @@ const RouteBottomSheetModal = forwardRef<BottomSheetModal, Props>(
         // index so the map/state stays in sync regardless of sort order.
         const sorted = useMemo(
             () => journeys.map((j, i) => ({ journey: j, originalIndex: i }))
+                // A running trip follows its own steps, so the other options would only mislead.
+                .filter(({ originalIndex }) => !running || originalIndex === selectedJourneyIndex)
                 .sort((a, b) => {
                     switch (sortKey) {
                         case 'walking':   return a.journey.totalWalkingMeters - b.journey.totalWalkingMeters;
@@ -58,7 +60,7 @@ const RouteBottomSheetModal = forwardRef<BottomSheetModal, Props>(
                         default:          return a.journey.arrivalTime.localeCompare(b.journey.arrivalTime);
                     }
                 }),
-            [journeys, sortKey],
+            [journeys, sortKey, running, selectedJourneyIndex],
         );
 
         return (
@@ -93,21 +95,22 @@ const RouteBottomSheetModal = forwardRef<BottomSheetModal, Props>(
                                 name={selectedPlace.name}
                                 address={selectedPlace.address}
                                 saved={savedPlace}
-                                onClose={closeRoute}
+                                onClose={running ? undefined : closeRoute}
                             />
                         )}
-                        {selectedPlace && <RouteOptionPills />}
+                        {selectedPlace && !running && <RouteOptionPills />}
                         {selectedPlace && !error && <TripButton />}
+                        {running && <ActiveTripPanel />}
                         {/* Only worth showing when there's more than one option */}
-                        {!error && journeys.length > 1 && <JourneySortChips value={sortKey} onChange={setSortKey} />}
+                        {!running && !error && journeys.length > 1 && <JourneySortChips value={sortKey} onChange={setSortKey} />}
                     </View>
 
-                    {error ? (
+                    {error && !running ? (
                         <Note icon={<CircleAlert size={26} color={DANGER} />} tint={DANGER + '1f'}>
                             <Text style={{ color: DANGER, fontSize: 15, textAlign: 'center' }}>{routeErrorMessage(error)}</Text>
                         </Note>
                     ) : journeys.length === 0 ? (
-                        loading ? (
+                        running ? null : loading ? (
                             <Note icon={<ActivityIndicator color={ACCENT} />} tint={theme.accentSoft}>
                                 <Text style={{ color: theme.muted, fontSize: 14 }}>Calculating route…</Text>
                             </Note>
