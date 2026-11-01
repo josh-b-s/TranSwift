@@ -2,10 +2,11 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Pressable, Text, View } from 'react-native';
 import { Footprints, Map as MapIcon } from 'lucide-react-native';
 import { router, useFocusEffect } from 'expo-router';
-import { useSelector } from 'react-redux';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { RootState } from '@/store/store';
-import { ACCENT, DANGER, TOP_SAFE, useThemeStyle } from '@/constants/themes';
+import { useDispatch, useSelector } from 'react-redux';
+import { AppDispatch, RootState } from '@/store/store';
+import { viewTrip } from '@/store/tripView.slice';
+import { ACCENT, DANGER, useThemeStyle } from '@/constants/themes';
+import ScreenHeader from '@/components/ui/ScreenHeader';
 import HistoryStats from '@/components/trip/HistoryStats';
 import HistoryCharts from '@/components/trip/HistoryCharts';
 import WalkingGoal from '@/components/trip/WalkingGoal';
@@ -15,7 +16,7 @@ import { historyTotals, loadHistory, type HistoryTrip } from '@/services/trips/t
 
 export default function HistoryScreen() {
     const theme = useThemeStyle();
-    const insets = useSafeAreaInsets();
+    const dispatch = useDispatch<AppDispatch>();
     const unit = useSelector((s: RootState) => s.preferences.speedUnit);
     const weeklyGoalM = useSelector((s: RootState) => s.preferences.weeklyGoalM);
     const [trips, setTrips] = useState<HistoryTrip[] | null>(null);
@@ -51,9 +52,9 @@ export default function HistoryScreen() {
 
     return (
         <View style={{ flex: 1, backgroundColor: theme.surfaceColor }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: TOP_SAFE(insets), paddingHorizontal: 24, paddingBottom: 12 }}>
-                <Text style={{ color: theme.color, fontSize: 30, fontWeight: '800', letterSpacing: -0.5 }}>History</Text>
-                {!!trips?.length && (
+            <ScreenHeader
+                title="History"
+                right={!!trips?.length && (
                     <Pressable
                         accessibilityRole="button"
                         accessibilityLabel="Open heatmap"
@@ -65,7 +66,7 @@ export default function HistoryScreen() {
                         <Text style={{ color: ACCENT, fontSize: 14, fontWeight: '700' }}>Heatmap</Text>
                     </Pressable>
                 )}
-            </View>
+            />
 
             {error ? (
                 <Text style={{ color: DANGER, padding: 24, textAlign: 'center' }}>Could not load your trips. {error}</Text>
@@ -96,7 +97,10 @@ export default function HistoryScreen() {
                     renderItem={({ item }) => (
                         <TripHistoryRow
                             trip={item}
-                            onOpen={() => router.push(`/trip/${item.startedAt}`)}
+                            onOpen={() => {
+                                dispatch(viewTrip({ startedAt: item.startedAt, returnTo: 'history' }));
+                                router.navigate('/');
+                            }}
                             onDelete={() => confirmDelete(item)}
                         />
                     )}

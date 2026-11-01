@@ -10,6 +10,7 @@ export default function TabsLayout() {
         <Tabs
             screenOptions={{
                 headerShown: false,
+                sceneStyle: { backgroundColor: theme.surfaceColor },
                 tabBarActiveTintColor: ACCENT,
                 tabBarInactiveTintColor: theme.muted,
                 tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },

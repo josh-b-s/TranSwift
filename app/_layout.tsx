@@ -12,8 +12,11 @@ import { loadPreferences } from '@/store/preferences.slice';
 import { loadSavedPlaces } from '@/store/savedPlaces.slice';
 import { restoreActiveDatabase } from '@/services/gtfs/import/gtfsDbRegistry';
 import '@/services/trips/locationTracking';
+import { useThemeStyle } from '@/constants/themes';
 
 export default function Layout() {
+    const theme = useThemeStyle();
+
     useEffect(() => {
         // Must resolve BEFORE warmUpGtfsEngine() reads getCurrentDbPath() —
         // otherwise warmup (and any search before this finishes) targets
@@ -35,7 +38,7 @@ export default function Layout() {
                     store's context for hooks like useDispatch to work there. */}
                 <Provider store={store}>
                     <BottomSheetModalProvider>
-                        <Stack screenOptions={{ headerShown: false }}>
+                        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: theme.surfaceColor } }}>
                             <Stack.Screen name="(tabs)" />
                         </Stack>
                     </BottomSheetModalProvider>

@@ -3,7 +3,7 @@ import type { LatLng } from '@/services/places/places';
 import { encodePath, type Sample } from './pathCodec';
 import type { WalkProgress } from './livePace';
 import type { RideStep, TripStep } from './tripSteps';
-import type { SavedLeg, WalkLeg } from './tripStore';
+import type { RideLeg, SavedLeg, WalkLeg } from './tripStore';
 
 const ARRIVE_RADIUS_M = 40;
 const MAX_ACCURACY_M = 30;
@@ -35,6 +35,18 @@ const isNear = (fix: Sample, target: LatLng) =>
         { lat: target.latitude, lon: target.longitude },
     ) <= ARRIVE_RADIUS_M;
 
+export const rideLegOf = (step: RideStep, stepIndex: number): RideLeg => ({
+    kind: 'ride',
+    stepIndex,
+    from: step.from,
+    to: step.to,
+    routeName: step.routeName,
+    routeType: step.routeType,
+    routeColor: step.routeColor,
+    routeTextColor: step.routeTextColor,
+    line: step.line,
+});
+
 /** Walks through a journey's steps from GPS fixes, recording the rider's path on walks and the line on rides. */
 export function createTripSession(steps: TripStep[]) {
     let index = 0;
@@ -47,17 +59,7 @@ export function createTripSession(steps: TripStep[]) {
     const finishStep = () => {
         const step = steps[index];
         if (step.type === 'transit') {
-            legs.push({
-                kind: 'ride',
-                stepIndex: index,
-                from: step.from,
-                to: step.to,
-                routeName: step.routeName,
-                routeType: step.routeType,
-                routeColor: step.routeColor,
-                routeTextColor: step.routeTextColor,
-                line: step.line,
-            });
+            legs.push(rideLegOf(step, index));
         } else if (samples.length > 1) {
             legs.push({
                 kind: 'walk',

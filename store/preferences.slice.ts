@@ -92,7 +92,8 @@ const slice = createSlice({
         updateWalkingSpeed(state, action: PayloadAction<{ id: string; label?: string; mps?: number }>) {
             const option = state.walkingSpeeds.find(o => o.id === action.payload.id);
             if (!option) return;
-            if (action.payload.label !== undefined) option.label = action.payload.label;
+            // An empty name clears it, so the preset shows as its speed.
+            if (action.payload.label !== undefined) option.label = action.payload.label.trim() || undefined;
             if (action.payload.mps !== undefined) option.mps = action.payload.mps;
             persist(state);
         },

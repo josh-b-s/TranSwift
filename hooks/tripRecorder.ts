@@ -1,10 +1,10 @@
 import { useEffect, useRef } from 'react';
 import { Alert, AppState } from 'react-native';
-import { router } from 'expo-router';
 import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch, RootState } from '@/store/store';
-import { endTrip, setTripPace, setTripStep, setTripStopsLeft } from '@/store/trip.slice';
-import { createTripSession } from '@/services/trips/tripSession';
+import { viewTrip } from '@/store/tripView.slice';
+import { applySwitch, clearSwitchRequest, endTrip, setTripPace, setTripStep, setTripStopsLeft, type SwitchRequest } from '@/store/trip.slice';
+import { createTripSession, rideLegOf } from '@/services/trips/tripSession';
 import { getDb } from '@/services/db/sqliteDb';
 import { createAlightAlert } from '@/services/trips/alightAlert';
 import { refreshedArrivalMs } from '@/services/trips/liveArrival';
@@ -12,7 +12,9 @@ import { paceAgainstBest } from '@/services/trips/livePace';
 import { createRideProgress } from '@/services/trips/rideProgress';
 import { startTracking } from '@/services/trips/locationTracking';
 import { applyTrip } from '@/services/trips/personalBests';
-import { saveTrip, type SavedTrip } from '@/services/trips/tripStore';
+import { saveTrip, type SavedLeg, type SavedTrip } from '@/services/trips/tripStore';
+import { finishedLegs } from '@/services/trips/tripFormat';
+import { rideBetween } from '@/services/trips/switchRoute';
 import { saveBests } from '@/services/trips/bestsStore';
 import { summarizeTrip, walkTotals } from '@/services/trips/tripSummary';
 import { clearRideProgress, notifyGetOff, notifyTripDone, requestNotificationPermission, showRideProgress } from '@/services/trips/tripNotification';
@@ -32,6 +34,20 @@ export function useTripRecorder() {
     const endRequested = useSelector((s: RootState) => s.trip.endRequested);
     // The running session's way to end early, set by the effect below.
     const endEarlyRef = useRef<(() => void) | null>(null);
+
+    const doneLegs = useSelector((s: RootState) => s.trip.doneLegs);
+    // A ref so legs carried over by a switch don't restart the session a second time.
+    const doneLegsRef = useRef(doneLegs);
+    doneLegsRef.current = doneLegs;
+    const switchRequest = useSelector((s: RootState) => s.trip.switchRequest);
+    // The running session's way to carry on along a new route, set by the effect below.
+    const switchRef = useRef<((request: SwitchRequest) => void) | null>(null);
+
+    useEffect(() => {
+        if (!switchRequest) return;
+        if (switchRef.current) switchRef.current(switchRequest);
+        else dispatch(clearSwitchRequest());
+    }, [switchRequest, dispatch]);
 
     useEffect(() => {
         if (!endRequested) return;
@@ -67,7 +83,9 @@ export function useTripRecorder() {
         const persist = (partial: boolean): Promise<SavedTrip> => {
             // A walk cut short adds to the distance totals, but sets no per-stop best.
             const unfinished = partial ? session.unfinishedWalk : null;
-            const legs = unfinished ? [...session.legs, unfinished] : session.legs;
+            // Numbered afresh, since each route a trip switched to counts its steps from 0.
+            const legs = [...doneLegsRef.current, ...session.legs, ...(unfinished ? [unfinished] : [])]
+                .map((leg, i): SavedLeg => ({ ...leg, stepIndex: i }));
             const { bests: updated, broken } = applyTrip(bests, { startedAt, legs });
             const trip: SavedTrip = { startedAt, endedAt: Date.now(), legs, records: broken };
             if (partial) trip.partial = true;
@@ -80,7 +98,7 @@ export function useTripRecorder() {
             dispatch(endTrip());
             persist(false)
                 .then(trip => {
-                    if (AppState.currentState === 'active') router.push(`/trip/${startedAt}`);
+                    if (AppState.currentState === 'active') dispatch(viewTrip({ startedAt }));
                     else return notifyTripDone(startedAt, summarizeTrip(trip), speedUnitRef.current);
                 })
                 .catch(err => Alert.alert('Could not save trip', String(err)));
@@ -91,7 +109,7 @@ export function useTripRecorder() {
             if (finished) return;
             finished = true;
             dispatch(endTrip());
-            if (session.legs.length === 0) return;
+            if (finishedLegs([...doneLegsRef.current, ...session.legs]).length === 0) return;
             persist(true).catch(err => Alert.alert('Could not save trip', String(err)));
         };
         endEarlyRef.current = endEarly;
@@ -129,6 +147,32 @@ export function useTripRecorder() {
             if (left === null) clearRideProgress().catch(err => console.warn('[trip] could not clear the ride notification:', err));
             else showRideProgress(step.routeName, step.to, left).catch(err => console.warn('[trip] ride notification failed:', err));
         };
+
+        // Carries the trip on along a route chosen from the alternatives. On a vehicle it rides on to the stop the new
+        // route starts from first, and the part already ridden is kept as a leg of its own.
+        const switchTo = ({ steps: next, via }: SwitchRequest) => {
+            if (finished) return;
+            const carried: SavedLeg[] = [...session.legs];
+            let newSteps = next;
+            if (via) {
+                const step = steps[session.stepIndex];
+                const left = lastStopsLeft;
+                const onVehicle = step?.type === 'transit' && left !== null ? { step, reached: step.stops.length - 1 - left } : null;
+                const viaIndex = onVehicle ? onVehicle.step.stops.findIndex(s => s.latitude === via.latitude && s.longitude === via.longitude) : -1;
+                if (!onVehicle || viaIndex <= onVehicle.reached) {
+                    Alert.alert('Stop already passed', 'The vehicle has gone past where those options start. Search again for current ones.');
+                    dispatch(clearSwitchRequest());
+                    return;
+                }
+                const { step: current, reached } = onVehicle;
+                if (reached > 0) carried.push(rideLegOf(rideBetween(current, 0, reached), session.stepIndex));
+                newSteps = [rideBetween(current, reached, viaIndex), ...next];
+            } else if (session.unfinishedWalk) {
+                carried.push(session.unfinishedWalk);
+            }
+            dispatch(applySwitch({ steps: newSteps, legs: carried }));
+        };
+        switchRef.current = switchTo;
 
         startTracking(locations => {
             if (finished) return;
@@ -169,6 +213,7 @@ export function useTripRecorder() {
         return () => {
             cancelled = true;
             endEarlyRef.current = null;
+            switchRef.current = null;
             stopTracking?.();
             clearRideProgress().catch(err => console.warn('[trip] could not clear the ride notification:', err));
         };

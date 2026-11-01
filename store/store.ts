@@ -6,6 +6,8 @@ import debugReducer from './debug.slice';
 import preferencesReducer from './preferences.slice';
 import tripReducer from './trip.slice';
 import savedPlacesReducer from './savedPlaces.slice';
+import alternativesReducer from './alternatives.slice';
+import tripViewReducer from './tripView.slice';
 
 export const store = configureStore({
     reducer: {
@@ -16,6 +18,8 @@ export const store = configureStore({
         preferences: preferencesReducer,
         trip: tripReducer,
         savedPlaces: savedPlacesReducer,
+        alternatives: alternativesReducer,
+        tripView: tripViewReducer,
     },
 });
 

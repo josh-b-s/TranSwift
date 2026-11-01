@@ -1,5 +1,6 @@
 import React from 'react';
 import { Stack } from 'expo-router';
+import ScreenHeader from '@/components/ui/ScreenHeader';
 import { useThemeStyle } from '@/constants/themes';
 
 export default function SettingsLayout() {
@@ -8,9 +9,12 @@ export default function SettingsLayout() {
     return (
         <Stack
             screenOptions={{
-                headerStyle: { backgroundColor: theme.surfaceColor },
-                headerTintColor: theme.color,
-                headerShadowVisible: false,
+                // Same big title as the History tab.
+                header: ({ options, back, navigation }) => (
+                    <ScreenHeader title={options.title ?? ''} onBack={back ? navigation.goBack : undefined} />
+                ),
+                // Shows behind a screen while it slides, so it must match the screens or a light strip flashes in dark mode.
+                contentStyle: { backgroundColor: theme.surfaceColor },
             }}
         >
             <Stack.Screen name="index" options={{ title: 'Settings' }} />

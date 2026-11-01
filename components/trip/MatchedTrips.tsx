@@ -1,6 +1,8 @@
 import React from 'react';
 import { Pressable, Text, View } from 'react-native';
-import { router } from 'expo-router';
+import { useDispatch } from 'react-redux';
+import { AppDispatch } from '@/store/store';
+import { viewTrip } from '@/store/tripView.slice';
 import { ACCENT, useThemeStyle } from '@/constants/themes';
 import type { SpeedUnit } from '@/services/preferences/preferencesStore';
 import { formatDuration, formatSpeed } from '@/services/trips/tripFormat';
@@ -11,6 +13,7 @@ const MAX_ROWS = 6;
 /** Earlier runs of the same journey, with the current one marked and the fastest tagged. */
 export default function MatchedTrips({ matches, currentStartedAt, unit }: { matches: TripMatches; currentStartedAt: number; unit: SpeedUnit }) {
     const theme = useThemeStyle();
+    const dispatch = useDispatch<AppDispatch>();
     if (matches.runs.length < 2) return null;
 
     return (
@@ -28,7 +31,7 @@ export default function MatchedTrips({ matches, currentStartedAt, unit }: { matc
                         key={trip.startedAt}
                         accessibilityRole="button"
                         disabled={current}
-                        onPress={() => router.push(`/trip/${trip.startedAt}`)}
+                        onPress={() => dispatch(viewTrip({ startedAt: trip.startedAt }))}
                         style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}
                     >
                         <Text style={{ flex: 1, color: current ? ACCENT : theme.color, fontSize: 13, fontWeight: current ? '700' : '400' }}>

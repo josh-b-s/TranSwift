@@ -17,7 +17,8 @@ export type VehicleScope = 'routes' | 'nearby';
 
 export type WalkingSpeedOption = {
     id: string;
-    label: string;
+    /** Optional. Without one the preset is shown as its speed. */
+    label?: string;
     /** Meters/second. */
     mps: number;
 };

@@ -60,9 +60,8 @@ export default function SettingsMenu() {
                             <Text style={{ color: theme.muted, fontSize: 13, marginTop: 2 }}>{item.subtitle}</Text>
                         </View>
                         <ChevronRight size={18} color={theme.muted} />
-                        {/* Rule starts at the text, not under the icon. */}
                         {index < ITEMS.length - 1 && (
-                            <View style={{ position: 'absolute', left: 70, right: 0, bottom: 0, height: 1, backgroundColor: theme.hairline }} />
+                            <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 1, backgroundColor: theme.hairline }} />
                         )}
                     </Pressable>
                 ))}

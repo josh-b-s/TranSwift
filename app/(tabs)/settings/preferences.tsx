@@ -9,6 +9,7 @@ import { SPEED_UNITS } from '@/constants/speedUnits';
 import { MAX_MAX_WALK_DISTANCE_M, MIN_MAX_WALK_DISTANCE_M, WALK_DISTANCE_STEP_M } from '@/constants/walkLimit';
 import { MAX_WEEKLY_GOAL_M, NO_WEEKLY_GOAL_M, WEEKLY_GOAL_STEP_M } from '@/constants/walkGoal';
 import { formatDistance } from '@/services/trips/tripFormat';
+import { formatMps, walkingSpeedLabel } from '@/services/preferences/walkingSpeed';
 import SegmentedControl from '@/components/ui/SegmentedControl';
 import SettingsSection from '@/components/ui/SettingsSection';
 import StepperRow from '@/components/ui/StepperRow';
@@ -60,9 +61,9 @@ export default function Preferences() {
     const [draftLabel, setDraftLabel] = useState('');
     const [draftMps, setDraftMps] = useState('');
 
-    function startEditing(id: string, label: string, mps: number) {
+    function startEditing(id: string, label: string | undefined, mps: number) {
         setEditingId(id);
-        setDraftLabel(label);
+        setDraftLabel(label ?? '');
         setDraftMps(String(mps));
     }
 
@@ -73,21 +74,19 @@ export default function Preferences() {
     function saveEditing() {
         if (!editingId) return;
         const mps = parseFloat(draftMps);
-        const label = draftLabel.trim();
-        if (!label || !Number.isFinite(mps) || mps <= 0) {
-            Alert.alert('Invalid speed', 'Give it a name and a speed greater than 0.');
+        if (!Number.isFinite(mps) || mps <= 0) {
+            Alert.alert('Invalid speed', 'Give it a speed greater than 0.');
             return;
         }
-        dispatch(updateWalkingSpeed({ id: editingId, label, mps }));
+        dispatch(updateWalkingSpeed({ id: editingId, label: draftLabel, mps }));
         setEditingId(null);
     }
 
     function handleAddSpeed() {
         const id = nanoid();
-        dispatch(addWalkingSpeed({ id, label: 'New speed', mps: 1.2 }));
-        // Drop straight into edit mode so the user names/sets it right away
-        // instead of leaving a placeholder "New speed" row sitting there.
-        startEditing(id, 'New speed', 1.2);
+        dispatch(addWalkingSpeed({ id, mps: 1.2 }));
+        // Drop straight into edit mode so the speed is set right away.
+        startEditing(id, undefined, 1.2);
     }
 
     function handleRemoveSpeed(id: string) {
@@ -165,7 +164,7 @@ export default function Preferences() {
                 />
             </SettingsSection>
 
-            <SettingsSection title="Walking speeds" hint="These are the presets the walking-speed pill on the route sheet cycles through.">
+            <SettingsSection title="Walking speeds" hint="These are the presets the walking-speed pill on the route sheet lets you pick from. A name is optional; without one the speed is shown.">
                 {walkingSpeeds.map((option) => {
                     const isEditing = editingId === option.id;
                     return (
@@ -196,7 +195,7 @@ export default function Preferences() {
                                         <TextInput
                                             value={draftLabel}
                                             onChangeText={setDraftLabel}
-                                            placeholder="Name"
+                                            placeholder="Name (optional)"
                                             placeholderTextColor={theme.color + '66'}
                                             style={{
                                                 color: theme.color, fontSize: 15, fontWeight: '600',
@@ -228,10 +227,10 @@ export default function Preferences() {
                             ) : (
                                 <>
                                     <View style={{ flex: 1 }}>
-                                        <Text style={{ color: theme.color, fontSize: 15, fontWeight: '600' }}>{option.label}</Text>
-                                        <Text style={{ color: theme.muted, fontSize: 12, marginTop: 1 }}>
-                                            {option.mps.toFixed(1)} m/s
-                                        </Text>
+                                        <Text style={{ color: theme.color, fontSize: 15, fontWeight: '600' }}>{walkingSpeedLabel(option)}</Text>
+                                        {!!option.label?.trim() && (
+                                            <Text style={{ color: theme.muted, fontSize: 12, marginTop: 1 }}>{formatMps(option.mps)}</Text>
+                                        )}
                                     </View>
                                     <Pressable
                                         onPress={() => startEditing(option.id, option.label, option.mps)}

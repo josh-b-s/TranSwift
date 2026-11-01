@@ -4,6 +4,8 @@ import { BottomSheetModal, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { SharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
+import { useIsFocused } from '@react-navigation/native';
+import { useBackHandler } from '@/hooks/backHandler';
 import { ACCENT, RADIUS, SHADOW, TOP_SAFE, useThemeStyle } from '@/constants/themes';
 import RouteSheetHeader from '@/components/sheets/RouteSheetHeader';
 import DepartureFilterChips from '@/components/sheets/DepartureFilterChips';
@@ -60,6 +62,13 @@ const StopDeparturesSheet = forwardRef<BottomSheetModal, Props>(({ stop, animate
         setFilter(NO_FILTER);
         setOpenKey(null);
     }, [stop]);
+
+    // Back puts an opened departure away before it closes the sheet.
+    const focused = useIsFocused();
+    useBackHandler(focused && stop !== null && openKey !== null, () => {
+        setOpenKey(null);
+        return true;
+    });
 
     const routeIds = [...new Set(departures.map(d => routeKey(d.routeName, d.routeType)))].sort().join('\n');
     useEffect(() => {

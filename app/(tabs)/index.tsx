@@ -2,8 +2,11 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import MapView, { LatLng, MapPressEvent, Polyline, PROVIDER_GOOGLE, Region} from 'react-native-maps';
 import {ActivityIndicator, Keyboard, StyleSheet, Text, useWindowDimensions, View} from 'react-native';
 import * as Location from 'expo-location';
-import {useSelector} from 'react-redux';
-import {RootState} from '@/store/store';
+import {useDispatch, useSelector} from 'react-redux';
+import {AppDispatch, RootState} from '@/store/store';
+import {clearRoute} from '@/store/route.slice';
+import {selectPlace, setQuery, stopPicking} from '@/store/search.slice';
+import {closeAlternatives} from '@/store/alternatives.slice';
 import {BottomSheetModal} from '@gorhom/bottom-sheet';
 import {useSharedValue} from 'react-native-reanimated';
 import {useColorScheme} from 'nativewind';
@@ -14,6 +17,12 @@ import Search from '@/components/search/Search';
 import LocationButton from '@/components/map/LocationButton';
 import Speedometer from '@/components/trip/Speedometer';
 import RouteBottomSheetModal from '@/components/sheets/RouteBottomSheetModal';
+import TripSummarySheet from '@/components/sheets/TripSummarySheet';
+import MapTopBar from '@/components/map/MapTopBar';
+import RouteLines from '@/components/map/RouteLines';
+import {useViewedTrip} from '@/hooks/viewedTrip';
+import {useCloseTripView} from '@/hooks/closeTripView';
+import {useBackHandler} from '@/hooks/backHandler';
 import StopDeparturesSheet from '@/components/sheets/StopDeparturesSheet';
 import {StopDots} from '@/components/map/StopDots';
 import VehicleMarkers from '@/components/map/VehicleMarkers';
@@ -71,6 +80,8 @@ export default function Index() {
     const mapRef = useRef<MapView>(null);
     const modalRef = useRef<BottomSheetModal>(null);
     const departuresRef = useRef<BottomSheetModal>(null);
+    const tripSheetRef = useRef<BottomSheetModal>(null);
+    const dispatch = useDispatch<AppDispatch>();
     const bottomSheetPosition = useSharedValue(1000);
     const {colorScheme} = useColorScheme();
     const theme = useThemeStyle();
@@ -89,6 +100,10 @@ export default function Index() {
     const origin = useSelector((s: RootState) => s.search.origin);
     const pickingField = useSelector((s: RootState) => s.search.pickingField);
     const tripRunning = useSelector((s: RootState) => s.trip.startedAt !== null);
+    const viewedTripId = useSelector((s: RootState) => s.tripView.startedAt);
+    const alternativesOpen = useSelector((s: RootState) => s.alternatives.open);
+    const {viewed, error: viewedError} = useViewedTrip();
+    const closeTripView = useCloseTripView();
     const debugEnabled = useSelector((s: RootState) => s.debug.enabled);
 
     const [region, setRegion] = useState<Region | null>(null);
@@ -136,7 +151,8 @@ export default function Index() {
     const follow = useMapFollow(mapRef, here, simulation ? simulation.headingDeg : compass?.degrees ?? null);
     useAutoStartTrip(here);
     // Hidden while choosing a point on the map, so it doesn't cover the map.
-    const showSheet = selectedPlace !== null && pickingField === null;
+    // A saved trip on show takes the sheet and the map's lines.
+    const showSheet = selectedPlace !== null && pickingField === null && viewedTripId === null;
     useEffect(() => {
         if (isFocused) {
             if (showSheet) {
@@ -150,8 +166,18 @@ export default function Index() {
         }
     }, [isFocused, showSheet]);
 
+    useEffect(() => {
+        if (!isFocused) {
+            tripSheetRef.current?.close({duration: 0});
+        } else if (viewedTripId !== null) {
+            tripSheetRef.current?.present();
+        } else {
+            tripSheetRef.current?.dismiss();
+        }
+    }, [isFocused, viewedTripId]);
+
     // Stop dots give way to the route once a place is chosen, and so does the departures sheet.
-    const stopsTappable = isFocused && selectedPlace === null && pickingField === null && !debugEnabled;
+    const stopsTappable = isFocused && selectedPlace === null && pickingField === null && viewedTripId === null && !debugEnabled;
     const stopsInView = useStopsInView(region, stopsTappable);
     const vehicleScope = useSelector((s: RootState) => s.preferences.vehicleScope);
     const zoomedIn = isZoomedIn(region);
@@ -169,8 +195,8 @@ export default function Index() {
     );
     const stopColors = useStopColors(stopsInView);
     useEffect(() => {
-        if (selectedPlace !== null) setDepartureStop(null);
-    }, [selectedPlace]);
+        if (selectedPlace !== null || viewedTripId !== null) setDepartureStop(null);
+    }, [selectedPlace, viewedTripId]);
     // Same handling as the route sheet above: closed, not dismissed, while another tab is showing.
     useEffect(() => {
         if (!isFocused) {
@@ -207,6 +233,8 @@ export default function Index() {
         if (!tripId) return;
         setTripFocus(current => (current && 'tripId' in current.trip && current.trip.tripId === tripId ? null : {trip: {tripId}, color: vehicle.color, routeKey: routeKey(vehicle.routeName, vehicle.routeType)}));
     }, []);
+
+    const showJourney = !debugEnabled && viewedTripId === null;
 
     const routeStops = useMemo(
         () => (debugEnabled ? [] : routeSegments.flatMap(s => (s.type === 'transit' ? s.stops ?? [] : []))),
@@ -267,9 +295,37 @@ export default function Index() {
         if (pickingField !== null) follow.release();
     }, [pickingField, follow.release]);
 
+    useEffect(() => {
+        const coords = viewed?.lines.flatMap(line => line.coords) ?? EMPTY_COORDS;
+        if (coords.length < 2) return;
+        follow.release();
+        mapRef.current?.fitToCoordinates(coords, {edgePadding: ROUTE_FIT_PADDING, animated: true});
+    }, [viewed, follow.release]);
+
+    // The back button steps out of whatever is open on top of the map, innermost first.
+    useBackHandler(isFocused, () => {
+        if (pickingField !== null) {
+            dispatch(stopPicking());
+        } else if (viewedTripId !== null) {
+            closeTripView();
+        } else if (alternativesOpen) {
+            dispatch(closeAlternatives());
+        } else if (departureStop) {
+            setDepartureStop(null);
+            setTripFocus(null);
+        } else if (selectedPlace !== null && !tripRunning) {
+            dispatch(selectPlace(null));
+            dispatch(clearRoute());
+            dispatch(setQuery(''));
+        } else {
+            return false;
+        }
+        return true;
+    });
+
     return (
         <View style={{flex: 1}}>
-            {pickingField === null && !tripRunning && <Search/>}
+            {pickingField === null && !tripRunning && viewedTripId === null && <Search/>}
 
             <MapView
                 ref={mapRef}
@@ -303,7 +359,7 @@ export default function Index() {
                 }}
             >
                 {/* A darker shade of the route colour under each ride, as an outline. */}
-                {!debugEnabled && routeSegments.map((segment, index) => segment.type === 'transit' && (
+                {showJourney && routeSegments.map((segment, index) => segment.type === 'transit' && (
                     <Polyline
                         key={`casing-${index}`}
                         coordinates={segment.coords}
@@ -315,7 +371,7 @@ export default function Index() {
                     />
                 ))}
 
-                {!debugEnabled && (routeSegments.length > 0 ? (
+                {showJourney && (routeSegments.length > 0 ? (
                     routeSegments.map((segment, index) => (
                         <Polyline
                             key={index}
@@ -336,9 +392,11 @@ export default function Index() {
                     />
                 ) : null)}
 
-                {!debugEnabled && routeSegments.map((segment, index) => segment.type === 'transit' && (
+                {showJourney && routeSegments.map((segment, index) => segment.type === 'transit' && (
                     <RideStopMarkers key={index} segment={segment} color={segment.routeColor ?? routeColor ?? '#2563eb'} />
                 ))}
+
+                {!debugEnabled && viewed && <RouteLines lines={viewed.lines}/>}
 
                 {!debugEnabled && tripPath && tripFocus && <TripPathOverlay path={tripPath} color={tripFocus.color} />}
 
@@ -395,11 +453,20 @@ export default function Index() {
             )}
 
             <MapPickOverlay mapRef={mapRef} />
+            {viewedTripId !== null && (
+                <MapTopBar
+                    title={viewed?.trip.partial ? 'Trip ended early' : 'Trip complete'}
+                    subtitle={viewed ? new Date(viewed.trip.startedAt).toLocaleString([], {weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit'}) : undefined}
+                    closeLabel="Close trip"
+                    onClose={closeTripView}
+                />
+            )}
             <Speedometer animatedPosition={bottomSheetPosition} />
             <LocationButton mode={follow.mode} onPress={follow.press} animatedPosition={bottomSheetPosition} />
             {/*<DebugControls />*/}
             {__DEV__ && <DebugMovementControls mapRef={mapRef} animatedPosition={bottomSheetPosition} followsUser={follow.mode !== 'free'}/>}
             <RouteBottomSheetModal ref={modalRef} animatedPosition={bottomSheetPosition} />
+            <TripSummarySheet ref={tripSheetRef} animatedPosition={bottomSheetPosition} viewed={viewed} error={viewedError} />
             <StopDeparturesSheet
                 ref={departuresRef}
                 stop={departureStop}

@@ -1,6 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
-import { CircleX, Clock, Footprints, Repeat } from 'lucide-react-native';
+import { ChevronDown, CircleX, Clock, Footprints } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch, RootState } from '@/store/store';
@@ -8,6 +8,8 @@ import { setDepartureTime, setWalkingSpeed } from '@/store/search.slice';
 import { useRequestRoute } from '@/hooks/requestRoute';
 import { ACCENT, useThemeStyle } from '@/constants/themes';
 import DepartureTimeModal from '@/components/search/DepartureTimeModal';
+import Dropdown from '@/components/ui/Dropdown';
+import { formatMps, walkingSpeedLabel } from '@/services/preferences/walkingSpeed';
 
 /** Departure time and walking speed for the current route. Changing either recomputes it. */
 export default function RouteOptionPills() {
@@ -15,29 +17,25 @@ export default function RouteOptionPills() {
     const theme = useThemeStyle();
     const requestRoute = useRequestRoute();
     const { departureTime, walkingSpeedMps } = useSelector((s: RootState) => s.search);
-    // User-editable presets, see app/(tabs)/settings/preferences.tsx. Cycling steps
-    // through the list in order and wraps at the end.
+    // User-editable presets, see app/(tabs)/settings/preferences.tsx.
     const walkingSpeedOptions = useSelector((s: RootState) => s.preferences.walkingSpeeds);
     const [showTimeModal, setShowTimeModal] = useState(false);
 
     // Shows the raw m/s value when no preset matches (the matching one was edited or
     // removed) rather than mislabeling it as whichever preset comes first.
-    const speedLabel = walkingSpeedOptions.find(o => o.mps === walkingSpeedMps)?.label
-        ?? `${walkingSpeedMps.toFixed(1)} m/s`;
+    const current = walkingSpeedOptions.find(o => o.mps === walkingSpeedMps);
+    const speedLabel = current ? walkingSpeedLabel(current) : formatMps(walkingSpeedMps);
 
     const changeDeparture = useCallback((epochMs: number | null) => {
         dispatch(setDepartureTime(epochMs));
         requestRoute({ departureTime: epochMs });
     }, [dispatch, requestRoute]);
 
-    const cycleWalkingSpeed = useCallback(() => {
-        if (walkingSpeedOptions.length === 0) return;
+    const chooseWalkingSpeed = useCallback((mps: number) => {
         Haptics.selectionAsync();
-        const idx = walkingSpeedOptions.findIndex(o => o.mps === walkingSpeedMps);
-        const next = walkingSpeedOptions[(idx + 1) % walkingSpeedOptions.length];
-        dispatch(setWalkingSpeed(next.mps));
-        requestRoute({ walkingSpeedMps: next.mps });
-    }, [walkingSpeedOptions, walkingSpeedMps, dispatch, requestRoute]);
+        dispatch(setWalkingSpeed(mps));
+        requestRoute({ walkingSpeedMps: mps });
+    }, [dispatch, requestRoute]);
 
     const pillStyle = {
         flexDirection: 'row' as const,
@@ -76,17 +74,23 @@ export default function RouteOptionPills() {
                 )}
             </Pressable>
 
-            <Pressable
-                style={pillStyle}
-                accessibilityRole="button"
-                accessibilityLabel={`Walking speed: ${speedLabel}. Tap to cycle.`}
-                onPress={cycleWalkingSpeed}
-            >
-                <Footprints size={16} color={ACCENT} />
-                <Text style={textStyle}>{speedLabel}</Text>
-                {/* Marks it as a cycling control rather than a static label */}
-                <Repeat size={11} color={theme.color} style={{ opacity: 0.45 }} />
-            </Pressable>
+            <Dropdown
+                options={walkingSpeedOptions.map(o => ({ value: o.mps, label: walkingSpeedLabel(o) }))}
+                value={current ? current.mps : null}
+                onChange={chooseWalkingSpeed}
+                renderTrigger={({ onPress }) => (
+                    <Pressable
+                        style={pillStyle}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Walking speed: ${speedLabel}. Tap to choose.`}
+                        onPress={onPress}
+                    >
+                        <Footprints size={16} color={ACCENT} />
+                        <Text style={textStyle}>{speedLabel}</Text>
+                        <ChevronDown size={14} color={theme.color} style={{ opacity: 0.45 }} />
+                    </Pressable>
+                )}
+            />
 
             <DepartureTimeModal
                 visible={showTimeModal}

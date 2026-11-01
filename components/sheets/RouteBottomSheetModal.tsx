@@ -16,6 +16,7 @@ import { isCurrentLocation } from '@/services/places/endpoints';
 import RouteOptionPills from '@/components/search/RouteOptionPills';
 import TripButton from '@/components/trip/TripButton';
 import ActiveTripPanel from '@/components/trip/ActiveTripPanel';
+import AlternativesList from '@/components/trip/AlternativesList';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { Bus, CircleAlert } from 'lucide-react-native';
@@ -39,6 +40,7 @@ const RouteBottomSheetModal = forwardRef<BottomSheetModal, Props>(
         const [sortKey, setSortKey] = useState<SortKey>('arrival');
         const tabBarHeight = useBottomTabBarHeight();
         const running = useSelector((s: RootState) => s.trip.startedAt !== null);
+        const alternativesOpen = useSelector((s: RootState) => s.alternatives.open);
 
         const closeRoute = () => {
             dispatch(selectPlace(null));
@@ -105,7 +107,9 @@ const RouteBottomSheetModal = forwardRef<BottomSheetModal, Props>(
                         {!running && !error && journeys.length > 1 && <JourneySortChips value={sortKey} onChange={setSortKey} />}
                     </View>
 
-                    {error && !running ? (
+                    {running && alternativesOpen ? (
+                        <AlternativesList serviceAlerts={serviceAlerts} walkingSpeedMps={walkingSpeedMps} />
+                    ) : error && !running ? (
                         <Note icon={<CircleAlert size={26} color={DANGER} />} tint={DANGER + '1f'}>
                             <Text style={{ color: DANGER, fontSize: 15, textAlign: 'center' }}>{routeErrorMessage(error)}</Text>
                         </Note>

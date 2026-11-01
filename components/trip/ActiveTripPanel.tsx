@@ -1,6 +1,6 @@
 import React from 'react';
 import { Alert, Pressable, Text, View } from 'react-native';
-import { Bus, Footprints, Square } from 'lucide-react-native';
+import { Bus, Footprints, Route, Square } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch, RootState } from '@/store/store';
@@ -8,6 +8,7 @@ import { requestEndTrip } from '@/store/trip.slice';
 import { SPEED_UNITS } from '@/constants/speedUnits';
 import { ACCENT, RADIUS, useThemeStyle } from '@/constants/themes';
 import { formatPaceDelta, stopsToGo } from '@/services/trips/tripFormat';
+import { useFindAlternatives } from '@/hooks/findAlternatives';
 import { nextStepLine, stepHeadline } from '@/services/trips/stepText';
 
 const confirmEnd = (onEnd: () => void) =>
@@ -20,6 +21,7 @@ const confirmEnd = (onEnd: () => void) =>
 export default function ActiveTripPanel() {
     const dispatch = useDispatch<AppDispatch>();
     const theme = useThemeStyle();
+    const findAlternatives = useFindAlternatives();
     const unit = SPEED_UNITS[useSelector((s: RootState) => s.preferences.speedUnit)];
     const { startedAt, steps, stepIndex, bests, paceS, stopsLeft } = useSelector((s: RootState) => s.trip);
 
@@ -56,6 +58,18 @@ export default function ActiveTripPanel() {
                     {!!detail && <Text numberOfLines={1} style={{ color: ACCENT, fontSize: 13, fontWeight: '600' }}>{detail}</Text>}
                     {!!next && <Text numberOfLines={1} style={{ color: theme.muted, fontSize: 12 }}>{next}</Text>}
                 </View>
+                <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Find alternatives"
+                    hitSlop={8}
+                    onPress={() => {
+                        Haptics.selectionAsync();
+                        findAlternatives();
+                    }}
+                    style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.hairline }}
+                >
+                    <Route size={16} color={theme.color} />
+                </Pressable>
                 <Pressable
                     accessibilityRole="button"
                     accessibilityLabel="End trip"
