@@ -1,9 +1,12 @@
 import { createAsyncThunk, createSlice, PayloadAction } from '@reduxjs/toolkit';
 import type { LatLng } from '@/services/places/places';
-import type { GtfsRouteResult, GtfsJourney } from '@/services/gtfs/router/routeTypes';
+import type { GtfsRouteResult, GtfsJourney, RouteSegment } from '@/services/gtfs/router/routeTypes';
 import { computeGtfsRouteNative } from '@/services/gtfs/router/gtfsRouterNative';
 import { setDebugData } from './debug.slice';
 import { publishDebugData } from '@/services/gtfs/debug/debugDataStore';
+import { fetchWalkPath, hasWalkRouting } from '@/services/routing/walkPath';
+import { withWalkPaths } from '@/services/routing/withWalkPaths';
+import { segmentMeters } from '@/services/gtfs/router/walkTimes';
 
 export const computeRoute = createAsyncThunk<
     GtfsRouteResult,
@@ -37,7 +40,25 @@ export const computeRoute = createAsyncThunk<
     }
 });
 
+/** Routes the walks of one journey along footpaths. Skipped when no key is set or the journey was already done. */
+export const refineWalkPaths = createAsyncThunk<
+    { searchId: number; index: number; segments: RouteSegment[] },
+    number,
+    { state: { route: State } }
+>('route/refineWalkPaths', async (index, { getState }) => {
+    const { journeys, searchId } = getState().route;
+    return { searchId, index, segments: await withWalkPaths(journeys[index].segments, fetchWalkPath) };
+}, {
+    condition: (index, { getState }) => {
+        const journey = getState().route.journeys[index];
+        return hasWalkRouting && !!journey && !journey.walksRouted;
+    },
+});
+
 type State = {
+    // Bumped whenever the journeys are replaced, so a walk lookup that finishes late can tell it is out of date.
+    searchId: number;
+
     // Every journey found for the current search (the Pareto-optimal set). The bottom sheet lets the user pick between them.
     journeys: GtfsJourney[];
     selectedJourneyIndex: number;
@@ -50,6 +71,7 @@ type State = {
 };
 
 const initialState: State = {
+    searchId: 0,
     journeys: [],
     selectedJourneyIndex: 0,
     loading: false,
@@ -63,6 +85,7 @@ const slice = createSlice({
         /** Directly set a full result (e.g. from a non-thunk source). */
         setRoute(state, action: PayloadAction<GtfsRouteResult>) {
             state.journeys = action.payload.journeys;
+            state.searchId += 1;
             state.selectedJourneyIndex = 0;
             state.loading = false;
             state.error = null;
@@ -89,7 +112,17 @@ const slice = createSlice({
             .addCase(computeRoute.fulfilled, (s, a) => {
                 s.loading = false;
                 s.journeys = a.payload.journeys;
+                s.searchId += 1;
                 s.selectedJourneyIndex = 0;
+            })
+            .addCase(refineWalkPaths.fulfilled, (s, a) => {
+                const { searchId, index, segments } = a.payload;
+                if (searchId !== s.searchId) return;
+                s.journeys[index].segments = segments;
+                s.journeys[index].totalWalkingMeters = Math.round(
+                    segments.filter(seg => seg.type === 'walk').reduce((sum, seg) => sum + segmentMeters(seg), 0),
+                );
+                s.journeys[index].walksRouted = true;
             })
             .addCase(computeRoute.rejected, (s, a) => {
                 s.loading = false;

@@ -44,6 +44,8 @@ export interface GtfsJourney {
     transferCount: number;
     departureTime: string;
     arrivalTime: string;
+    /** Set once the walks have been routed along footpaths, whether or not every request worked. */
+    walksRouted?: boolean;
 }
 
 export interface GtfsDebugInfo {

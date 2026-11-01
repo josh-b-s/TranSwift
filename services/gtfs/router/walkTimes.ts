@@ -7,18 +7,23 @@ const toSeconds = (time: string | undefined) => {
     return Number.isFinite(h) && Number.isFinite(m) && Number.isFinite(s) ? h * 3600 + m * 60 + s : null;
 };
 
-/** How long a walk takes: its own times when the router gave them, otherwise its length at the rider's pace. */
-function walkSeconds(segment: RouteSegment, speedMps: number): number {
-    const from = toSeconds(segment.departureTime);
-    const to = toSeconds(segment.arrivalTime);
-    if (from !== null && to !== null && to > from) return to - from;
+/** Length of a segment's line. */
+export function segmentMeters(segment: RouteSegment): number {
     let metres = 0;
     for (let i = 1; i < segment.coords.length; i++) {
         const a = segment.coords[i - 1];
         const b = segment.coords[i];
         metres += haversineMeters({ lat: a.latitude, lon: a.longitude }, { lat: b.latitude, lon: b.longitude });
     }
-    return metres / speedMps;
+    return metres;
+}
+
+/** How long a walk takes: its own times when the router gave them, otherwise its length at the rider's pace. */
+function walkSeconds(segment: RouteSegment, speedMps: number): number {
+    const from = toSeconds(segment.departureTime);
+    const to = toSeconds(segment.arrivalTime);
+    if (from !== null && to !== null && to > from) return to - from;
+    return segmentMeters(segment) / speedMps;
 }
 
 /**

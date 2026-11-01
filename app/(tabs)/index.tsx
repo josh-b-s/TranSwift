@@ -54,6 +54,7 @@ import {useCompassHeading} from '@/hooks/compassHeading';
 import {useSimulation} from '@/hooks/simulation';
 import {useStopsInView} from '@/hooks/stopsInView';
 import {useStopColors} from '@/hooks/stopColors';
+import {useRefineWalkPaths} from '@/hooks/refineWalkPaths';
 import {nearestWithin} from '@/services/geo/nearestPoint';
 import {getAllStopsCached, type RepoStop} from '@/services/gtfs/core/stopRepo';
 import {findRepoStop} from '@/services/gtfs/departures/findRepoStop';
@@ -90,6 +91,7 @@ export default function Index() {
 
     const userLocation = useSelector((s: RootState) => s.location.userLocation);
     const displayedJourney = useSelector(selectDisplayedJourney);
+    useRefineWalkPaths();
     // Module-level empties keep these reference-stable when there's no
     // journey (the fit-to-route effect depends on routeCoords' identity).
     const routeCoords = displayedJourney?.coords ?? EMPTY_COORDS;

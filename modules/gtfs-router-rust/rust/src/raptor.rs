@@ -564,6 +564,9 @@ pub fn run_search(
     let mut journeys: Vec<Journey> = non_dominated.iter()
         .map(|c| reconstruct_path(index, stops, origin, destination, c.dest_pk, c.final_walk_m, c.arrival_sec, depart_sec_of_day, &parent, opts.walking_speed_mps))
         .collect();
+    // Walk-only candidates all collapse to the same direct walk.
+    let mut seen_walk_only = false;
+    journeys.retain(|j| !j.legs.is_empty() || !std::mem::replace(&mut seen_walk_only, true));
     journeys.sort_by_key(|j| j.arrival_time_sec);
 
     Ok(journeys)
@@ -716,6 +719,20 @@ fn reconstruct_path(
         all_coords.push(destination);
         total_walking_meters += final_walk_m;
     }
+
+    // No ride means the stop hop above is only a detour; walk straight there.
+    let (arrival_sec, total_walking_meters) = if legs.is_empty() {
+        let direct_m = haversine_meters(origin, destination);
+        segments.clear();
+        all_coords = vec![origin, destination];
+        transfer_stop_name = None;
+        if direct_m > 1.0 {
+            segments.push(walk_segment(origin, destination, "Your location", "Your destination", direct_m));
+        }
+        (departure_sec + walk_time_sec(direct_m, walking_speed_mps).round() as i64, direct_m)
+    } else {
+        (arrival_sec, total_walking_meters)
+    };
 
     let first_leg = legs.first();
     let last_leg = legs.last();
