@@ -12,8 +12,9 @@ What the app does today, and what could come next. Written from the code as it s
 - **Departure time.** Leave now, or pick a day and time with a custom picker (a day strip with hour and minute steppers, used instead of the native date-time picker that crashes on Android).
 - **Walking speed.** A pill on the search bar cycles through your walking speed presets, and the router uses the one selected.
 - **Walk limit.** A setting for the farthest the router may send you on foot (200 m to 5 km, default 1.68 km). It applies to the next search.
-- **Routing.** On-device RAPTOR in Rust, offline, against the GTFS database you imported. It returns several journeys at once, a Pareto set over arrival time, walking distance and transfers.
+- **Routing.** On-device RAPTOR in Rust, against the GTFS database you imported. The timetable search needs no network. It returns several journeys at once, a Pareto set over arrival time, walking distance and transfers.
 - **Route sheet.** Lists the journeys with times, duration and walking distance. You can sort by arrival, least walking or fewest transfers. Selecting a journey draws it on the map, with every stop of each ride shown as a white circle ringed in the route colour.
+- **Footpath walks.** If `EXPO_PUBLIC_GEOAPIFY_KEY` is set, the walks of the shown journey are redrawn along real footpaths (Geoapify routing, needs network). This runs when journeys arrive and when you pick another journey. Requests are cached by coordinates rounded to 4 decimals, and a failed request leaves the straight line. The walking distance shown for that journey is then recomputed from the footpath, so it can change a moment after the list appears. Walk times in the journey bar already come from the line's length, so they follow the footpath too.
 - **Realtime delays.** If a feed has GTFS-Realtime TripUpdates URLs configured, delays are fetched at search time and applied inside the engine. Legs carry a `departureDelaySec`. Failures on one URL don't drop the others.
 - **Friendly errors.** Search failures such as no service in the window are mapped to readable messages.
 
@@ -56,12 +57,14 @@ What the app does today, and what could come next. Written from the code as it s
 - **Background tracking.** GPS at 1 second or 3 metres, best-for-navigation accuracy, with the background location indicator on.
 - **Live pace.** On a walk you have done before between the same two stops, it shows how many seconds ahead of or behind your best you are, once you are past 50 m.
 - **Get-off alert.** A notification, "Get off at the next stop", when you reach the stop before yours on a ride. A one-stop ride, with nothing between boarding and alighting, alerts about a minute before arriving instead: from distance over speed while the vehicle is moving, otherwise from the ride's arrival time, and within 100 m of the stop as a last resort. While a one-stop ride is the current step, its arrival time is refreshed every 30 seconds: the timetable's arrival at the last stop plus the delay the realtime feeds now report for it. When the feeds give no delay for the trip, the arrival time from planning stays.
+- **Auto-start.** A trip starts on its own once you walk away from the journey's start, within 20 minutes before departure and 2 minutes after the first boarding time. Needs location fixes.
+- **Alternatives.** During a trip the app can search for other routes, from the next stop when you are on a vehicle or from where you stand, and lets you switch to one.
 - **Personal bests and records.** Each repeated walk keeps its best average speed. Finishing a trip reports broken records, either a faster walk between two stops or a longest walk.
 - **Trip summary.** A "Trip complete" notification, then a trip screen with the path on a map, distance, duration, average and top speed (GPS spikes above 10 m/s are discarded), and the records you broke.
 - **Splits and speed chart.** The trip screen shows walking pace per km or mile, with a partial last split, and a chart of walking speed over the trip's walking time. Time spent riding is not counted in either.
 - **Share.** The trip screen ends with a 4:5 picture of the trip (names, date, the route with walks in the app colour and rides in their line colour, walked distance, walking time and average speed). "Share image" rasterises it and opens the system share sheet. "Export GPX" shares the trip as a GPX 1.1 file: one track per leg, with the recorded timed fixes for walks and the followed line (no times) for rides. Uses `expo-sharing`, and `react-native-svg` to draw and rasterise the card.
 - **Same trip before.** If you have made the same journey (same first and last stop) more than once, the trip screen lists the runs with total time, walking time and speed, marks the quickest run and the fastest walk, and links to the others. Total time runs from start to finish, riding included, and exists only for trips saved after end times were added.
-- **Simulation.** A location simulator with movement controls lets you test a trip without walking.
+- **Simulation.** A location simulator with movement controls (development builds only) lets you test a trip without walking.
 
 ### History
 
@@ -87,7 +90,7 @@ What the app does today, and what could come next. Written from the code as it s
 ### Developer tooling
 
 - **Debug visualiser.** Replays a search on the map: BFS rounds and candidate seed paths (flat, per-hop or depth coloured) and RAPTOR route-checks one at a time. The mounts in `index.tsx` are currently commented out, so it is not reachable in the app.
-- **Tests.** `npm test` runs 168 tests on Node's built-in runner, including the departures and trip stops queries against the real schema in in-memory SQLite. `cargo test --lib` in `modules/gtfs-router-rust/rust` runs the engine's 34 tests, including the realtime overlay, `trip_realtime`, and the vehicle and alert decoders. The same command in `modules/gtfs-importer/rust` runs 3 tests that import a small zip end to end and check the station tables and trip headsigns.
+- **Tests.** `npm test` runs about 257 tests on Node's built-in runner, including the departures and trip stops queries against the real schema in in-memory SQLite. `cargo test --lib` in `modules/gtfs-router-rust/rust` runs the engine's 34 tests, including the realtime overlay, `trip_realtime`, and the vehicle and alert decoders. The same command in `modules/gtfs-importer/rust` runs 3 tests that import a small zip end to end and check the station tables and trip headsigns.
 
 ## Future features
 
@@ -118,7 +121,7 @@ What the app does today, and what could come next. Written from the code as it s
 - Added and replacement trips from the feed are listed on the departures sheet as "Extra service", with their route and direction. They have no stops to expand, no delay and no stops away, and only trips whose stops the engine could place in the timetable appear. A trip with no route the timetable knows shows a "?" badge.
 - By default vehicles show only for the routes you are already looking at. With "All nearby" on they show for everything in view, but only when zoomed in to stop dot level, and the route lookup for every tracked vehicle runs on each 15 second refresh, which may be heavy on a feed with thousands of vehicles. A feed that sends VehiclePositions without a trip or route id the timetable knows shows nothing.
 - "Stops away" needs the vehicle to report both a trip id and its current stop sequence. It cannot tell a vehicle stopped at the stop from one arriving at it, so both read "Arriving".
-- The warm-up that live departures wait for costs about 12 seconds of background work each time the active database changes.
+- The warm-up that live departures wait for runs in the background each time the active database changes. It took 1.3 s on a Poco F6 with the Melbourne feed. A comment in `lib.rs` puts a cold run on a large feed at 10 to 14 s, so the time depends on feed size and device.
 - Headsigns are stored when a feed is imported. A database imported before that still shows each trip's last stop until the feed is imported again.
 
 ### Service alerts
