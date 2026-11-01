@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/images/icon.png" alt="TranSwift app icon" width="120">
+</p>
+
 # TranSwift
 
 A Melbourne trip planner that works offline and plans around how fast *you* walk.
