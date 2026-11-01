@@ -4,12 +4,18 @@ A Melbourne trip planner that works offline and plans around how fast *you* walk
 
 Most journey planners assume everyone walks at the same pace. If you walk slowly, the "fastest" route can make you miss a connection. If you walk quickly, a route with a longer walk can be the better one. TranSwift takes your walking speed as an input, so the route it picks is the fastest for you. It also records your walks and tracks your personal bests.
 
-<!--
-Add screen recordings here once captured, then uncomment:
-![Search and route results](docs/gifs/search-demo.gif)
-![Walking speed changes the route](docs/gifs/walking-speed-demo.gif)
-![Walking route along footpaths](docs/gifs/walk-paths-demo.gif)
--->
+<table>
+  <tr>
+    <td width="33%" valign="top"><img src="docs/gifs/search-demo.gif" alt="Search and route results" width="100%"></td>
+    <td width="33%" valign="top"><img src="docs/gifs/walking-speed-demo.gif" alt="Walking speed changes the route" width="100%"></td>
+    <td width="33%" valign="top"><img src="docs/images/trip-stats.png" alt="Trip stats" width="100%"></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>Search and route results</sub></td>
+    <td align="center"><sub>Walking speed changes the route</sub></td>
+    <td align="center"><sub>Trip stats</sub></td>
+  </tr>
+</table>
 
 ## What it does
 
