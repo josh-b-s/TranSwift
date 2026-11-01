@@ -99,6 +99,7 @@ const slice = createSlice({
         },
         clearRoute(state) {
             state.journeys = [];
+            state.searchId += 1;
             state.selectedJourneyIndex = 0;
             state.error = null;
         },
