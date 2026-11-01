@@ -16,20 +16,21 @@ export function useFindAlternatives() {
     // Only watched on a vehicle, where it tells when the next stop will be reached.
     const speedMps = useCurrentSpeedMps(stopsLeft !== null);
 
-    return useCallback(() => {
+    /** `fromHere` searches from where the rider stands even on a vehicle, for when they have got off. */
+    return useCallback((fromHere = false) => {
         const destination = steps[steps.length - 1]?.end;
         if (!userLocation || !destination) {
             Alert.alert('Location unavailable', 'Waiting for your current location.');
             return;
         }
-        const start = alternativeStart(steps, stepIndex, stopsLeft, userLocation, speedMps, new Date());
+        const start = alternativeStart(steps, stepIndex, fromHere ? null : stopsLeft, userLocation, speedMps, new Date());
         const avoid = routeToAvoid(steps, stepIndex);
         dispatch(openAlternatives({
             label: start.label,
             via: start.via,
             avoid,
             // On a ride, or waiting to board one, the cause is most likely that ride's route.
-            avoiding: avoid !== null && steps[stepIndex]?.type === 'transit',
+            avoiding: avoid !== null && !fromHere && steps[stepIndex]?.type === 'transit',
         }));
         dispatch(findAlternatives({
             origin: start.origin,

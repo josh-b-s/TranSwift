@@ -66,17 +66,21 @@ test('a ride with no stops listed counts as boarded', () => {
 
 test('a walk in progress can be read back, marked incomplete', () => {
     const session = createTripSession(steps);
-    assert.equal(session.unfinishedWalk, null);
+    assert.deepEqual(session.inProgress, []);
     session.addFix(fix(-37.7990, 0));
     session.addFix(fix(-37.7995, 1000));
-    const leg = session.unfinishedWalk;
-    assert.ok(leg);
+    const [leg] = session.inProgress;
+    assert.equal(leg.kind, 'walk');
     assert.equal(leg.incomplete, true);
     assert.equal(leg.to, 'A');
     assert.equal(leg.bestKey, undefined);
 });
 
-test('there is no walk in progress during a ride', () => {
+test('stops left counts down once boarded and is null before', () => {
     const session = atBoardingStop();
-    assert.equal(session.unfinishedWalk, null);
+    assert.equal(session.stopsLeft, null);
+    session.addFix(fix(-37.801, 2000, 8));
+    assert.equal(session.stopsLeft, 2);
+    session.addFix(fix(-37.82, 3000, 8));
+    assert.equal(session.stopsLeft, 1);
 });

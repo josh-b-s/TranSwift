@@ -13,6 +13,8 @@ export function createRideProgress(stops: RouteStop[]) {
     let reached = 0;
 
     return {
+        /** Index of the last stop reached; 0 is the boarding stop. */
+        get reached() { return reached; },
         /** Stops still to go, counting the one the rider gets off at. */
         get stopsLeft() { return stops.length - 1 - reached; },
 

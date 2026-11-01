@@ -4,7 +4,7 @@ import { Bus, Footprints, Route, Square } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch, RootState } from '@/store/store';
-import { requestEndTrip } from '@/store/trip.slice';
+import { requestEndTrip, setLeftEarlyAt } from '@/store/trip.slice';
 import { SPEED_UNITS } from '@/constants/speedUnits';
 import { ACCENT, RADIUS, useThemeStyle } from '@/constants/themes';
 import { formatPaceDelta, stopsToGo } from '@/services/trips/tripFormat';
@@ -23,7 +23,7 @@ export default function ActiveTripPanel() {
     const theme = useThemeStyle();
     const findAlternatives = useFindAlternatives();
     const unit = SPEED_UNITS[useSelector((s: RootState) => s.preferences.speedUnit)];
-    const { startedAt, steps, stepIndex, bests, paceS, stopsLeft } = useSelector((s: RootState) => s.trip);
+    const { startedAt, steps, stepIndex, bests, paceS, stopsLeft, leftEarlyAt } = useSelector((s: RootState) => s.trip);
 
     const step = steps[stepIndex];
     if (startedAt === null || !step) return null;
@@ -36,8 +36,37 @@ export default function ActiveTripPanel() {
     const next = nextStepLine(steps[stepIndex + 1]);
     const Icon = step.type === 'walk' ? Footprints : Bus;
 
+    const leftRoute = leftEarlyAt !== null && step.type === 'transit' ? step.routeName : null;
+
     return (
-        <View style={{ paddingHorizontal: 24, paddingBottom: 12 }}>
+        <View style={{ paddingHorizontal: 24, paddingBottom: 12, gap: 8 }}>
+            {leftRoute !== null && (
+                <View style={{ padding: 14, borderRadius: RADIUS.card, backgroundColor: theme.backgroundColor, gap: 10 }}>
+                    <Text style={{ color: theme.color, fontSize: 14, fontWeight: '600' }}>
+                        Looks like you got off the {leftRoute} at {leftEarlyAt}. Look for another way?
+                    </Text>
+                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                        <Pressable
+                            accessibilityRole="button"
+                            onPress={() => {
+                                Haptics.selectionAsync();
+                                dispatch(setLeftEarlyAt(null));
+                                findAlternatives(true);
+                            }}
+                            style={{ flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: 20, backgroundColor: ACCENT }}
+                        >
+                            <Text style={{ color: '#fff', fontSize: 14, fontWeight: '700' }}>See options</Text>
+                        </Pressable>
+                        <Pressable
+                            accessibilityRole="button"
+                            onPress={() => dispatch(setLeftEarlyAt(null))}
+                            style={{ flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: 20, backgroundColor: theme.hairline }}
+                        >
+                            <Text style={{ color: theme.color, fontSize: 14, fontWeight: '600' }}>Not now</Text>
+                        </Pressable>
+                    </View>
+                </View>
+            )}
             <View
                 style={{
                     flexDirection: 'row',

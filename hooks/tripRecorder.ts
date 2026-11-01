@@ -3,13 +3,12 @@ import { Alert, AppState } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch, RootState } from '@/store/store';
 import { viewTrip } from '@/store/tripView.slice';
-import { applySwitch, clearSwitchRequest, endTrip, setTripPace, setTripStep, setTripStopsLeft, type SwitchRequest } from '@/store/trip.slice';
+import { applySwitch, clearSwitchRequest, endTrip, setLeftEarlyAt, setTripPace, setTripStep, setTripStopsLeft, type SwitchRequest } from '@/store/trip.slice';
 import { createTripSession, rideLegOf } from '@/services/trips/tripSession';
 import { getDb } from '@/services/db/sqliteDb';
 import { createAlightAlert } from '@/services/trips/alightAlert';
 import { refreshedArrivalMs } from '@/services/trips/liveArrival';
 import { paceAgainstBest } from '@/services/trips/livePace';
-import { createRideProgress } from '@/services/trips/rideProgress';
 import { startTracking } from '@/services/trips/locationTracking';
 import { applyTrip } from '@/services/trips/personalBests';
 import { saveTrip, type SavedLeg, type SavedTrip } from '@/services/trips/tripStore';
@@ -81,10 +80,9 @@ export function useTripRecorder() {
         let stopTracking: (() => void) | undefined;
 
         const persist = (partial: boolean): Promise<SavedTrip> => {
-            // A walk cut short adds to the distance totals, but sets no per-stop best.
-            const unfinished = partial ? session.unfinishedWalk : null;
+            // What the step in progress recorded counts towards distance, but a walk cut short sets no per-stop best.
             // Numbered afresh, since each route a trip switched to counts its steps from 0.
-            const legs = [...doneLegsRef.current, ...session.legs, ...(unfinished ? [unfinished] : [])]
+            const legs = [...doneLegsRef.current, ...session.legs, ...(partial ? session.inProgress : [])]
                 .map((leg, i): SavedLeg => ({ ...leg, stepIndex: i }));
             const { bests: updated, broken } = applyTrip(bests, { startedAt, legs });
             const trip: SavedTrip = { startedAt, endedAt: Date.now(), legs, records: broken };
@@ -126,10 +124,9 @@ export function useTripRecorder() {
             dispatch(setTripPace(rounded));
         };
 
-        let ride: { stepIndex: number; progress: ReturnType<typeof createRideProgress> } | null = null;
         let lastStopsLeft: number | null = null;
         // Stops left on the current ride, for the sheet and the pinned notification. Clears both once the ride is over.
-        const updateRide = (stepIndex: number, fix: { latitude: number; longitude: number }, boarded: boolean) => {
+        const updateRide = (stepIndex: number) => {
             const step = steps[stepIndex];
             if (step?.type !== 'transit' || step.stops.length < 2) {
                 if (lastStopsLeft === null) return;
@@ -138,14 +135,22 @@ export function useTripRecorder() {
                 clearRideProgress().catch(err => console.warn('[trip] could not clear the ride notification:', err));
                 return;
             }
-            if (ride?.stepIndex !== stepIndex) ride = { stepIndex, progress: createRideProgress(step.stops) };
             // Counting only starts once the rider is on the vehicle, so waiting at the stop doesn't tick stops off.
-            const left = boarded ? ride.progress.update(fix) : null;
+            const left = session.stopsLeft;
             if (left === lastStopsLeft) return;
             lastStopsLeft = left;
             dispatch(setTripStopsLeft(left));
             if (left === null) clearRideProgress().catch(err => console.warn('[trip] could not clear the ride notification:', err));
             else showRideProgress(step.routeName, step.to, left).catch(err => console.warn('[trip] ride notification failed:', err));
+        };
+
+        // Tells the panel when the rider looks to have got off before their stop, so it can offer a new search.
+        let lastLeftAt: string | null = null;
+        const updateLeftEarly = () => {
+            const name = session.leftVehicle?.stopName ?? null;
+            if (name === lastLeftAt) return;
+            lastLeftAt = name;
+            dispatch(setLeftEarlyAt(name));
         };
 
         // Carries the trip on along a route chosen from the alternatives. On a vehicle it rides on to the stop the new
@@ -167,8 +172,8 @@ export function useTripRecorder() {
                 const { step: current, reached } = onVehicle;
                 if (reached > 0) carried.push(rideLegOf(rideBetween(current, 0, reached), session.stepIndex));
                 newSteps = [rideBetween(current, reached, viaIndex), ...next];
-            } else if (session.unfinishedWalk) {
-                carried.push(session.unfinishedWalk);
+            } else {
+                carried.push(...session.inProgress);
             }
             dispatch(applySwitch({ steps: newSteps, legs: carried }));
         };
@@ -193,7 +198,8 @@ export function useTripRecorder() {
             if (session.stepIndex !== before) dispatch(setTripStep(session.stepIndex));
             const { coords } = locations[locations.length - 1];
             refreshArrival(session.stepIndex);
-            updateRide(session.stepIndex, coords, session.boarded);
+            updateRide(session.stepIndex);
+            updateLeftEarly();
             checkAlight(session.stepIndex, coords, Date.now(), liveArrival?.stepIndex === session.stepIndex ? liveArrival.ms : undefined);
             updatePace();
         })
