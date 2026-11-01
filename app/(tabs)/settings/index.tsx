@@ -1,8 +1,8 @@
 import React from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
-import { Bus, ChevronRight, type LucideIcon, SlidersHorizontal, Star } from 'lucide-react-native';
-import { useRouter } from 'expo-router';
-import { ACCENT, RADIUS, useThemeStyle } from '@/constants/themes';
+import {Pressable, ScrollView, Text, View} from 'react-native';
+import {Bus, ChevronRight, type LucideIcon, SlidersHorizontal, Star} from 'lucide-react-native';
+import {useRouter} from 'expo-router';
+import {ACCENT, RADIUS, useThemeStyle} from '@/constants/themes';
 
 type MenuItem = {
     icon: LucideIcon;
@@ -37,14 +37,20 @@ export default function SettingsMenu() {
     const router = useRouter();
 
     return (
-        <ScrollView style={{ flex: 1, backgroundColor: theme.surfaceColor }} contentContainerStyle={{ padding: 16 }}>
-            <View style={{ borderRadius: RADIUS.card, overflow: 'hidden', backgroundColor: theme.backgroundColor }}>
+        <ScrollView style={{flex: 1, backgroundColor: theme.surfaceColor}} contentContainerStyle={{padding: 16}}>
+            <View style={{borderRadius: RADIUS.card, overflow: 'hidden', backgroundColor: theme.backgroundColor}}>
                 {ITEMS.map((item, index) => (
                     <Pressable
                         key={item.route}
                         accessibilityRole="button"
                         onPress={() => router.push(item.route)}
-                        style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14, paddingHorizontal: 16 }}
+                        style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: 14,
+                            paddingVertical: 14,
+                            paddingHorizontal: 16
+                        }}
                     >
                         <View
                             style={{
@@ -53,15 +59,24 @@ export default function SettingsMenu() {
                                 alignItems: 'center', justifyContent: 'center',
                             }}
                         >
-                            <item.icon size={20} color={ACCENT} />
+                            <item.icon size={20} color={ACCENT}/>
                         </View>
-                        <View style={{ flex: 1 }}>
-                            <Text style={{ color: theme.color, fontSize: 16, fontWeight: '600' }}>{item.title}</Text>
-                            <Text style={{ color: theme.muted, fontSize: 13, marginTop: 2 }}>{item.subtitle}</Text>
+                        <View style={{flex: 1}}>
+                            <Text style={{color: theme.color, fontSize: 16, fontWeight: '600'}}>{item.title}</Text>
+                            <Text style={{color: theme.muted, fontSize: 13, marginTop: 2}}>{item.subtitle}</Text>
                         </View>
-                        <ChevronRight size={18} color={theme.muted} />
+                        <ChevronRight size={18} color={theme.muted}/>
                         {index < ITEMS.length - 1 && (
-                            <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 1, backgroundColor: theme.hairline }} />
+                            <View
+                                style={{
+                                    position: 'absolute',
+                                    left: 70,
+                                    right: 0,
+                                    bottom: 0,
+                                    height: 1,
+                                    backgroundColor: theme.hairline,
+                                }}
+                            />
                         )}
                     </Pressable>
                 ))}

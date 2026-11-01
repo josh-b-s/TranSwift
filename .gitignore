@@ -41,7 +41,8 @@ yarn-error.*
 /android
 
 .env
-/.idea/
+.idea/
+.vscode/
 /assets/gtfs/
 /assets/gtfs.db
 /assets/gtfs.zip
