@@ -8,6 +8,8 @@ A Melbourne trip planner that works offline and plans around how fast *you* walk
 
 Most journey planners assume everyone walks at the same pace. If you walk slowly, the "fastest" route can make you miss a connection. If you walk quickly, a route with a longer walk can be the better one. TranSwift takes your walking speed as an input, so the route it picks is the fastest for you. It also records your walks and tracks your personal bests.
 
+**Try it:** [Download the Android APK](https://github.com/josh-b-s/TranSwift/releases/latest)
+
 <table>
   <tr>
     <td width="33%" valign="top"><img src="docs/gifs/search-demo.gif" alt="Search and route results" width="100%"></td>
@@ -96,7 +98,7 @@ RAPTOR and its Pareto variant are published algorithms. Steps 3 to 7 are origina
 
 ### Measured performance
 
-Three searches from one session on a Poco F6 (Xiaomi 24069PC21G), debug build, warm engine, live Melbourne feed with realtime delays applied:
+Three searches from one session on a Poco F6 (Xiaomi 24069PC21G), app in debug mode, Rust crates in release mode, warm engine, live Melbourne feed with realtime delays applied:
 
 | Search | Journeys found | Engine time (load + RAPTOR) | Stops queried | Trips in window | Stop-time rows |
 | --- | --- | --- | --- | --- | --- |
@@ -104,7 +106,7 @@ Three searches from one session on a Poco F6 (Xiaomi 24069PC21G), debug build, w
 | Medium trip | 1 | 318 ms + 9 ms | 1,880 | 488 | 11,034 |
 | Long trip, 3 transfers | 2 | 328 ms + 21 ms | 2,264 | 1,479 | 33,298 |
 
-RAPTOR itself takes 1 to 21 ms. Almost all of the time goes to resolving the corridor and fetching only the `stop_times` the search needs. A release build should be faster, and I have not measured one.
+RAPTOR itself takes 1 to 21 ms. Almost all of the time goes to resolving the corridor and fetching only the `stop_times` the search needs. A release build of the app should be faster, and I have not measured one.
 
 ### Testing
 
