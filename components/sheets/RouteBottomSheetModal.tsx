@@ -1,5 +1,5 @@
 import React, { forwardRef, useMemo, useState } from 'react';
-import { ActivityIndicator, Text, View } from 'react-native';
+import { ActivityIndicator, Text, useWindowDimensions, View } from 'react-native';
 import { BottomSheetModal, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { SharedValue } from 'react-native-reanimated';
 import { useDispatch, useSelector } from 'react-redux';
@@ -24,6 +24,10 @@ import { clearRoute, selectJourney } from '@/store/route.slice';
 import { selectPlace, setQuery } from '@/store/search.slice';
 import { routeErrorMessage } from '@/services/gtfs/router/routeErrorMessage';
 
+// The grab handle above the sheet's content: 4 px indicator plus its padding.
+const HANDLE_HEIGHT = 24;
+const LOWEST_SNAP = 0.16;
+
 type Props = {
     animatedPosition: SharedValue<number>;
 };
@@ -41,6 +45,17 @@ const RouteBottomSheetModal = forwardRef<BottomSheetModal, Props>(
         const tabBarHeight = useBottomTabBarHeight();
         const running = useSelector((s: RootState) => s.trip.startedAt !== null);
         const alternativesOpen = useSelector((s: RootState) => s.alternatives.open);
+        const { height: windowHeight } = useWindowDimensions();
+        // Height of the pinned block (place name and the running trip's card, which holds the stop button).
+        const [headerHeight, setHeaderHeight] = useState(0);
+
+        // While a trip runs the lowest stop must still show the stop button, which 16% of the screen cuts off.
+        const snapPoints = useMemo(() => {
+            const lowest = running && headerHeight > 0
+                ? Math.max(windowHeight * LOWEST_SNAP, headerHeight + HANDLE_HEIGHT)
+                : `${LOWEST_SNAP * 100}%`;
+            return [lowest, '45%', '100%'];
+        }, [running, headerHeight, windowHeight]);
 
         const closeRoute = () => {
             dispatch(selectPlace(null));
@@ -83,7 +98,7 @@ const RouteBottomSheetModal = forwardRef<BottomSheetModal, Props>(
                 // instead of getting covered.
                 bottomInset={tabBarHeight}
                 index={1}
-                snapPoints={['16%', '45%', '100%']}
+                snapPoints={snapPoints}
                 enableOverDrag={false}
                 enablePanDownToClose={false}
                 // Fixed snap points only; the content height must not add its own.
@@ -91,7 +106,10 @@ const RouteBottomSheetModal = forwardRef<BottomSheetModal, Props>(
             >
                 {/* One scroll controller for the whole sheet: dragging up expands it before the list scrolls, and pulling down at the top lowers it. The header block is sticky so it stays visible. */}
                 <BottomSheetScrollView stickyHeaderIndices={[0]} contentContainerStyle={{ paddingBottom: 24 }}>
-                    <View style={{ backgroundColor: theme.surfaceColor, paddingTop: 8 }}>
+                    <View
+                        style={{ backgroundColor: theme.surfaceColor, paddingTop: 8 }}
+                        onLayout={(e) => setHeaderHeight(e.nativeEvent.layout.height)}
+                    >
                         {selectedPlace && (
                             <RouteSheetHeader
                                 name={selectedPlace.name}

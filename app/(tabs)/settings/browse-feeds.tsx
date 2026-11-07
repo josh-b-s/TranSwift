@@ -106,7 +106,8 @@ export default function BrowseFeeds() {
                 replaceId,
                 abort.signal,
             );
-            router.back();
+            if (router.canGoBack()) router.back();
+            else router.replace('/settings');
         } catch (err) {
             if (err instanceof CancelledError) return;
             if (err instanceof DuplicateFeedError) {

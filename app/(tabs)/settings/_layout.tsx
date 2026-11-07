@@ -11,7 +11,7 @@ export default function SettingsLayout() {
             screenOptions={{
                 // Same big title as the History tab.
                 header: ({ options, back, navigation }) => (
-                    <ScreenHeader title={options.title ?? ''} onBack={back ? navigation.goBack : undefined} />
+                    <ScreenHeader title={options.title ?? ''} onBack={back ? navigation.goBack : options.title === 'Settings' ? undefined : () => navigation.navigate('index')} />
                 ),
                 // Shows behind a screen while it slides, so it must match the screens or a light strip flashes in dark mode.
                 contentStyle: { backgroundColor: theme.surfaceColor },

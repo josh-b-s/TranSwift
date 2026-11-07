@@ -1,18 +1,27 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Pressable, Text, View } from 'react-native';
-import { Footprints, Map as MapIcon } from 'lucide-react-native';
+import { CalendarDays, Footprints, List, Map as MapIcon } from 'lucide-react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch, RootState } from '@/store/store';
 import { viewTrip } from '@/store/tripView.slice';
 import { ACCENT, DANGER, useThemeStyle } from '@/constants/themes';
 import ScreenHeader from '@/components/ui/ScreenHeader';
+import SegmentedControl from '@/components/ui/SegmentedControl';
+import HistoryCalendar from '@/components/trip/HistoryCalendar';
 import HistoryStats from '@/components/trip/HistoryStats';
 import HistoryCharts from '@/components/trip/HistoryCharts';
 import WalkingGoal from '@/components/trip/WalkingGoal';
 import TripHistoryRow from '@/components/trip/TripHistoryRow';
 import { deleteTrip } from '@/services/trips/tripStore';
+import { dayStart, tripsOnDay } from '@/services/trips/calendarMonth';
 import { historyTotals, loadHistory, type HistoryTrip } from '@/services/trips/tripHistory';
+
+type HistoryView = 'list' | 'calendar';
+const VIEW_OPTIONS: { value: HistoryView; label: string; icon: typeof List }[] = [
+    { value: 'list', label: 'List', icon: List },
+    { value: 'calendar', label: 'Calendar', icon: CalendarDays },
+];
 
 export default function HistoryScreen() {
     const theme = useThemeStyle();
@@ -21,6 +30,9 @@ export default function HistoryScreen() {
     const weeklyGoalM = useSelector((s: RootState) => s.preferences.weeklyGoalM);
     const [trips, setTrips] = useState<HistoryTrip[] | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [view, setView] = useState<HistoryView>('list');
+    const [monthMs, setMonthMs] = useState(() => dayStart(Date.now()));
+    const [selectedDayMs, setSelectedDayMs] = useState<number | null>(() => dayStart(Date.now()));
 
     // The tab stays mounted, so reload each time it comes into view.
     useFocusEffect(
@@ -36,6 +48,7 @@ export default function HistoryScreen() {
     );
 
     const totals = useMemo(() => historyTotals(trips ?? []), [trips]);
+    const dayTrips = useMemo(() => (selectedDayMs === null ? [] : tripsOnDay(trips ?? [], selectedDayMs)), [trips, selectedDayMs]);
 
     const confirmDelete = (trip: HistoryTrip) =>
         Alert.alert('Delete this trip?', 'It will be removed from your history.', [
@@ -84,16 +97,34 @@ export default function HistoryScreen() {
                 </View>
             ) : (
                 <FlatList
-                    data={trips}
+                    data={view === 'list' ? trips : dayTrips}
                     keyExtractor={trip => String(trip.startedAt)}
                     contentContainerStyle={{ padding: 24, paddingTop: 0, gap: 8 }}
                     ListHeaderComponent={
                         <View style={{ gap: 16, marginBottom: 8 }}>
-                            <HistoryStats totals={totals} unit={unit} />
-                            <WalkingGoal trips={trips} goalM={weeklyGoalM} />
-                            <HistoryCharts trips={trips} unit={unit} />
+                            <SegmentedControl options={VIEW_OPTIONS} value={view} onChange={setView} />
+                            {view === 'list' ? (
+                                <>
+                                    <HistoryStats totals={totals} unit={unit} />
+                                    <WalkingGoal trips={trips} goalM={weeklyGoalM} />
+                                    <HistoryCharts trips={trips} unit={unit} />
+                                </>
+                            ) : (
+                                <HistoryCalendar
+                                    trips={trips}
+                                    monthMs={monthMs}
+                                    onMonthChange={setMonthMs}
+                                    selectedDayMs={selectedDayMs}
+                                    onSelectDay={setSelectedDayMs}
+                                />
+                            )}
                         </View>
                     }
+                    ListEmptyComponent={view === 'calendar' ? (
+                        <Text style={{ color: theme.muted, fontSize: 14, textAlign: 'center', padding: 24 }}>
+                            No trips on this day.
+                        </Text>
+                    ) : null}
                     renderItem={({ item }) => (
                         <TripHistoryRow
                             trip={item}

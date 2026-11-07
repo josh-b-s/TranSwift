@@ -43,7 +43,7 @@ export async function importCatalogFeed(
             await renameDatabase(entry.id, old.name);
         }
 
-        if (old && (old.realtimeUrls || old.vehicleUrls || old.alertUrls)) {
+        if (old && (old.realtimeUrls || old.vehicleUrls || old.alertUrls || old.realtimeHeader || old.realtimeQuery)) {
             await setRealtimeConfig(entry.id, {
                 tripUrls: old.realtimeUrls ?? [],
                 vehicleUrls: old.vehicleUrls ?? [],

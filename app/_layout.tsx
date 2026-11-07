@@ -11,6 +11,7 @@ import { warmUpGtfsEngine } from '@/services/gtfs/router/gtfsWarmup';
 import { loadPreferences } from '@/store/preferences.slice';
 import { loadSavedPlaces } from '@/store/savedPlaces.slice';
 import { restoreActiveDatabase } from '@/services/gtfs/import/gtfsDbRegistry';
+import { cleanGtfsStorage } from '@/services/gtfs/import/storageCleanup';
 import '@/services/trips/locationTracking';
 import { useThemeStyle } from '@/constants/themes';
 
@@ -24,6 +25,7 @@ export default function Layout() {
         // user actually had selected last session.
         (async () => {
             await restoreActiveDatabase();
+            cleanGtfsStorage().catch((err) => console.warn('[storage] cleanup failed:', err));
             warmUpGtfsEngine(); // deliberately not awaited from here on — shouldn't block first paint
         })();
         store.dispatch(loadSavedPlaces());

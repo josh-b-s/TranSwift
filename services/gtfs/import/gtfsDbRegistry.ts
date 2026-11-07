@@ -11,6 +11,7 @@ import { rewarmGtfsEngine } from '../router/gtfsWarmup';
 import { invalidateStopCache } from '../core/stopRepo';
 import { invalidateStopColors } from '../departures/stopColors';
 import { computeFeedStats, type FeedStats } from './gtfsFeedStats';
+import { deleteDatabaseFiles } from './storageCleanup';
 import type { RealtimeAuth } from '../catalog/realtimeParse';
 
 /** Where a feed was downloaded from, kept for licence credit and later update checks. */
@@ -301,7 +302,7 @@ export async function deleteDatabase(id: string): Promise<void> {
     await writeRegistry(reg);
 
     if (entry) {
-        await FileSystem.deleteAsync(dbPathFor(entry), { idempotent: true }).catch(() => {});
+        await deleteDatabaseFiles(dbPathFor(entry)).catch(() => {});
     }
 }
 

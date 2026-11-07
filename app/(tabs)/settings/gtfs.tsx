@@ -10,6 +10,7 @@ import { loadRealtimeEndpoints } from '@/services/gtfs/catalog/feedCatalog';
 import { describeAuth, forgetAuthFailure } from '@/services/gtfs/realtime/authFailure';
 import { createProgressTracker, type ImportProgress } from '@/services/gtfs/import/importProgress';
 import { CancelledError } from '@/services/gtfs/import/cancelledError';
+import * as FileSystem from 'expo-file-system/legacy';
 import { pickGtfsZip, importZipAsNewDatabase } from '@/services/gtfs/import/gtfsDbImport';
 import {
     deleteDatabase,
@@ -82,9 +83,11 @@ export default function GtfsData() {
 
     async function handleAddZip() {
         setError('');
+        let cachedZipUri: string | undefined;
         try {
             const zip = await pickGtfsZip();
             if (!zip) return; // user cancelled the picker, not an error
+            cachedZipUri = zip.uri; // the picker copied it into the cache, so it is ours to delete
 
             const fileName = zip.name ?? 'GTFS zip';
             setImportState({
@@ -127,6 +130,7 @@ export default function GtfsData() {
                 setError(`Import failed: ${String(err)}`);
             }
         } finally {
+            if (cachedZipUri) await FileSystem.deleteAsync(cachedZipUri, { idempotent: true }).catch(() => {});
             abortRef.current = null;
             setImportState({ busy: false });
         }

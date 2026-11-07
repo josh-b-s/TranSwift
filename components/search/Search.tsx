@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { FlatList, Keyboard, Pressable, Text, TouchableOpacity, View } from 'react-native';
+import { FlatList, Keyboard, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { ArrowUpDown, Clock, MapPin, Navigation, Star } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { useDispatch, useSelector } from 'react-redux';
@@ -53,6 +53,12 @@ export default function Search() {
 
     const focusField = useCallback((field: RouteField) => {
         setActiveField(field);
+        resetTyping();
+    }, [resetTyping]);
+
+    const dismissTyping = useCallback(() => {
+        Keyboard.dismiss();
+        setActiveField(null);
         resetTyping();
     }, [resetTyping]);
 
@@ -121,6 +127,15 @@ export default function Search() {
     const expanded = activeField !== null || destination !== null || !isCurrentLocation(origin);
 
     return (
+        <>
+            {/* Catches a tap anywhere outside the bar and the list, so it closes the suggestions. */}
+            {activeField !== null && (
+                <Pressable
+                    onPress={dismissTyping}
+                    accessibilityLabel="Close suggestions"
+                    style={[StyleSheet.absoluteFill, { zIndex: 9998 }]}
+                />
+            )}
         <View style={{ position: 'absolute', left: 16, right: 16, zIndex: 9999, top: topInset }}>
             <Animated.View
                 layout={LinearTransition.duration(OPEN_MS)}
@@ -225,6 +240,7 @@ export default function Search() {
                 </View>
             )}
         </View>
+        </>
     );
 }
 

@@ -1,5 +1,6 @@
 import type { QueryableDb } from '@/services/db/queryableDb';
 import type { LatLng } from '@/services/db/sqliteDb';
+import { trimShapeToStops } from './trimShape';
 
 // Coordinates are stored as integer degrees * 1e6 (see schema.sql).
 const COORD_SCALE = 1_000_000;
@@ -46,5 +47,6 @@ export async function loadTripPath(db: QueryableDb, trip: TripRef): Promise<Trip
     );
 
     const stops = stopRows.map(toLatLng);
-    return { tripId: row.trip_id, line: shapeRows.length > 1 ? shapeRows.map(toLatLng) : stops, stops };
+    const line = shapeRows.length > 1 ? trimShapeToStops(shapeRows.map(toLatLng), stops) : stops;
+    return { tripId: row.trip_id, line, stops };
 }

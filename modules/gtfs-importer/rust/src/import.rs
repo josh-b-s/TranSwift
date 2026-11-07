@@ -533,6 +533,9 @@ fn process_agency(
             let mut ins_shape = conn.prepare("INSERT INTO shapes (shape_pk,shape_pt_lat,shape_pt_lon,shape_pt_sequence) VALUES (?,?,?,?)")?;
             let mut shape_id_to_pk: HashMap<String, i64> = HashMap::new();
             let mut pt_count: HashMap<String, u64> = HashMap::new();
+            // The latest point decimation skipped, per shape. Whatever is left here when the file ends is a shape's
+            // last point, which is written so the line reaches the terminus.
+            let mut pending_last: HashMap<String, (i64, i64, i64)> = HashMap::new();
 
             let mut rdr = csv::ReaderBuilder::new().has_headers(true).flexible(true).from_reader(bytes.as_slice());
             let headers = rdr.headers().map_err(|e| {
@@ -552,7 +555,12 @@ fn process_agency(
                     ) { (Some(a), Some(b)) => (a, b), _ => continue };
                     let cnt = *pt_count.get(shape_id).unwrap_or(&0);
                     pt_count.insert(shape_id.to_string(), cnt + 1);
-                    if cnt != 0 && cnt % 3 != 0 { continue; }
+                    let seq: i64 = seq_i.and_then(|i| rec.get(i)).and_then(|v| v.parse().ok()).unwrap_or(0);
+                    if cnt != 0 && cnt % 3 != 0 {
+                        pending_last.insert(shape_id.to_string(), (lat, lon, seq));
+                        continue;
+                    }
+                    pending_last.remove(shape_id);
                     let shape_pk = *shape_id_to_pk.entry(shape_id.to_string()).or_insert_with(|| {
                         let pk = next_shape_pk; next_shape_pk += 1;
                         pk
@@ -560,10 +568,15 @@ fn process_agency(
                     if pt_count[shape_id] == 1 {
                         ins_meta.execute(params![shape_pk, shape_id, agency_id])?;
                     }
-                    let seq: i64 = seq_i.and_then(|i| rec.get(i)).and_then(|v| v.parse().ok()).unwrap_or(0);
                     ins_shape.execute(params![shape_pk, lat, lon, seq])?;
                     stored += 1;
                     if stored % 200_000 == 0 { progress.on_progress(format!("agency {agency_id} · shapes"), stored, 0)?; }
+                }
+            }
+            for (shape_id, (lat, lon, seq)) in pending_last {
+                if let Some(&shape_pk) = shape_id_to_pk.get(&shape_id) {
+                    ins_shape.execute(params![shape_pk, lat, lon, seq])?;
+                    stored += 1;
                 }
             }
             progress.on_progress(format!("agency {agency_id} · shapes"), stored, stored)?;
