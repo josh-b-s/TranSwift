@@ -66,3 +66,10 @@ test('a poor first fix does not set the point the rider is measured from', () =>
     d.update(fix(10));
     assert.equal(d.update(fix(40)), false);
 });
+
+test('knows whether the rider has been seen at the start', () => {
+    const d = detector();
+    assert.equal(d.seenAtStart, false);
+    d.update(fix(10));
+    assert.equal(d.seenAtStart, true);
+});

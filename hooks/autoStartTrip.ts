@@ -4,14 +4,20 @@ import { RootState } from '@/store/store';
 import { selectDisplayedJourney } from '@/store/route.slice';
 import { useStartTrip } from '@/hooks/startTrip';
 import { createFollowDetector, type FollowFix } from '@/services/trips/followDetector';
-import { withinStartWindow } from '@/services/trips/startWindow';
+import { useMidRideStart } from '@/hooks/midRideStart';
+import type { MidRideResume } from '@/services/trips/midRideResume';
+import { stepsFromJourney } from '@/services/trips/tripSteps';
+import { withinJourneyWindow, withinStartWindow } from '@/services/trips/startWindow';
 import type { GtfsJourney } from '@/services/gtfs/router/routeTypes';
 
 // Stays the same when the journey is recomputed, so ending a trip doesn't start the same one again.
 const journeyId = (j: GtfsJourney) =>
     `${j.departureTime}|${j.arrivalTime}|${j.legs.map(leg => leg.routeName).join(',')}`;
 
-/** Starts a trip on the shown journey once the rider, seen at its start, walks away from it. Needs fixes, so only works while they come in. */
+/**
+ * Starts a trip on the shown journey once the rider, seen at its start, walks away from it. Failing that, starts it
+ * part way when the rider, never seen at the start, is on one of its rides. Needs fixes, so only works while they come in.
+ */
 export function useAutoStartTrip(position: FollowFix | null) {
     const journey = useSelector(selectDisplayedJourney);
     const running = useSelector((s: RootState) => s.trip.startedAt !== null);
@@ -21,6 +27,7 @@ export function useAutoStartTrip(position: FollowFix | null) {
         if (!journey || !firstStep?.coords.length) return null;
         return createFollowDetector(journey.coords[0], firstStep.coords[firstStep.coords.length - 1]);
     }, [journey]);
+    const journeySteps = useMemo(() => (journey ? stepsFromJourney(journey) : null), [journey]);
     // The journey a trip was last started on, by this hook or by the button.
     const usedId = useRef<string | undefined>(undefined);
 
@@ -36,4 +43,12 @@ export function useAutoStartTrip(position: FollowFix | null) {
             startTrip(journey);
         }
     }, [journey, detector, position, running, startTrip]);
+
+    const midRideEligible = !!journey && !!detector && !running && usedId.current !== journeyId(journey)
+        && !detector.seenAtStart && withinJourneyWindow(journey.departureTime, journey.arrivalTime, new Date());
+    useMidRideStart(journeySteps, position, midRideEligible, (resume: MidRideResume) => {
+        if (!journey) return;
+        usedId.current = journeyId(journey);
+        startTrip(journey, resume);
+    });
 }

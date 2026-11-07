@@ -84,3 +84,12 @@ test('stops left counts down once boarded and is null before', () => {
     session.addFix(fix(-37.82, 3000, 8));
     assert.equal(session.stopsLeft, 1);
 });
+
+test('a rider who joined mid-ride is on the vehicle with the stops before them counted off', () => {
+    const rideOnly = steps.slice(1);
+    const session = createTripSession(rideOnly, 1);
+    assert.equal(session.boarded, true);
+    assert.equal(session.stopsLeft, 1);
+    session.addFix(fix(alight, 1000, 10));
+    assert.equal(session.done, true);
+});

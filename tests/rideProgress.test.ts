@@ -28,3 +28,10 @@ test('never counts back up', () => {
     progress.update(at(-37.8405));
     assert.equal(progress.update(at(-37.8205)), 1);
 });
+
+test('resumes from a stop already reached', () => {
+    const progress = createRideProgress(stops, 1);
+    assert.equal(progress.stopsLeft, 2);
+    assert.equal(progress.update(at(-37.8205)), 2);
+    assert.equal(progress.update(at(-37.8405)), 1);
+});

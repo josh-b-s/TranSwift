@@ -21,6 +21,8 @@ export function createFollowDetector(start: LatLng, firstStepEnd: LatLng) {
     let anchor: LatLng | null = null;
 
     return {
+        /** Whether the rider is currently known to have been at the start. */
+        get seenAtStart() { return anchor !== null; },
         update(fix: FollowFix): boolean {
             if (fix.accuracyM === null || fix.accuracyM > MAX_ACCURACY_M) return false;
             if (anchor === null) {

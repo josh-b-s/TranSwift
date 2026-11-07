@@ -87,8 +87,9 @@ export const rideLegOf = (step: RideStep, stepIndex: number): RideLeg => ({
  * Walks through a journey's steps from GPS fixes, recording the rider's path on walks and the line on rides.
  * A step that was never finished because the rider got ahead of it (got off early and walked on to a later
  * stop) is closed with what was actually ridden, and the walk in between is recorded as a walk of its own.
+ * `resumeReached` is the stop a rider joined the first step's ride at, already on the vehicle.
  */
-export function createTripSession(steps: TripStep[]) {
+export function createTripSession(steps: TripStep[], resumeReached: number | null = null) {
     let index = 0;
     let samples: Sample[] = [];
     let walkedM = 0;
@@ -105,6 +106,11 @@ export function createTripSession(steps: TripStep[]) {
     let leftShown = false;
     let lastFix: Fix | null = null;
     const legs: SavedLeg[] = [];
+    const firstStep = steps[0];
+    if (resumeReached !== null && firstStep?.type === 'transit') {
+        boarded = true;
+        progress = createRideProgress(firstStep.stops, resumeReached);
+    }
 
     const resetStep = () => {
         samples = [];

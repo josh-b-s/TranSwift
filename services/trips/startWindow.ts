@@ -5,6 +5,12 @@ const EARLY_MS = 20 * 60_000;
 // Past the first vehicle's departure the plan is stale. A little grace covers a vehicle running late.
 const LATE_MS = 2 * 60_000;
 
+/** Whether a journey can be under way right now: from shortly before it leaves until a little after it is due to arrive. */
+export function withinJourneyWindow(departureTime: string, arrivalTime: string, now: Date): boolean {
+    const nowMs = now.getTime();
+    return nowMs >= clockToMs(departureTime, now) - EARLY_MS && nowMs <= clockToMs(arrivalTime, now) + LATE_MS;
+}
+
 /**
  * Whether auto start fits a journey right now: from shortly before it leaves until its first vehicle has gone.
  * Times are "HH:MM:SS" clock readings, as the journey carries them.

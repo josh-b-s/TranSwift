@@ -40,6 +40,10 @@ export function useTripRecorder() {
     // A ref so legs carried over by a switch don't restart the session a second time.
     const doneLegsRef = useRef(doneLegs);
     doneLegsRef.current = doneLegs;
+    const resumeReached = useSelector((s: RootState) => s.trip.resumeReached);
+    // A ref so the session reads it when it starts without it being a reason to restart.
+    const resumeReachedRef = useRef(resumeReached);
+    resumeReachedRef.current = resumeReached;
     const switchRequest = useSelector((s: RootState) => s.trip.switchRequest);
     // The running session's way to carry on along a new route, set by the effect below.
     const switchRef = useRef<((request: SwitchRequest) => void) | null>(null);
@@ -59,7 +63,7 @@ export function useTripRecorder() {
     useEffect(() => {
         if (startedAt === null) return;
 
-        const session = createTripSession(steps);
+        const session = createTripSession(steps, resumeReachedRef.current);
         const checkAlight = createAlightAlert(steps, ride =>
             notifyGetOff(ride.to).catch(err => console.warn('[trip] get-off alert failed:', err)));
         let lastPace: number | null = null;

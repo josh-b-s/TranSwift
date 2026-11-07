@@ -7,10 +7,10 @@ type Position = { latitude: number; longitude: number };
 
 /**
  * Counts the stops a ride has left, from the rider's fixes. A stop counts as reached once a fix is within
- * `AT_STOP_M` of it, and the count never goes back up. Underground or without a fix it holds its last value.
+ * `AT_STOP_M` of it, and the count never goes back up. `alreadyReached` resumes a ride that was joined part way. Underground or without a fix it holds its last value.
  */
-export function createRideProgress(stops: RouteStop[]) {
-    let reached = 0;
+export function createRideProgress(stops: RouteStop[], alreadyReached = 0) {
+    let reached = alreadyReached;
 
     return {
         /** Index of the last stop reached; 0 is the boarding stop. */

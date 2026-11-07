@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { withinStartWindow } from '@/services/trips/startWindow';
+import { withinJourneyWindow, withinStartWindow } from '@/services/trips/startWindow';
 
 const at = (h: number, m: number) => new Date(2026, 10, 1, h, m, 0);
 // Leaves at 13:00, first vehicle at 13:16.
@@ -26,4 +26,11 @@ test('is stale once the first vehicle left a few minutes ago', () => {
 
 test('a journey with no ride has no end to the window', () => {
     assert.equal(withinStartWindow('13:00:00', undefined, at(14, 30)), true);
+});
+
+test('a journey is under way from shortly before it leaves until a little after it arrives', () => {
+    assert.equal(withinJourneyWindow('10:00:00', '10:30:00', at(9, 30)), false);
+    assert.equal(withinJourneyWindow('10:00:00', '10:30:00', at(10, 15)), true);
+    assert.equal(withinJourneyWindow('10:00:00', '10:30:00', at(10, 31)), true);
+    assert.equal(withinJourneyWindow('10:00:00', '10:30:00', at(10, 40)), false);
 });

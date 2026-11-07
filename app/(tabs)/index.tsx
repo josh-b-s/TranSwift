@@ -48,6 +48,8 @@ import {isCurrentLocation} from '@/services/places/endpoints';
 import {useGoToUserLocation} from '../../hooks/goToUserLocation';
 import {useFeedSuggestion} from '../../hooks/feedSuggestion';
 import {useRealtimeAuthAlert} from '@/hooks/realtimeAuthAlert';
+import {useAutoUpdateFeeds} from '@/hooks/autoUpdateFeeds';
+import {journeyDrawn, placeClosesDepartures, stopsTappable} from '@/services/trips/tapLayers';
 import {useTripRecorder} from '@/hooks/tripRecorder';
 import {useTripNotificationTap} from '@/hooks/tripNotificationTap';
 import {useAutoStartTrip} from '@/hooks/autoStartTrip';
@@ -125,20 +127,30 @@ export default function Index() {
     // The trip whose whole line and stops are drawn, and whose vehicle is highlighted.
     const [tripFocus, setTripFocus] = useState<TripFocus | null>(null);
     const tripPath = useTripPath(tripFocus?.trip ?? null);
+    const layers = {
+        hasPlace: selectedPlace !== null,
+        tripRunning,
+        detailOpen: departureStop !== null || tripFocus !== null,
+        picking: pickingField !== null,
+        viewingSavedTrip: viewedTripId !== null,
+        debug: debugEnabled,
+    };
+    const journeyShown = journeyDrawn(layers);
 
     // Vehicles on the routes of the open stop, of the shown trip and of the shown journey.
     const wantedRouteKeys = useMemo(
         () => [...new Set([
             ...(departuresLowered ? [] : stopRouteKeys),
             ...(tripFocus ? [tripFocus.routeKey] : []),
-            ...(displayedJourney?.legs ?? []).map(l => routeKey(l.routeName, l.routeType)),
+            ...(journeyShown ? displayedJourney?.legs ?? [] : []).map(l => routeKey(l.routeName, l.routeType)),
         ])],
-        [stopRouteKeys, departuresLowered, tripFocus, displayedJourney],
+        [stopRouteKeys, departuresLowered, tripFocus, displayedJourney, journeyShown],
     );
 
     const goToUserLocation = useGoToUserLocation(mapRef);
     useFeedSuggestion();
     useRealtimeAuthAlert();
+    useAutoUpdateFeeds();
     useTripRecorder();
     useTripNotificationTap();
 
@@ -186,8 +198,7 @@ export default function Index() {
     }, [isFocused, viewedTripId]);
 
     // Stop dots give way to the route once a place is chosen, and so does the departures sheet. A running trip keeps them.
-    const stopsTappable = isFocused && (selectedPlace === null || tripRunning) && pickingField === null && viewedTripId === null && !debugEnabled;
-    const stopsInView = useStopsInView(region, stopsTappable);
+    const stopsInView = useStopsInView(region, isFocused && stopsTappable(layers));
     const vehicleScope = useSelector((s: RootState) => s.preferences.vehicleScope);
     const zoomedIn = isZoomedIn(region);
     const showAllVehicles = vehicleScope === 'nearby' && zoomedIn;
@@ -204,7 +215,7 @@ export default function Index() {
     );
     const stopColors = useStopColors(stopsInView);
     useEffect(() => {
-        if ((selectedPlace !== null && !tripRunning) || viewedTripId !== null) setDepartureStop(null);
+        if (placeClosesDepartures(layers)) setDepartureStop(null);
     }, [selectedPlace, tripRunning, viewedTripId]);
     // Same handling as the route sheet above: closed, not dismissed, while another tab is showing.
     useEffect(() => {
@@ -240,14 +251,13 @@ export default function Index() {
     const selectVehicle = useCallback((vehicle: MapVehicle) => {
         const tripId = vehicle.tripId;
         if (!tripId) return;
+        follow.release();
         setTripFocus(current => (current && 'tripId' in current.trip && current.trip.tripId === tripId ? null : {trip: {tripId}, color: vehicle.color, routeKey: routeKey(vehicle.routeName, vehicle.routeType)}));
-    }, []);
-
-    const showJourney = !debugEnabled && viewedTripId === null;
+    }, [follow.release]);
 
     const routeStops = useMemo(
-        () => (debugEnabled ? [] : routeSegments.flatMap(s => (s.type === 'transit' ? s.stops ?? [] : []))),
-        [routeSegments, debugEnabled],
+        () => (!journeyShown ? [] : routeSegments.flatMap(s => (s.type === 'transit' ? s.stops ?? [] : []))),
+        [routeSegments, journeyShown],
     );
 
     // Stop circles are not tappable themselves, so a tap on the map opens the nearest one within reach.
@@ -368,7 +378,7 @@ export default function Index() {
                 }}
             >
                 {/* A darker shade of the route colour under each ride, as an outline. */}
-                {showJourney && routeSegments.map((segment, index) => segment.type === 'transit' && (
+                {journeyShown && routeSegments.map((segment, index) => segment.type === 'transit' && (
                     <Polyline
                         key={`casing-${index}`}
                         coordinates={segment.coords}
@@ -380,7 +390,7 @@ export default function Index() {
                     />
                 ))}
 
-                {showJourney && (routeSegments.length > 0 ? (
+                {journeyShown && (routeSegments.length > 0 ? (
                     routeSegments.map((segment, index) => (
                         <Polyline
                             key={index}
@@ -401,7 +411,7 @@ export default function Index() {
                     />
                 ) : null)}
 
-                {showJourney && routeSegments.map((segment, index) => segment.type === 'transit' && (
+                {journeyShown && routeSegments.map((segment, index) => segment.type === 'transit' && (
                     <RideStopMarkers key={index} segment={segment} color={segment.routeColor ?? routeColor ?? '#2563eb'} />
                 ))}
 

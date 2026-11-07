@@ -31,16 +31,19 @@ type State = {
     leftEarlyAt: string | null;
     /** Legs recorded on routes the rider has since switched away from. */
     doneLegs: SavedLeg[];
+    /** Index of the stop a rider who joined mid-ride is already past on the first step's ride; null when the trip began at its start. */
+    resumeReached: number | null;
 };
 
-const initialState: State = { startedAt: null, steps: [], stepIndex: 0, bests: NO_BESTS, paceS: null, requiredMps: null, stopsLeft: null, endRequested: false, switchRequest: null, leftEarlyAt: null, doneLegs: [] };
+const initialState: State = { startedAt: null, steps: [], stepIndex: 0, bests: NO_BESTS, paceS: null, requiredMps: null, stopsLeft: null, endRequested: false, switchRequest: null, leftEarlyAt: null, doneLegs: [], resumeReached: null };
 
 const slice = createSlice({
     name: 'trip',
     initialState,
     reducers: {
-        startTrip(_state, action: PayloadAction<{ startedAt: number; steps: TripStep[]; bests: PersonalBests }>) {
-            return { ...action.payload, stepIndex: 0, paceS: null, requiredMps: null, stopsLeft: null, endRequested: false, switchRequest: null, leftEarlyAt: null, doneLegs: [] };
+        startTrip(_state, action: PayloadAction<{ startedAt: number; steps: TripStep[]; bests: PersonalBests; resumeReached?: number }>) {
+            const { resumeReached, ...rest } = action.payload;
+            return { ...rest, resumeReached: resumeReached ?? null, stepIndex: 0, paceS: null, requiredMps: null, stopsLeft: null, endRequested: false, switchRequest: null, leftEarlyAt: null, doneLegs: [] };
         },
         setTripStep(state, action: PayloadAction<number>) {
             state.stepIndex = action.payload;
@@ -73,6 +76,7 @@ const slice = createSlice({
             state.stopsLeft = null;
             state.switchRequest = null;
             state.leftEarlyAt = null;
+            state.resumeReached = null;
         },
         requestEndTrip(state) {
             state.endRequested = true;
