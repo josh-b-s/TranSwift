@@ -7,7 +7,7 @@ import type { TripMatch } from '@/services/trips/vehicleMatch';
 const M_PER_DEG_LAT = 111_320;
 const north = (m: number) => ({ latitude: -37.8 + m / M_PER_DEG_LAT, longitude: 144.9 });
 const stopAt = (m: number) => ({ name: `s${m}`, ...north(m) });
-const path = { tripId: 'T1', line: [north(0), north(2000)], stops: [], terminus: null };
+const path = { tripId: 'T1', line: [north(0), north(2000)], stops: [], terminus: null, shaped: true };
 const ride = { type: 'transit', from: 's0', to: 's2000', end: north(2000), routeName: '96', routeType: 0, line: '', tripPk: 7,
     stops: [stopAt(0), stopAt(500), stopAt(1000), stopAt(1500), stopAt(2000)] } as unknown as TripStep;
 const walk = { type: 'walk', from: 'Home', to: 's0', end: north(0) } as TripStep;

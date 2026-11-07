@@ -4,6 +4,8 @@ import type { TripPath } from '@/services/gtfs/vehicles/tripPath';
 
 /** A fix this close to a trip's line counts as on it; GPS in streets drifts 10 to 25 m, and parallel streets are further apart. */
 export const ON_LINE_M = 35;
+/** Without a shape the line is a chord between stops, which a curving road leaves by well over ON_LINE_M. */
+export const STOPS_ONLY_ON_LINE_M = 100;
 /** A stop this close to the rider's path counts as passed. */
 export const STOP_PASSED_M = 50;
 /** Least share of fixes that must be on the line. */
@@ -33,13 +35,14 @@ export type TripMatch = {
 
 function matchOne(fixes: PathFix[], trip: TripPath): TripMatch | null {
     const projector = createLineProjector(trip.line);
+    const lineM = trip.shaped ? ON_LINE_M : STOPS_ONLY_ON_LINE_M;
     const alongs: number[] = [];
     let onLine = 0;
     let hint: number | null = null;
     for (const fix of fixes) {
         const position = projector.project(fix, hint);
         if (!position) return null;
-        if (position.distanceM <= ON_LINE_M) {
+        if (position.distanceM <= lineM) {
             onLine++;
             alongs.push(position.alongM);
             hint = position.alongM;

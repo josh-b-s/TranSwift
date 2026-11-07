@@ -15,6 +15,7 @@ const trip = (tripId: string, points: [number, number][], stopsAtM: [number, num
     line: points.map(([e, n]) => at(e, n)),
     stops: stopsAtM.map(([e, n]) => at(e, n)),
     terminus: null,
+    shaped: true,
 });
 // Rides along y = 0 eastwards, 1 km, with stops every 250 m.
 const eastRoute = trip('east', [[0, 0], [1000, 0]], [[0, 0], [250, 0], [500, 0], [750, 0], [1000, 0]]);
@@ -63,6 +64,25 @@ test('follows a line that doubles back', () => {
     // Out 500 m east, round a corner, then back along a street 30 m north; the rider is on the way back.
     const loop = trip('loop', [[0, 0], [500, 0], [500, 30], [0, 30]], [[0, 0], [500, 0], [0, 30]]);
     assert.equal(matchRecentPath(ride(450, -8, 8, 30), [loop])?.tripId, 'loop');
+});
+
+// A road that bows 60 m north between two stops 1 km apart, ridden at 8 m/s with a fix every 5 s.
+const bowed = (fromM: number): PathFix[] => Array.from({ length: 8 }, (_, i) => {
+    const x = fromM + 40 * i;
+    return { ...at(x, 60 * Math.sin((Math.PI * x) / 1000)), time: i * 5000 };
+});
+const chord = (shaped: boolean) => ({ ...trip('bow', [[0, 0], [1000, 0]], [[0, 0], [1000, 0]]), shaped });
+
+test('without a shape, follows a curving road that leaves the straight line between stops', () => {
+    assert.equal(matchRecentPath(bowed(300), [chord(false)])?.tripId, 'bow');
+});
+
+test('with a shape, the same bow is off the line', () => {
+    assert.equal(matchRecentPath(bowed(300), [chord(true)]), null);
+});
+
+test('without a shape, still turns down a path on a parallel street', () => {
+    assert.equal(matchRecentPath(ride(100, 8, 8, 150), [chord(false)]), null);
 });
 
 test('returns null with no candidates', () => {

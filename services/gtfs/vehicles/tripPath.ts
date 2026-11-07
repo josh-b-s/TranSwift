@@ -9,7 +9,7 @@ const COORD_SCALE = 1_000_000;
 export type TripRef = { tripPk: number } | { tripId: string };
 
 /** The whole line a trip runs on, every stop it calls at and the name of the last. `tripId` is the feed's id, as vehicles report it. */
-export type TripPath = { tripId: string; line: LatLng[]; stops: LatLng[]; terminus: string | null };
+export type TripPath = { tripId: string; line: LatLng[]; stops: LatLng[]; terminus: string | null; /** False when the line is only straight legs between the stops. */ shaped: boolean };
 
 type TripRow = { trip_id: string; pattern_pk: number; agency: number; shape_id: string | null };
 type PointRow = { lat: number; lon: number };
@@ -48,6 +48,7 @@ export async function loadTripPath(db: QueryableDb, trip: TripRef): Promise<Trip
     );
 
     const stops = stopRows.map(toLatLng);
-    const line = shapeRows.length > 1 ? trimShapeToStops(shapeRows.map(toLatLng), stops) : stops;
-    return { tripId: row.trip_id, line, stops, terminus: stopRows.at(-1)?.name ?? null };
+    const shaped = shapeRows.length > 1;
+    const line = shaped ? trimShapeToStops(shapeRows.map(toLatLng), stops) : stops;
+    return { tripId: row.trip_id, line, stops, terminus: stopRows.at(-1)?.name ?? null, shaped };
 }
