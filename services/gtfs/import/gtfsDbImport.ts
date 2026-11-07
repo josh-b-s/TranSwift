@@ -66,7 +66,14 @@ export async function importZipAsNewDatabase(
     const name = source?.label ?? nameFromZipFileName(zip.name ?? 'Imported feed');
     const entry = await registerDatabase(name, fileName, md5, source);
     // registerDatabase made this the active database, which computeFeedStats reads.
-    const stats = await computeFeedStats();
-    await saveFeedStats(entry.id, stats);
-    return { ...entry, stats };
+    try {
+        const stats = await computeFeedStats();
+        await saveFeedStats(entry.id, stats);
+        return { ...entry, stats };
+    } catch (err) {
+        // Registering also starts the router engine on this file, and its connection can collide with the one
+        // computeFeedStats opens ("disk I/O error"). The import itself worked, and ensureActiveStats() fills the stats in later.
+        console.warn('[gtfsDbImport] feed stats failed, leaving them for later:', err);
+        return entry;
+    }
 }

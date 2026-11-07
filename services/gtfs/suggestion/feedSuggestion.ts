@@ -2,17 +2,19 @@
  * feedSuggestion.ts — decides whether to prompt the user about GTFS data for
  * where they are:
  *  - a feed that covers them is already imported and its timetable ends soon: re-download it;
- *  - no imported feed covers them: suggest the best catalog feed that does.
- * Coverage is checked by bounding box first, then by region (reverse geocode) for
- * feeds the catalog has no box for. The same checks run against imported feeds, so
- * a feed already on the device is never suggested again.
+ *  - no imported feed covers them: suggest the largest catalog feed that does.
+ * A feed covers them if its bounding box contains them, or, for feeds the catalog has
+ * no box for, if it is in their region (reverse geocode). Both kinds compete on zip
+ * size, so a state-wide feed beats a small operator inside it. A feed already on the
+ * device is never suggested again.
  */
 
 import * as Location from 'expo-location';
-import { feedsAround, feedsInRegion, type Region } from '../catalog/catalogFilter';
+import { feedsAround, feedsInRegion, largestFirst, type Region } from '../catalog/catalogFilter';
 import type { CatalogFeed } from '../catalog/catalogParse';
 import { coverageContains, type Point } from '../catalog/coverage';
 import { loadCatalog } from '../catalog/feedCatalog';
+import { fetchZipSize } from '../import/gtfsDownload';
 import { ensureActiveStats, listDatabases, type GtfsDatabaseEntry } from '../import/gtfsDbRegistry';
 import { daysUntilGtfsDate } from './serviceDate';
 import { hasNewerVersion } from './feedUpdate';
@@ -24,12 +26,25 @@ async function regionOf(at: Point): Promise<Region | null> {
     return place?.isoCountryCode && place.region ? { country: place.isoCountryCode, subdivision: place.region } : null;
 }
 
-/** Catalog feeds covering `at`: by bounding box, or failing that by region. */
+async function zipSize(feed: CatalogFeed): Promise<number | null> {
+    try {
+        return await fetchZipSize(feed.zipUrl);
+    } catch (err) {
+        console.warn(`[feedSuggestion] size check failed for "${feed.provider}":`, err);
+        return null;
+    }
+}
+
+/** Catalog feeds covering `at`, by bounding box or by region, largest download first. */
 async function catalogFeedsAt(feeds: CatalogFeed[], at: Point): Promise<CatalogFeed[]> {
-    const byBox = feedsAround(feeds, at);
-    if (byBox.length > 0) return byBox;
-    const region = await regionOf(at);
-    return region ? feedsInRegion(feeds, region) : [];
+    // The boxes still work if the geocoder doesn't.
+    const region = await regionOf(at).catch((err) => {
+        console.warn('[feedSuggestion] reverse geocode failed:', err);
+        return null;
+    });
+    const covering = [...feedsAround(feeds, at), ...(region ? feedsInRegion(feeds, region) : [])];
+    if (covering.length < 2) return covering;
+    return largestFirst(covering, await Promise.all(covering.map(zipSize)));
 }
 
 export type FeedSuggestion =
@@ -80,8 +95,8 @@ export async function findFeedSuggestion(at: Point): Promise<FeedSuggestion | nu
     const candidates = await catalogFeedsAt(feeds, at);
     if (candidates.length === 0) return null;
 
-    // Covers this spot in the catalog but not by its stops, or has no catalog box at all.
-    const candidateIds = new Set(candidates.map((f) => f.id));
-    const imported = entries.filter((e) => e.source && candidateIds.has(e.source.id));
-    return imported.length > 0 ? expiryOrUpdateOf(imported) : { kind: 'nearby', feed: candidates[0] };
+    // The best feed covers this spot in the catalog but not by its stops, or has no catalog box at all.
+    const [best] = candidates;
+    const imported = entries.filter((e) => e.source?.id === best.id);
+    return imported.length > 0 ? expiryOrUpdateOf(imported) : { kind: 'nearby', feed: best };
 }

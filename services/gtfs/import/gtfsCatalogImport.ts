@@ -17,7 +17,7 @@ import type { ImportProgressEvent } from './rustGtfsImporter';
  * Downloads a catalog feed, imports it as a new database, then deletes the zip.
  * With `replaceId`, the database it replaces is deleted afterwards and the new
  * one takes over its name and realtime settings. Otherwise the realtime URLs
- * are filled in from the Mobility Database.
+ * are filled in from the Mobility Database. `onInterrupted` is asked what to do when the connection drops mid-download.
  */
 export async function importCatalogFeed(
     feed: CatalogFeed,
@@ -25,8 +25,9 @@ export async function importCatalogFeed(
     onImport: (p: ImportProgressEvent) => void,
     replaceId?: string,
     signal?: AbortSignal,
+    onInterrupted?: (err: unknown) => Promise<boolean>,
 ): Promise<GtfsDatabaseEntry> {
-    const zip = await downloadZip(feed.zipUrl, `${feed.id}.zip`, onDownload, signal);
+    const zip = await downloadZip(feed.zipUrl, `${feed.id}.zip`, onDownload, signal, onInterrupted);
     try {
         const entry = await importZipAsNewDatabase(zip, onImport, {
             id: feed.id,

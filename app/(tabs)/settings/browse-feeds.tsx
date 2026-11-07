@@ -27,6 +27,9 @@ export default function BrowseFeeds() {
     const { feedId, replaceId } = useLocalSearchParams<{ feedId?: string; replaceId?: string }>();
     const openedFeed = useRef(false);
     const abortRef = useRef<AbortController | null>(null);
+    // Set while a dropped download waits for the user to continue or give up.
+    const answerRef = useRef<((again: boolean) => void) | null>(null);
+    const [stalled, setStalled] = useState(false);
     const [catalog, setCatalog] = useState<CatalogResult | null>(null);
     const [loadError, setLoadError] = useState('');
     const [refreshing, setRefreshing] = useState(false);
@@ -93,6 +96,22 @@ export default function BrowseFeeds() {
         );
     }
 
+    function askToContinue(): Promise<boolean> {
+        setStalled(true);
+        return new Promise((resolve) => {
+            answerRef.current = (again) => {
+                answerRef.current = null;
+                setStalled(false);
+                resolve(again);
+            };
+        });
+    }
+
+    function cancelImport() {
+        abortRef.current?.abort();
+        answerRef.current?.(false);
+    }
+
     async function runImport(feed: CatalogFeed) {
         const track = createProgressTracker();
         setBusy({ label: feed.provider, progress: downloadProgress(0, 0) });
@@ -105,6 +124,7 @@ export default function BrowseFeeds() {
                 (p) => setBusy({ label: feed.provider, progress: track(p) }),
                 replaceId,
                 abort.signal,
+                askToContinue,
             );
             if (router.canGoBack()) router.back();
             else router.replace('/settings');
@@ -118,6 +138,8 @@ export default function BrowseFeeds() {
             }
         } finally {
             abortRef.current = null;
+            answerRef.current = null;
+            setStalled(false);
             setBusy(null);
         }
     }
@@ -194,8 +216,11 @@ export default function BrowseFeeds() {
             {busy && (
                 <ImportProgressCard
                     fileName={busy.label}
-                    progress={busy.progress}
-                    onCancel={() => abortRef.current?.abort()}
+                    progress={stalled
+                        ? { ...busy.progress, label: 'Connection lost', detail: 'What was downloaded is kept.' }
+                        : busy.progress}
+                    onCancel={cancelImport}
+                    onContinue={stalled ? () => answerRef.current?.(true) : undefined}
                 />
             )}
             {!!error && <Text style={{ color: '#ef4444', fontSize: 12 }}>{error}</Text>}

@@ -22,6 +22,14 @@ export function feedsAround(feeds: CatalogFeed[], at: Point): CatalogFeed[] {
         .sort((a, b) => coverageArea(a.box!) - coverageArea(b.box!));
 }
 
+/** `feeds` by zip size in bytes (`sizes[i]` is for `feeds[i]`), largest first. Feeds with an unknown size (null) keep their order, after the rest. */
+export function largestFirst(feeds: CatalogFeed[], sizes: (number | null)[]): CatalogFeed[] {
+    return feeds
+        .map((feed, i) => ({ feed, size: sizes[i] ?? -1 }))
+        .sort((a, b) => b.size - a.size)
+        .map(({ feed }) => feed);
+}
+
 export type Region = { country: string; subdivision: string };
 
 /** Box-less feeds in `region`. Very large feeds (PTV's) often have no box in the catalog, so coordinates can't find them. */

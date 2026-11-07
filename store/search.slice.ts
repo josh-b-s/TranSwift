@@ -1,7 +1,9 @@
 import { createAsyncThunk, createSlice, PayloadAction } from '@reduxjs/toolkit';
+import * as Location from 'expo-location';
 import type { LatLng, SearchPlace } from '@/services/places/places';
 import { searchPlaces as searchPlacesService } from '@/services/places/places';
 import { CURRENT_LOCATION } from '@/services/places/endpoints';
+import { pinNameFrom, type PinName } from '@/services/places/pinName';
 
 export type { SearchPlace };
 
@@ -21,6 +23,16 @@ export const searchPlaces = createAsyncThunk<
         return rejectWithValue(String(err));
     }
 });
+
+/** Looks up what to call a dropped pin. A failed lookup just leaves the pin as it is. */
+export const namePin = createAsyncThunk<(PinName & { placeId: string }) | null, SearchPlace>(
+    'search/namePin',
+    async (pin) => {
+        const [address] = await Location.reverseGeocodeAsync(pin);
+        const named = address ? pinNameFrom(address) : null;
+        return named && { placeId: pin.place_id, ...named };
+    },
+);
 
 type State = {
     query: string;
@@ -110,6 +122,16 @@ const slice = createSlice({
                 s.error = a.payload ?? String(a.error);
                 s.results = [];
                 s.showResults = false;
+            })
+            // The pin can be either end by now, or swapped, so it is found by id.
+            .addCase(namePin.fulfilled, (s, a) => {
+                const named = a.payload;
+                if (!named) return;
+                for (const place of [s.origin, s.selected]) {
+                    if (place?.place_id !== named.placeId) continue;
+                    place.name = named.name;
+                    place.address = named.address;
+                }
             });
     },
 });

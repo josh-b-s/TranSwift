@@ -4,7 +4,7 @@ import MapView from 'react-native-maps';
 import { useDispatch, useSelector } from 'react-redux';
 import * as Haptics from 'expo-haptics';
 import { AppDispatch, RootState } from '@/store/store';
-import { selectPlace, setOrigin, stopPicking } from '@/store/search.slice';
+import { namePin, selectPlace, setOrigin, stopPicking } from '@/store/search.slice';
 import { makePinPlace } from '@/services/places/endpoints';
 import { useRequestRoute } from '@/hooks/requestRoute';
 import { ACCENT, RADIUS, SHADOW } from '@/constants/themes';
@@ -42,6 +42,7 @@ export default function MapPickOverlay({ mapRef }: { mapRef: RefObject<MapView |
             requestRoute({ destination: pin });
         }
         dispatch(stopPicking());
+        dispatch(namePin(pin));
     }
 
     return (

@@ -9,6 +9,8 @@ type Props = {
     progress: ImportProgress;
     /** Shows a cancel button while the progress is cancellable. */
     onCancel?: () => void;
+    /** Shows a continue button, for a download that stopped when the connection dropped. */
+    onContinue?: () => void;
 };
 
 function confirmCancel(onCancel: () => void) {
@@ -18,7 +20,7 @@ function confirmCancel(onCancel: () => void) {
     ]);
 }
 
-export default function ImportProgressCard({ fileName, progress, onCancel }: Props) {
+export default function ImportProgressCard({ fileName, progress, onCancel, onContinue }: Props) {
     const theme = useThemeStyle();
     const eta = formatEta(progress.etaSeconds);
 
@@ -43,11 +45,18 @@ export default function ImportProgressCard({ fileName, progress, onCancel }: Pro
                 {!!eta && <Text style={{ color: theme.color, opacity: 0.5, fontSize: 12 }}>{eta}</Text>}
             </View>
 
-            {onCancel && progress.cancellable && (
-                <Pressable onPress={() => confirmCancel(onCancel)} hitSlop={8} style={{ alignSelf: 'flex-start' }}>
-                    <Text style={{ color: '#ef4444', fontSize: 14, fontWeight: '600' }}>Cancel</Text>
-                </Pressable>
-            )}
+            <View style={{ flexDirection: 'row', gap: 20 }}>
+                {onContinue && (
+                    <Pressable onPress={onContinue} hitSlop={8} accessibilityRole="button">
+                        <Text style={{ color: '#2563eb', fontSize: 14, fontWeight: '600' }}>Continue</Text>
+                    </Pressable>
+                )}
+                {onCancel && progress.cancellable && (
+                    <Pressable onPress={() => confirmCancel(onCancel)} hitSlop={8} accessibilityRole="button">
+                        <Text style={{ color: '#ef4444', fontSize: 14, fontWeight: '600' }}>Cancel</Text>
+                    </Pressable>
+                )}
+            </View>
         </View>
     );
 }
