@@ -27,6 +27,7 @@ export async function downloadZip(
         ({ totalBytesWritten, totalBytesExpectedToWrite }) =>
             onProgress(totalBytesWritten, Math.max(totalBytesExpectedToWrite, 0)),
     );
+    const discardPartial = () => FileSystem.deleteAsync(target, { idempotent: true });
     // pauseAsync stops the native transfer; the partial file is deleted below.
     signal?.addEventListener('abort', () => task.pauseAsync().catch(() => {}), { once: true });
     if (signal?.aborted) throw new CancelledError();
@@ -35,13 +36,19 @@ export async function downloadZip(
     try {
         res = await task.downloadAsync();
     } catch (err) {
-        if (!signal?.aborted) throw err;
+        if (!signal?.aborted) {
+            await discardPartial();
+            throw err;
+        }
     }
     if (signal?.aborted) {
-        await FileSystem.deleteAsync(target, { idempotent: true });
+        await discardPartial();
         throw new CancelledError();
     }
-    if (!res || res.status !== 200) throw new Error(`Download failed (HTTP ${res?.status ?? 'none'})`);
+    if (!res || res.status !== 200) {
+        await discardPartial();
+        throw new Error(`Download failed (HTTP ${res?.status ?? 'none'})`);
+    }
     const header = (name: string) =>
         Object.entries(res.headers ?? {}).find(([k]) => k.toLowerCase() === name)?.[1];
     return { uri: res.uri, name: fileName, etag: header('etag'), lastModified: header('last-modified') };

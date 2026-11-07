@@ -13,7 +13,8 @@ export function rideBetween(step: RideStep, fromIndex: number, toIndex: number):
         end: { latitude: last.latitude, longitude: last.longitude },
         stops,
         line: encodeLine(stops),
-        // These belong to the whole ride, so they would point the live arrival at the wrong stop.
+        // These belong to the whole ride, so they would point the live arrival and departure at the wrong stop.
+        departureMs: undefined,
         arrivalMs: undefined,
         tripPk: undefined,
         alightSequence: undefined,

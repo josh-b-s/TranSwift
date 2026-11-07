@@ -3,12 +3,14 @@ import { Alert, AppState } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch, RootState } from '@/store/store';
 import { viewTrip } from '@/store/tripView.slice';
-import { applySwitch, clearSwitchRequest, endTrip, setLeftEarlyAt, setTripPace, setTripStep, setTripStopsLeft, type SwitchRequest } from '@/store/trip.slice';
+import { applySwitch, clearSwitchRequest, endTrip, setLeftEarlyAt, setTripPace, setTripRequiredMps, setTripStep, setTripStopsLeft, type SwitchRequest } from '@/store/trip.slice';
 import { createTripSession, rideLegOf } from '@/services/trips/tripSession';
+import { haversineMeters } from '@/services/geo/geoUtil';
 import { getDb } from '@/services/db/sqliteDb';
 import { createAlightAlert } from '@/services/trips/alightAlert';
 import { refreshedArrivalMs } from '@/services/trips/liveArrival';
 import { paceAgainstBest } from '@/services/trips/livePace';
+import { requiredSpeedMps } from '@/services/trips/requiredSpeed';
 import { startTracking } from '@/services/trips/locationTracking';
 import { applyTrip } from '@/services/trips/personalBests';
 import { saveTrip, type SavedLeg, type SavedTrip } from '@/services/trips/tripStore';
@@ -124,6 +126,23 @@ export function useTripRecorder() {
             dispatch(setTripPace(rounded));
         };
 
+        let lastRequiredMps: number | null = null;
+        // A walk to a stop must end before the ride from it leaves. Any other step has no deadline to hold the rider to.
+        const updateRequiredSpeed = (stepIndex: number, here: { latitude: number; longitude: number }) => {
+            const step = steps[stepIndex];
+            const nextRide = steps[stepIndex + 1];
+            const departureMs = step?.type === 'walk' && nextRide?.type === 'transit' ? nextRide.departureMs : undefined;
+            const required = departureMs === undefined ? null : requiredSpeedMps(
+                haversineMeters({ lat: here.latitude, lon: here.longitude }, { lat: step.end.latitude, lon: step.end.longitude }),
+                departureMs,
+                Date.now(),
+            );
+            const rounded = required === null ? null : Math.round(required * 10) / 10;
+            if (rounded === lastRequiredMps) return;
+            lastRequiredMps = rounded;
+            dispatch(setTripRequiredMps(rounded));
+        };
+
         let lastStopsLeft: number | null = null;
         // Stops left on the current ride, for the sheet and the pinned notification. Clears both once the ride is over.
         const updateRide = (stepIndex: number) => {
@@ -202,6 +221,7 @@ export function useTripRecorder() {
             updateLeftEarly();
             checkAlight(session.stepIndex, coords, Date.now(), liveArrival?.stepIndex === session.stepIndex ? liveArrival.ms : undefined);
             updatePace();
+            updateRequiredSpeed(session.stepIndex, coords);
         })
             .then(stop => {
                 if (cancelled) {

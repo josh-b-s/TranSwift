@@ -20,6 +20,8 @@ type State = {
     bests: PersonalBests;
     /** Whole seconds ahead (positive) or behind the current walk's best; null when there is no reading. */
     paceS: number | null;
+    /** Metres per second the rider must average to reach the next ride on time; null when there is no such ride or time. */
+    requiredMps: number | null;
     /** Stops left on the current ride, counting the one to get off at; null when not riding or not known yet. */
     stopsLeft: number | null;
     /** Set when the rider ends the trip, so the recorder can save what was followed before the trip is cleared. */
@@ -31,20 +33,23 @@ type State = {
     doneLegs: SavedLeg[];
 };
 
-const initialState: State = { startedAt: null, steps: [], stepIndex: 0, bests: NO_BESTS, paceS: null, stopsLeft: null, endRequested: false, switchRequest: null, leftEarlyAt: null, doneLegs: [] };
+const initialState: State = { startedAt: null, steps: [], stepIndex: 0, bests: NO_BESTS, paceS: null, requiredMps: null, stopsLeft: null, endRequested: false, switchRequest: null, leftEarlyAt: null, doneLegs: [] };
 
 const slice = createSlice({
     name: 'trip',
     initialState,
     reducers: {
         startTrip(_state, action: PayloadAction<{ startedAt: number; steps: TripStep[]; bests: PersonalBests }>) {
-            return { ...action.payload, stepIndex: 0, paceS: null, stopsLeft: null, endRequested: false, switchRequest: null, leftEarlyAt: null, doneLegs: [] };
+            return { ...action.payload, stepIndex: 0, paceS: null, requiredMps: null, stopsLeft: null, endRequested: false, switchRequest: null, leftEarlyAt: null, doneLegs: [] };
         },
         setTripStep(state, action: PayloadAction<number>) {
             state.stepIndex = action.payload;
         },
         setTripPace(state, action: PayloadAction<number | null>) {
             state.paceS = action.payload;
+        },
+        setTripRequiredMps(state, action: PayloadAction<number | null>) {
+            state.requiredMps = action.payload;
         },
         setTripStopsLeft(state, action: PayloadAction<number | null>) {
             state.stopsLeft = action.payload;
@@ -64,6 +69,7 @@ const slice = createSlice({
             state.doneLegs = [...state.doneLegs, ...action.payload.legs];
             state.stepIndex = 0;
             state.paceS = null;
+            state.requiredMps = null;
             state.stopsLeft = null;
             state.switchRequest = null;
             state.leftEarlyAt = null;
@@ -77,5 +83,5 @@ const slice = createSlice({
     },
 });
 
-export const { startTrip, setTripStep, setTripPace, setTripStopsLeft, setLeftEarlyAt, requestSwitch, clearSwitchRequest, applySwitch, requestEndTrip, endTrip } = slice.actions;
+export const { startTrip, setTripStep, setTripPace, setTripRequiredMps, setTripStopsLeft, setLeftEarlyAt, requestSwitch, clearSwitchRequest, applySwitch, requestEndTrip, endTrip } = slice.actions;
 export default slice.reducer;

@@ -17,6 +17,9 @@ import Search from '@/components/search/Search';
 import LocationButton from '@/components/map/LocationButton';
 import Speedometer from '@/components/trip/Speedometer';
 import RouteBottomSheetModal from '@/components/sheets/RouteBottomSheetModal';
+import SpeedMarker from '@/components/map/SpeedMarker';
+import { formatSpeed } from '@/services/trips/tripFormat';
+import { pointAt } from '@/services/trips/speedTrack';
 import TripSummarySheet from '@/components/sheets/TripSummarySheet';
 import MapTopBar from '@/components/map/MapTopBar';
 import RouteLines from '@/components/map/RouteLines';
@@ -106,6 +109,10 @@ export default function Index() {
     const alternativesOpen = useSelector((s: RootState) => s.alternatives.open);
     const {viewed, error: viewedError} = useViewedTrip();
     const closeTripView = useCloseTripView();
+    const [scrubFraction, setScrubFraction] = useState<number | null>(null);
+    useEffect(() => setScrubFraction(null), [viewedTripId]);
+    const scrubPoint = viewed && scrubFraction !== null && viewed.speedTrack.length > 0 ? pointAt(viewed.speedTrack, scrubFraction) : null;
+    const speedUnit = useSelector((s: RootState) => s.preferences.speedUnit);
     const debugEnabled = useSelector((s: RootState) => s.debug.enabled);
 
     const [region, setRegion] = useState<Region | null>(null);
@@ -178,8 +185,8 @@ export default function Index() {
         }
     }, [isFocused, viewedTripId]);
 
-    // Stop dots give way to the route once a place is chosen, and so does the departures sheet.
-    const stopsTappable = isFocused && selectedPlace === null && pickingField === null && viewedTripId === null && !debugEnabled;
+    // Stop dots give way to the route once a place is chosen, and so does the departures sheet. A running trip keeps them.
+    const stopsTappable = isFocused && (selectedPlace === null || tripRunning) && pickingField === null && viewedTripId === null && !debugEnabled;
     const stopsInView = useStopsInView(region, stopsTappable);
     const vehicleScope = useSelector((s: RootState) => s.preferences.vehicleScope);
     const zoomedIn = isZoomedIn(region);
@@ -197,8 +204,8 @@ export default function Index() {
     );
     const stopColors = useStopColors(stopsInView);
     useEffect(() => {
-        if (selectedPlace !== null || viewedTripId !== null) setDepartureStop(null);
-    }, [selectedPlace, viewedTripId]);
+        if ((selectedPlace !== null && !tripRunning) || viewedTripId !== null) setDepartureStop(null);
+    }, [selectedPlace, tripRunning, viewedTripId]);
     // Same handling as the route sheet above: closed, not dismissed, while another tab is showing.
     useEffect(() => {
         if (!isFocused) {
@@ -400,10 +407,14 @@ export default function Index() {
 
                 {!debugEnabled && viewed && <RouteLines lines={viewed.lines}/>}
 
+                {!debugEnabled && scrubPoint && (
+                    <SpeedMarker latitude={scrubPoint.latitude} longitude={scrubPoint.longitude} label={formatSpeed(scrubPoint.mps, speedUnit)}/>
+                )}
+
                 {!debugEnabled && tripPath && tripFocus && <TripPathOverlay path={tripPath} color={tripFocus.color} />}
 
                 <StopDots stops={stopsInView} colors={stopColors} />
-                <VehicleMarkers vehicles={drawnVehicles} center={region} selectedTripId={focusedTripId} onPress={selectVehicle} />
+                <VehicleMarkers vehicles={drawnVehicles} center={region} capped={zoomedIn} selectedTripId={focusedTripId} selectedTerminus={tripPath?.terminus ?? null} onPress={selectVehicle} />
 
                 {!isCurrentLocation(origin) && (
                     <PlaceMarker latitude={origin.latitude} longitude={origin.longitude} color={ORIGIN_PIN_COLOR} title={origin.name} />
@@ -468,7 +479,7 @@ export default function Index() {
             {/*<DebugControls />*/}
             {__DEV__ && <DebugMovementControls mapRef={mapRef} animatedPosition={bottomSheetPosition} followsUser={follow.mode !== 'free'}/>}
             <RouteBottomSheetModal ref={modalRef} animatedPosition={bottomSheetPosition} />
-            <TripSummarySheet ref={tripSheetRef} animatedPosition={bottomSheetPosition} viewed={viewed} error={viewedError} />
+            <TripSummarySheet ref={tripSheetRef} animatedPosition={bottomSheetPosition} viewed={viewed} error={viewedError} scrubFraction={scrubFraction} onScrub={setScrubFraction} />
             <StopDeparturesSheet
                 ref={departuresRef}
                 stop={departureStop}

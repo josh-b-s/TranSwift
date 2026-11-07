@@ -35,6 +35,8 @@ export type GtfsDatabaseEntry = {
     zipHash?: string;
     /** Set for feeds imported from the catalog; absent for zips picked from the device. */
     source?: FeedSource;
+    /** When the server was last asked whether `source` has a newer version. */
+    updateCheckedAt?: number;
     /** Computed once after import. Absent on entries imported before it existed. */
     stats?: FeedStats;
     /** GTFS-realtime TripUpdates URLs, e.g. one per transport mode. Set by hand; realtime is off without any. */
@@ -266,6 +268,14 @@ export async function setRealtimeConfig(id: string, config: RealtimeConfig): Pro
     entry.alertUrls = cleanUrls(config.alertUrls);
     entry.realtimeHeader = config.header.trim() || undefined;
     entry.realtimeQuery = config.query.trim() || undefined;
+    await writeRegistry(reg);
+}
+
+export async function setUpdateCheckedAt(id: string, checkedAt: number): Promise<void> {
+    const reg = await readRegistry();
+    const entry = reg.databases.find(d => d.id === id);
+    if (!entry) return;
+    entry.updateCheckedAt = checkedAt;
     await writeRegistry(reg);
 }
 

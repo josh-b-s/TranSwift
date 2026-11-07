@@ -8,11 +8,12 @@ const COORD_SCALE = 1_000_000;
 /** A trip named either by the timetable's key (a departure has it) or by the feed's id (a vehicle has it). */
 export type TripRef = { tripPk: number } | { tripId: string };
 
-/** The whole line a trip runs on, and every stop it calls at. `tripId` is the feed's id, as vehicles report it. */
-export type TripPath = { tripId: string; line: LatLng[]; stops: LatLng[] };
+/** The whole line a trip runs on, every stop it calls at and the name of the last. `tripId` is the feed's id, as vehicles report it. */
+export type TripPath = { tripId: string; line: LatLng[]; stops: LatLng[]; terminus: string | null };
 
 type TripRow = { trip_id: string; pattern_pk: number; agency: number; shape_id: string | null };
 type PointRow = { lat: number; lon: number };
+type StopRow = PointRow & { name: string };
 
 const toLatLng = (r: PointRow): LatLng => ({ latitude: r.lat / COORD_SCALE, longitude: r.lon / COORD_SCALE });
 
@@ -29,8 +30,8 @@ export async function loadTripPath(db: QueryableDb, trip: TripRef): Promise<Trip
     );
     if (!row) return null;
 
-    const stopRows = await db.getAllAsync<PointRow>(
-        `SELECT s.stop_lat AS lat, s.stop_lon AS lon
+    const stopRows = await db.getAllAsync<StopRow>(
+        `SELECT s.stop_lat AS lat, s.stop_lon AS lon, s.stop_name AS name
          FROM pattern_stops ps
          JOIN stops s ON s.stop_pk = ps.stop_pk
          WHERE ps.pattern_pk = ?
@@ -48,5 +49,5 @@ export async function loadTripPath(db: QueryableDb, trip: TripRef): Promise<Trip
 
     const stops = stopRows.map(toLatLng);
     const line = shapeRows.length > 1 ? trimShapeToStops(shapeRows.map(toLatLng), stops) : stops;
-    return { tripId: row.trip_id, line, stops };
+    return { tripId: row.trip_id, line, stops, terminus: stopRows.at(-1)?.name ?? null };
 }

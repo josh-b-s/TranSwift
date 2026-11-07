@@ -5,6 +5,8 @@ const METRES_PER_DEG = 111_320;
 const MAX_END_GAP_M = 500;
 /** First and last stop this close means a loop line, where "nearest point to each end" can't tell the ends apart. */
 const LOOP_GAP_M = 50;
+/** A shape point this close to a stop already meets it, so the stop is not joined on again. */
+const ON_STOP_M = 1;
 
 function metres(a: LatLng, b: LatLng): number {
     const dLat = (a.latitude - b.latitude) * METRES_PER_DEG;
@@ -41,5 +43,6 @@ export function trimShapeToStops(shape: LatLng[], stops: LatLng[]): LatLng[] {
 
     if (best.end <= best.start) return shape;
     if (best.startDist > MAX_END_GAP_M || best.endDist > MAX_END_GAP_M) return shape;
-    return [first, ...shape.slice(best.start, best.end + 1), last];
+    const cut = shape.slice(best.start, best.end + 1);
+    return [...(best.startDist > ON_STOP_M ? [first] : []), ...cut, ...(best.endDist > ON_STOP_M ? [last] : [])];
 }

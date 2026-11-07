@@ -5,10 +5,10 @@ import { MAX_PLAUSIBLE_MPS } from './pathStats';
 // A single GPS fix is too noisy for a speed, so each point spans at least this long.
 const WINDOW_MS = 5_000;
 
-type TimedSpeed = { atS: number; mps: number };
+export type TimedSpeed = { atS: number; mps: number };
 
 /** Speed over each window of one walk, stamped with its midpoint in seconds from the walk's start. */
-function windowSpeeds(path: Sample[]): TimedSpeed[] {
+export function windowSpeeds(path: Sample[]): TimedSpeed[] {
     const out: TimedSpeed[] = [];
     let end = 0;
     for (let start = 0; start < path.length - 1; start++) {

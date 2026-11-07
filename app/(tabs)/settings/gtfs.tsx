@@ -1,6 +1,11 @@
 import React, { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
+import { useDispatch, useSelector } from 'react-redux';
+import { AppDispatch, RootState } from '@/store/store';
+import { setAutoUpdateFeeds } from '@/store/preferences.slice';
+import SegmentedControl from '@/components/ui/SegmentedControl';
+import SettingsSection from '@/components/ui/SettingsSection';
 import { Bus, CircleCheck, CirclePlus, CircleX, Download, Globe, Pencil, Trash2 } from 'lucide-react-native';
 import { useThemeStyle } from '@/constants/themes';
 import ImportProgressCard from '@/components/ui/ImportProgressCard';
@@ -45,6 +50,8 @@ export default function GtfsData() {
     const theme = useThemeStyle();
     const pill = usePillStyle();
     const router = useRouter();
+    const dispatch = useDispatch<AppDispatch>();
+    const autoUpdateFeeds = useSelector((s: RootState) => s.preferences.autoUpdateFeeds);
     const [databases, setDatabases] = useState<GtfsDatabaseEntry[]>([]);
     const [activeId, setActiveId] = useState<string | null>(null);
     const [loaded, setLoaded] = useState(false);
@@ -130,7 +137,7 @@ export default function GtfsData() {
                 setError(`Import failed: ${String(err)}`);
             }
         } finally {
-            if (cachedZipUri) await FileSystem.deleteAsync(cachedZipUri, { idempotent: true }).catch(() => {});
+            if (cachedZipUri) await FileSystem.deleteAsync(cachedZipUri, { idempotent: true }).catch((err) => console.warn('[addZip] could not delete the cached zip:', err));
             abortRef.current = null;
             setImportState({ busy: false });
         }
@@ -259,6 +266,17 @@ export default function GtfsData() {
             <Text style={{ color: theme.color, opacity: 0.5, fontSize: 13 }}>
                 Each imported feed becomes its own database. Pick which one the app should route against.
             </Text>
+
+            <SettingsSection
+                title="Automatic updates"
+                hint="On wifi, about once a week, check feeds you added from the catalog and download a newer version if there is one. Realtime settings are kept."
+            >
+                <SegmentedControl
+                    options={[{ value: 'off', label: 'Off' }, { value: 'on', label: 'On' }]}
+                    value={autoUpdateFeeds ? 'on' : 'off'}
+                    onChange={(value) => dispatch(setAutoUpdateFeeds(value === 'on'))}
+                />
+            </SettingsSection>
 
             {loaded && databases.length === 0 && !importState.busy && (
                 <Text style={{ color: theme.color, opacity: 0.5, fontSize: 13, fontStyle: 'italic' }}>

@@ -189,6 +189,19 @@ fn pack_coord(v: &str) -> Option<i64> {
     v.parse::<f64>().ok().map(|f| (f * 1_000_000.0).round() as i64)
 }
 
+/// Shape points closer than this to the last kept point are dropped, so corners survive and only dense runs thin out.
+const MIN_SHAPE_POINT_GAP_M: f64 = 10.0;
+const METRES_PER_COORD_UNIT: f64 = 0.11132; // one 1e-6 degree of latitude
+
+struct ShapeCursor { pk: i64, kept: (i64, i64), skipped: Option<(i64, i64, i64)> }
+
+fn metres_apart(a: (i64, i64), b: (i64, i64)) -> f64 {
+    let lon_scale = (a.0 as f64 / 1_000_000.0).to_radians().cos();
+    let dlat = (b.0 - a.0) as f64 * METRES_PER_COORD_UNIT;
+    let dlon = (b.1 - a.1) as f64 * METRES_PER_COORD_UNIT * lon_scale;
+    dlat.hypot(dlon)
+}
+
 fn parse_gtfs_time_sec(s: &str) -> i64 {
     if s.is_empty() { return 0; }
     let mut parts = s.split(':');
@@ -524,18 +537,14 @@ fn process_agency(
     // ── pattern_hops + pattern_headway (frequency-graph precompute) ─────
     compute_and_insert_pattern_stats(conn, agency_id, &pattern_groups, &trip_to_pattern_pk, &trip_stop_times, progress)?;
 
-    // ── shapes — same every-3rd-point decimation as both TS versions ────
+    // ── shapes, thinned so points closer than MIN_SHAPE_POINT_GAP_M to the last kept one are dropped ────
     let mut next_shape_pk = pk_offsets.shape;
     {
         let bytes = source.file("shapes.txt");
         if !bytes.is_empty() {
             let mut ins_meta = conn.prepare("INSERT INTO shape_meta (shape_pk,shape_id,agency) VALUES (?,?,?)")?;
             let mut ins_shape = conn.prepare("INSERT INTO shapes (shape_pk,shape_pt_lat,shape_pt_lon,shape_pt_sequence) VALUES (?,?,?,?)")?;
-            let mut shape_id_to_pk: HashMap<String, i64> = HashMap::new();
-            let mut pt_count: HashMap<String, u64> = HashMap::new();
-            // The latest point decimation skipped, per shape. Whatever is left here when the file ends is a shape's
-            // last point, which is written so the line reaches the terminus.
-            let mut pending_last: HashMap<String, (i64, i64, i64)> = HashMap::new();
+            let mut cursors: HashMap<String, ShapeCursor> = HashMap::new();
 
             let mut rdr = csv::ReaderBuilder::new().has_headers(true).flexible(true).from_reader(bytes.as_slice());
             let headers = rdr.headers().map_err(|e| {
@@ -553,29 +562,30 @@ fn process_agency(
                         rec.get(lati).and_then(pack_coord),
                         rec.get(loni).and_then(pack_coord),
                     ) { (Some(a), Some(b)) => (a, b), _ => continue };
-                    let cnt = *pt_count.get(shape_id).unwrap_or(&0);
-                    pt_count.insert(shape_id.to_string(), cnt + 1);
                     let seq: i64 = seq_i.and_then(|i| rec.get(i)).and_then(|v| v.parse().ok()).unwrap_or(0);
-                    if cnt != 0 && cnt % 3 != 0 {
-                        pending_last.insert(shape_id.to_string(), (lat, lon, seq));
-                        continue;
+                    match cursors.get_mut(shape_id) {
+                        None => {
+                            let pk = next_shape_pk; next_shape_pk += 1;
+                            ins_meta.execute(params![pk, shape_id, agency_id])?;
+                            ins_shape.execute(params![pk, lat, lon, seq])?;
+                            cursors.insert(shape_id.to_string(), ShapeCursor { pk, kept: (lat, lon), skipped: None });
+                            stored += 1;
+                        }
+                        Some(c) if metres_apart(c.kept, (lat, lon)) >= MIN_SHAPE_POINT_GAP_M => {
+                            ins_shape.execute(params![c.pk, lat, lon, seq])?;
+                            c.kept = (lat, lon);
+                            c.skipped = None;
+                            stored += 1;
+                        }
+                        Some(c) => c.skipped = Some((lat, lon, seq)),
                     }
-                    pending_last.remove(shape_id);
-                    let shape_pk = *shape_id_to_pk.entry(shape_id.to_string()).or_insert_with(|| {
-                        let pk = next_shape_pk; next_shape_pk += 1;
-                        pk
-                    });
-                    if pt_count[shape_id] == 1 {
-                        ins_meta.execute(params![shape_pk, shape_id, agency_id])?;
-                    }
-                    ins_shape.execute(params![shape_pk, lat, lon, seq])?;
-                    stored += 1;
                     if stored % 200_000 == 0 { progress.on_progress(format!("agency {agency_id} · shapes"), stored, 0)?; }
                 }
             }
-            for (shape_id, (lat, lon, seq)) in pending_last {
-                if let Some(&shape_pk) = shape_id_to_pk.get(&shape_id) {
-                    ins_shape.execute(params![shape_pk, lat, lon, seq])?;
+            // The last point of a shape is always kept so the line reaches the terminus.
+            for c in cursors.values() {
+                if let Some((lat, lon, seq)) = c.skipped {
+                    ins_shape.execute(params![c.pk, lat, lon, seq])?;
                     stored += 1;
                 }
             }

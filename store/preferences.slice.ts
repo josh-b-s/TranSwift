@@ -24,6 +24,7 @@ type State = {
     maxWalkDistanceM: number;
     weeklyGoalM: number;
     vehicleScope: VehicleScope;
+    autoUpdateFeeds: boolean;
     /** True once loadPreferences() has resolved — screens can use this to
      *  avoid flashing default values before the real ones load. */
     loaded: boolean;
@@ -36,6 +37,7 @@ const initialState: State = {
     maxWalkDistanceM: DEFAULT_MAX_WALK_DISTANCE_M,
     weeklyGoalM: NO_WEEKLY_GOAL_M,
     vehicleScope: DEFAULT_VEHICLE_SCOPE,
+    autoUpdateFeeds: false,
     loaded: false,
 };
 
@@ -49,6 +51,7 @@ function persist(state: State) {
         maxWalkDistanceM: state.maxWalkDistanceM,
         weeklyGoalM: state.weeklyGoalM,
         vehicleScope: state.vehicleScope,
+        autoUpdateFeeds: state.autoUpdateFeeds,
     }).catch(err => {
         console.warn('[preferences] failed to persist:', err);
     });
@@ -75,6 +78,10 @@ const slice = createSlice({
         },
         setVehicleScope(state, action: PayloadAction<VehicleScope>) {
             state.vehicleScope = action.payload;
+            persist(state);
+        },
+        setAutoUpdateFeeds(state, action: PayloadAction<boolean>) {
+            state.autoUpdateFeeds = action.payload;
             persist(state);
         },
         setMaxWalkDistance(state, action: PayloadAction<number>) {
@@ -110,6 +117,7 @@ const slice = createSlice({
             state.maxWalkDistanceM = DEFAULT_MAX_WALK_DISTANCE_M;
             state.weeklyGoalM = NO_WEEKLY_GOAL_M;
             state.vehicleScope = DEFAULT_VEHICLE_SCOPE;
+            state.autoUpdateFeeds = false;
             nativewindColorScheme.set(DEFAULT_THEME_MODE);
             persist(state);
         },
@@ -122,6 +130,7 @@ const slice = createSlice({
             state.maxWalkDistanceM = action.payload.maxWalkDistanceM;
             state.weeklyGoalM = action.payload.weeklyGoalM;
             state.vehicleScope = action.payload.vehicleScope;
+            state.autoUpdateFeeds = action.payload.autoUpdateFeeds;
             state.loaded = true;
             nativewindColorScheme.set(action.payload.themeMode);
         });
@@ -134,6 +143,7 @@ export const {
     setMaxWalkDistance,
     setWeeklyGoal,
     setVehicleScope,
+    setAutoUpdateFeeds,
     addWalkingSpeed,
     updateWalkingSpeed,
     removeWalkingSpeed,

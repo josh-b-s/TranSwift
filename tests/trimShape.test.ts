@@ -19,11 +19,16 @@ test('extends a shape that stops short of the end stops', () => {
     assert.deepEqual(out[out.length - 1], pt(0, 0.0095));
 });
 
+test('does not repeat an end point that already sits on its stop', () => {
+    const out = trimShapeToStops(line, [pt(0, 0.002), pt(0, 0.008)]);
+    assert.equal(out.length, 7);
+});
+
 test('keeps the direction of travel when the shape doubles back', () => {
     const there = [pt(0, 0), pt(0, 0.002), pt(0, 0.004)];
     const out = trimShapeToStops([...there, ...there.slice().reverse()], [pt(0, 0.004), pt(0, 0)]);
-    assert.equal(out[1].longitude, 0.004);
-    assert.equal(out[out.length - 2].longitude, 0);
+    assert.equal(out[0].longitude, 0.004);
+    assert.equal(out[out.length - 1].longitude, 0);
 });
 
 test('leaves loop lines, missing stops and far-off shapes alone', () => {

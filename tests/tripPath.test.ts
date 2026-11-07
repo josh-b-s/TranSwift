@@ -44,6 +44,7 @@ test('a trip is found by its key or by its feed id, with the shape and stops in 
     const byId = await loadTripPath(db, { tripId: 'T1' });
     assert.deepEqual(byPk, byId);
     assert.equal(byPk?.tripId, 'T1');
+    assert.equal(byPk?.terminus, 'C');
     assert.deepEqual(byPk?.line, [
         { latitude: -37.80, longitude: 144.90 },
         { latitude: -37.81, longitude: 144.92 },

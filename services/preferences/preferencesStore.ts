@@ -32,6 +32,8 @@ export type StoredPreferences = {
     /** Distance to walk each week, in meters. Zero means no goal. */
     weeklyGoalM: number;
     vehicleScope: VehicleScope;
+    /** Consent to redownload imported catalog feeds in the background when a newer version exists. */
+    autoUpdateFeeds: boolean;
 };
 
 export const DEFAULT_THEME_MODE: ThemeMode = 'system';
@@ -60,6 +62,7 @@ export async function loadStoredPreferences(): Promise<StoredPreferences> {
                 : DEFAULT_MAX_WALK_DISTANCE_M,
             weeklyGoalM: Number.isFinite(parsed.weeklyGoalM) ? clampWeeklyGoal(parsed.weeklyGoalM as number) : NO_WEEKLY_GOAL_M,
             vehicleScope: parsed.vehicleScope === 'nearby' ? 'nearby' : DEFAULT_VEHICLE_SCOPE,
+            autoUpdateFeeds: parsed.autoUpdateFeeds === true,
         };
     } catch {
         // No file yet (fresh install) — defaults, not an error.
@@ -70,6 +73,7 @@ export async function loadStoredPreferences(): Promise<StoredPreferences> {
             maxWalkDistanceM: DEFAULT_MAX_WALK_DISTANCE_M,
             weeklyGoalM: NO_WEEKLY_GOAL_M,
             vehicleScope: DEFAULT_VEHICLE_SCOPE,
+            autoUpdateFeeds: false,
         };
     }
 }

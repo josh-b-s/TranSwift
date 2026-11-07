@@ -8,25 +8,25 @@ import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { Trophy } from 'lucide-react-native';
 import { RootState } from '@/store/store';
 import { ACCENT, DANGER, RADIUS, SHADOW, SUCCESS, TOP_SAFE, useThemeStyle } from '@/constants/themes';
-import { SPEED_UNITS } from '@/constants/speedUnits';
 import { MAP_TOP_BAR_HEIGHT } from '@/components/map/MapTopBar';
 import TripStats from '@/components/trip/TripStats';
 import TripLegList from '@/components/trip/TripLegList';
-import TripBarChart from '@/components/trip/TripBarChart';
+import SpeedScrubber from '@/components/trip/SpeedScrubber';
 import TripSplits from '@/components/trip/TripSplits';
 import MatchedTrips from '@/components/trip/MatchedTrips';
 import TripShare from '@/components/trip/TripShare';
 import type { ViewedTrip } from '@/hooks/viewedTrip';
-import { formatDuration, formatSpeed } from '@/services/trips/tripFormat';
 
 type Props = {
     animatedPosition: SharedValue<number>;
     viewed: ViewedTrip | null;
     error: string | null;
+    scrubFraction: number | null;
+    onScrub: (fraction: number) => void;
 };
 
 /** What a saved trip came to, over the map that shows its route. */
-const TripSummarySheet = forwardRef<BottomSheetModal, Props>(({ animatedPosition, viewed, error }, ref) => {
+const TripSummarySheet = forwardRef<BottomSheetModal, Props>(({ animatedPosition, viewed, error, scrubFraction, onScrub }, ref) => {
     const theme = useThemeStyle();
     const insets = useSafeAreaInsets();
     const tabBarHeight = useBottomTabBarHeight();
@@ -59,6 +59,9 @@ const TripSummarySheet = forwardRef<BottomSheetModal, Props>(({ animatedPosition
                     <ActivityIndicator color={ACCENT} style={{ marginTop: 24 }} />
                 ) : (
                     <>
+                        {viewed.speedTrack.length > 0 && (
+                            <SpeedScrubber track={viewed.speedTrack} unit={unit} fraction={scrubFraction} onChange={onScrub} />
+                        )}
                         <TripStats summary={viewed.summary} unit={unit} />
                         {viewed.records.length > 0 && (
                             <View style={{ borderRadius: RADIUS.tile, padding: 14, backgroundColor: theme.backgroundColor, gap: 8 }}>
@@ -70,15 +73,6 @@ const TripSummarySheet = forwardRef<BottomSheetModal, Props>(({ animatedPosition
                                     <Text key={line} style={{ color: theme.color, fontSize: 14 }}>{line}</Text>
                                 ))}
                             </View>
-                        )}
-                        {viewed.speeds.length > 0 && (
-                            <TripBarChart
-                                title={`Walking speed (${SPEED_UNITS[unit].label})`}
-                                values={viewed.speeds}
-                                peakLabel={formatSpeed(Math.max(...viewed.speeds), unit)}
-                                startLabel="Start"
-                                endLabel={formatDuration(viewed.summary.durationS)}
-                            />
                         )}
                         {viewed.splits.length > 0 && <TripSplits splits={viewed.splits} unit={unit} />}
                         {viewed.matches && <MatchedTrips matches={viewed.matches} currentStartedAt={viewed.trip.startedAt} unit={unit} />}

@@ -18,6 +18,8 @@ export type RideStep = StepBase & {
     line: string;
     /** Board to alight, so the alert can tell when the stop before yours is near. */
     stops: RouteStop[];
+    /** When the ride leaves its first stop, with the realtime delay known when the journey was planned. */
+    departureMs?: number;
     /** When the ride is due at its last stop. Includes the realtime delays known when the journey was planned. */
     arrivalMs?: number;
     /** The trip and the stop sequence it gets off at, to refresh the arrival time from realtime data during the ride. */
@@ -41,6 +43,7 @@ export function stepsFromJourney(journey: GtfsJourney, now = new Date()): TripSt
                 routeTextColor: seg.routeTextColor,
                 line: encodeLine(seg.coords),
                 stops: seg.stops ?? [],
+                departureMs: seg.departureTime ? clockToMs(seg.departureTime, now) : undefined,
                 arrivalMs: seg.arrivalTime ? clockToMs(seg.arrivalTime, now) : undefined,
                 tripPk: seg.tripPk,
                 alightSequence: seg.alightSequence,
