@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use rusqlite::{Connection, params};
 use crate::source::{find_all_gtfs_sources, GtfsSource};
 use crate::csv_util::parse_csv_map;
@@ -538,6 +538,8 @@ fn process_agency(
     compute_and_insert_pattern_stats(conn, agency_id, &pattern_groups, &trip_to_pattern_pk, &trip_stop_times, progress)?;
 
     // ── shapes, thinned so points closer than MIN_SHAPE_POINT_GAP_M to the last kept one are dropped ────
+    // Readers only look up a pattern's own shape_id, so any other shape is dead weight.
+    let used_shape_ids: HashSet<&str> = pattern_groups.values().map(|g| g.shape_id.as_str()).filter(|id| !id.is_empty()).collect();
     let mut next_shape_pk = pk_offsets.shape;
     {
         let bytes = source.file("shapes.txt");
@@ -557,7 +559,7 @@ fn process_agency(
                 for rec in rdr.records() {
                     let rec = match rec { Ok(r) => r, Err(_) => continue };
                     let shape_id = rec.get(idi).unwrap_or("");
-                    if shape_id.is_empty() { continue; }
+                    if !used_shape_ids.contains(shape_id) { continue; }
                     let (lat, lon) = match (
                         rec.get(lati).and_then(pack_coord),
                         rec.get(loni).and_then(pack_coord),

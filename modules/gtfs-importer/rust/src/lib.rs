@@ -3,6 +3,8 @@ mod csv_util;
 mod schema;
 mod import;
 mod station;
+#[cfg(test)]
+mod shape_tests;
 mod background;
 
 use std::sync::atomic::{AtomicBool, Ordering};
