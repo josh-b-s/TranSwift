@@ -16,6 +16,7 @@ use std::collections::HashMap;
 use rusqlite::{params, Connection, OptionalExtension};
 use crate::graph::coarse::CoarseEdge;
 use crate::graph::edge_codec::{decode_edges, encode_edges};
+use crate::repo::StopsCache;
 
 /// Bumped whenever the algorithm that builds the adjacency changes, not
 /// just when the underlying GTFS data does — same reasoning as TS's
@@ -38,7 +39,10 @@ use crate::graph::edge_codec::{decode_edges, encode_edges};
 /// blob would silently keep the old one-edge-per-pair graph, so force a rebuild.
 ///
 /// v3 -> v4: the persisted record is varint packed (graph/edge_codec.rs), a different layout from v3.
-const RUST_GRAPH_ALGO_VERSION: i64 = 4;
+///
+/// v4 -> v5: walk edges no longer store their distance; decode recomputes it from the stops.
+/// A v4 blob has 8 extra bytes per walk edge and would decode into garbage, so force a rebuild.
+const RUST_GRAPH_ALGO_VERSION: i64 = 5;
 
 pub struct GraphSignature {
     pub stop_count: i64,
@@ -70,10 +74,12 @@ fn ensure_tables(conn: &Connection) -> rusqlite::Result<()> {
 
 /// Attempts to load a previously persisted graph matching `signature`.
 /// Returns None on any mismatch/absence — caller falls back to a full
-/// rebuild (which also re-persists).
+/// rebuild (which also re-persists). `stops` supplies the coordinates
+/// that walk distances are recomputed from.
 pub fn load_persisted_graph(
     conn: &Connection,
     signature: &GraphSignature,
+    stops: &StopsCache,
 ) -> rusqlite::Result<Option<HashMap<i64, Vec<CoarseEdge>>>> {
     ensure_tables(conn)?;
 
@@ -91,7 +97,7 @@ pub fn load_persisted_graph(
     for row in rows {
         let (stop_pk, blob) = row?;
         any = true;
-        let Some(edges) = decode_edges(stop_pk, &blob) else { return Ok(None) }; // corrupt blob: rebuild
+        let Some(edges) = decode_edges(stop_pk, &blob, stops) else { return Ok(None) }; // corrupt blob: rebuild
         adjacency.insert(stop_pk, edges);
     }
     if !any { return Ok(None); } // stale/half-written — treat as a miss, rebuild
@@ -130,7 +136,8 @@ pub fn save_persisted_graph(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::graph::coarse::EdgeKind;
+    use crate::graph::coarse::{pair_distance_m, EdgeKind};
+    use crate::repo::StopRow;
 
     fn conn() -> Connection {
         let conn = Connection::open_in_memory().unwrap();
@@ -138,19 +145,25 @@ mod tests {
         conn
     }
 
-    fn graph() -> HashMap<i64, Vec<CoarseEdge>> {
-        let walk = CoarseEdge { to: 2, kind: EdgeKind::Walk, cost: 0.5, distance_m: 812.25, via_pattern: None };
+    fn stops() -> StopsCache {
+        let stop = |pk: i64, lat: f64| StopRow { stop_pk: pk, stop_id: pk.to_string(), stop_name: format!("s{pk}"), stop_lat: lat, stop_lon: 144.0, agency: 1 };
+        StopsCache::for_test(vec![stop(1, -37.0), stop(2, -37.0073)])
+    }
+
+    fn graph(stops: &StopsCache) -> HashMap<i64, Vec<CoarseEdge>> {
+        let distance_m = pair_distance_m(stops.get(1).unwrap(), stops.get(2).unwrap());
+        let walk = CoarseEdge { to: 2, kind: EdgeKind::Walk, cost: 0.5, distance_m, via_pattern: None };
         let transit = CoarseEdge { to: 1, kind: EdgeKind::Transit, cost: 1.0, distance_m: 0.0, via_pattern: Some(7) };
         HashMap::from([(1, vec![walk]), (2, vec![transit])])
     }
 
     #[test]
     fn a_saved_graph_loads_back_with_the_same_edges() {
-        let mut conn = conn();
-        let signature = compute_graph_signature(&conn).unwrap();
-        save_persisted_graph(&mut conn, &signature, &graph()).unwrap();
-        let loaded = load_persisted_graph(&conn, &signature).unwrap().expect("a matching signature loads");
-        assert_eq!(loaded[&1][0].distance_m, 812.25);
+        let (mut conn, stops) = (conn(), stops());
+        let (signature, saved) = (compute_graph_signature(&conn).unwrap(), graph(&stops));
+        save_persisted_graph(&mut conn, &signature, &saved).unwrap();
+        let loaded = load_persisted_graph(&conn, &signature, &stops).unwrap().expect("a matching signature loads");
+        assert_eq!(loaded[&1][0].distance_m.to_bits(), saved[&1][0].distance_m.to_bits());
         assert_eq!(loaded[&1][0].kind, EdgeKind::Walk);
         assert_eq!(loaded[&2][0].via_pattern, Some(7));
         assert_eq!(loaded[&2][0].to, 1);
@@ -158,10 +171,20 @@ mod tests {
 
     #[test]
     fn a_corrupt_blob_is_treated_as_a_miss() {
-        let mut conn = conn();
+        let (mut conn, stops) = (conn(), stops());
         let signature = compute_graph_signature(&conn).unwrap();
-        save_persisted_graph(&mut conn, &signature, &graph()).unwrap();
+        save_persisted_graph(&mut conn, &signature, &graph(&stops)).unwrap();
         conn.execute("UPDATE rust_coarse_graph_adjacency SET edges = x'ff' WHERE stop_pk = 1", []).unwrap();
-        assert!(load_persisted_graph(&conn, &signature).unwrap().is_none());
+        assert!(load_persisted_graph(&conn, &signature, &stops).unwrap().is_none());
+    }
+
+    #[test]
+    fn a_blob_from_the_previous_graph_version_is_a_miss() {
+        let (mut conn, stops) = (conn(), stops());
+        let signature = compute_graph_signature(&conn).unwrap();
+        save_persisted_graph(&mut conn, &signature, &graph(&stops)).unwrap();
+        let old_key = format!("{}:{}:{}", RUST_GRAPH_ALGO_VERSION - 1, signature.stop_count, signature.pattern_stop_count);
+        conn.execute("UPDATE rust_coarse_graph_meta SET value = ? WHERE key = 'signature'", params![old_key]).unwrap();
+        assert!(load_persisted_graph(&conn, &signature, &stops).unwrap().is_none());
     }
 }

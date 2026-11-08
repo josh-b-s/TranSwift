@@ -59,7 +59,8 @@ importer assigns pks contiguously from 1 (see `import.rs`'s `PkOffsets`).
   the seed-path corridor comes back too thin) — worth extra scrutiny/testing
   precisely because it'll be exercised least in normal use.
 - **Persisted coarse graph uses NEW tables** (`rust_coarse_graph_meta` /
-  `rust_coarse_graph_adjacency`, fixed-width binary edge encoding) rather
+  `rust_coarse_graph_adjacency`, varint edge encoding, walk distances
+  recomputed on load) rather
   than reusing the JS-persisted `coarse_graph_meta`/`coarse_graph_adjacency`
   (TEXT-keyed) tables — see `graph/store.rs`'s module doc for why. Both can
   coexist in the same `gtfs.db` without collision.

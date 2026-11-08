@@ -10,8 +10,19 @@
 
 use std::collections::{HashMap, HashSet};
 use crate::geo::{haversine_meters, LatLon};
-use crate::repo::{PatternCumulativeCache, PatternStopRow, PatternsCache, StopsCache};
+use crate::repo::{PatternCumulativeCache, PatternStopRow, PatternsCache, StopRow, StopsCache};
 use crate::settings::{FULL_CLIQUE_MAX_STOPS, STRIDE_TARGET_SAMPLES, WALK_EDGE_THRESHOLD_M};
+
+/// Walk distance between two stops. The lower pk goes first whatever order the arguments come in,
+/// because haversine can differ in the last bit when its arguments swap. The graph build and the
+/// edge decoder both call this, so a recomputed distance equals the one the build produced.
+pub fn pair_distance_m(a: &StopRow, b: &StopRow) -> f64 {
+    let (lo, hi) = if a.stop_pk <= b.stop_pk { (a, b) } else { (b, a) };
+    haversine_meters(
+        LatLon { lat: lo.stop_lat, lon: lo.stop_lon },
+        LatLon { lat: hi.stop_lat, lon: hi.stop_lon },
+    )
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EdgeKind {
@@ -200,10 +211,7 @@ pub fn build_adjacency_from_scratch(
                     // Only compute each pair once (canonical ordering by pk).
                     if other_pk <= s.stop_pk { continue; }
                     let Some(other) = stops.get(other_pk) else { continue };
-                    let d = haversine_meters(
-                        LatLon { lat: s.stop_lat, lon: s.stop_lon },
-                        LatLon { lat: other.stop_lat, lon: other.stop_lon },
-                    );
+                    let d = pair_distance_m(s, other);
                     if d <= WALK_EDGE_THRESHOLD_M {
                         add_edge(&mut adjacency, s.stop_pk, CoarseEdge { to: other_pk, kind: EdgeKind::Walk, cost: 0.5, distance_m: d, via_pattern: None }, i64::MIN, 0.0);
                         add_edge(&mut adjacency, other_pk, CoarseEdge { to: s.stop_pk, kind: EdgeKind::Walk, cost: 0.5, distance_m: d, via_pattern: None }, i64::MIN, 0.0);

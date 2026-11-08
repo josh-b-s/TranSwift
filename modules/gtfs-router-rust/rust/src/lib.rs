@@ -700,7 +700,7 @@ impl GtfsRouterEngine {
         mark!(t, "build_stop_lines");
 
         let t = Instant::now();
-        let adjacency = match graph::store::load_persisted_graph(&conn, &signature)? {
+        let adjacency = match graph::store::load_persisted_graph(&conn, &signature, &stops)? {
             Some(adj) => { mark!(t, "graph_load_persisted"); adj }
             None => {
                 let adj = graph::coarse::build_adjacency_from_scratch(&stops, &pattern_stop_rows, &patterns, &pattern_cumulative);
