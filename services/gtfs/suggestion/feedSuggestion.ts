@@ -21,6 +21,8 @@ import { daysUntilGtfsDate } from './serviceDate';
 import { hasNewerVersion } from './feedUpdate';
 
 const EXPIRY_WARNING_DAYS = 14;
+// A feed downloaded this recently that still mismatches realtime won't be fixed by downloading it again.
+const MISMATCH_GRACE_MS = 7 * 24 * 60 * 60 * 1000;
 
 async function regionOf(at: Point): Promise<Region | null> {
     const [place] = await Location.reverseGeocodeAsync(at);
@@ -69,7 +71,7 @@ async function updateOf(entries: GtfsDatabaseEntry[]): Promise<FeedSuggestion | 
     const oldFormat = downloadable.find((e) => !isCurrentSchema(e));
     if (oldFormat) return { kind: 'oldFormat', entry: oldFormat };
 
-    const mismatched = downloadable.find((e) => e.realtimeMismatch);
+    const mismatched = downloadable.find((e) => e.realtimeMismatch && Date.now() - e.importedAt > MISMATCH_GRACE_MS);
     if (mismatched) return { kind: 'updated', entry: mismatched };
 
     for (const entry of downloadable) {

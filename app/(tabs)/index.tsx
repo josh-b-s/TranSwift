@@ -357,6 +357,8 @@ export default function Index() {
                 showsPointsOfInterest={false}
                 // With the POI listener on, Android sends taps on a Google icon to onPoiClick and never calls onPress.
                 poiClickEnabled={false}
+                // Tapping a marker otherwise shows Android's Open in Google Maps / Directions buttons.
+                toolbarEnabled={false}
                 onMapReady={() => {
                     if (userLocation) {
                         mapRef.current?.animateToRegion(

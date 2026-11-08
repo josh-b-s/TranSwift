@@ -5,7 +5,9 @@ import { formatDistance, formatSpeed, stopsToGo } from './tripFormat';
 import type { TripSummary } from './tripSummary';
 
 const CHANNEL_ID = 'trip-summaries';
-const ALIGHT_CHANNEL_ID = 'get-off-alerts';
+// Android fixes a channel's vibration when it is created, so a new pattern needs a new id.
+const ALIGHT_CHANNEL_ID = 'get-off-alerts-v2';
+const OLD_ALIGHT_CHANNEL_ID = 'get-off-alerts';
 const PROGRESS_CHANNEL_ID = 'ride-progress';
 const PROGRESS_ID = 'ride-progress';
 
@@ -40,10 +42,11 @@ export async function notifyTripDone(startedAt: number, summary: TripSummary, un
 
 /** Fires immediately, so call it only when the rider is about to reach the stop. */
 export async function notifyGetOff(stopName: string): Promise<void> {
+    await Notifications.deleteNotificationChannelAsync(OLD_ALIGHT_CHANNEL_ID);
     await Notifications.setNotificationChannelAsync(ALIGHT_CHANNEL_ID, {
         name: 'Get-off alerts',
         importance: Notifications.AndroidImportance.MAX,
-        vibrationPattern: [0, 400, 200, 400],
+        vibrationPattern: [0, 700, 250, 700, 250, 1000],
     });
     await Notifications.scheduleNotificationAsync({
         content: { title: 'Get off at the next stop', body: stopName },

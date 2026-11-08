@@ -30,7 +30,12 @@
     "plugins": [
       "expo-router",
       "expo-asset",
-      "expo-notifications",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/notification-icon.png"
+        }
+      ],
       [
         "expo-splash-screen",
         {
