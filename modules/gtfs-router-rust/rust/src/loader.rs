@@ -776,7 +776,7 @@ pub fn load_gtfs_index_for_trip(
         // scan instead.
         if crate::settings::USE_SQL_ACTIVE_TRIP_FILTER {
             let mut stmt = conn.prepare(
-                "SELECT trip_pk, stop_pk, stop_sequence, arrival_sec, departure_sec, pickup_type, drop_off_type \
+                "SELECT trip_pk, stop_pk, stop_sequence, departure_sec - dwell_sec, departure_sec, pickup_type, drop_off_type \
                  FROM stop_times \
                  WHERE stop_pk IN (SELECT id FROM corridor_stop_pks) \
                  AND departure_sec BETWEEN ?1 AND ?2 \
@@ -800,7 +800,7 @@ pub fn load_gtfs_index_for_trip(
             }
         } else {
             let mut stmt = conn.prepare(
-                "SELECT trip_pk, stop_pk, stop_sequence, arrival_sec, departure_sec, pickup_type, drop_off_type \
+                "SELECT trip_pk, stop_pk, stop_sequence, departure_sec - dwell_sec, departure_sec, pickup_type, drop_off_type \
                  FROM stop_times \
                  WHERE stop_pk IN (SELECT id FROM corridor_stop_pks) \
                  AND departure_sec BETWEEN ?1 AND ?2"
@@ -845,7 +845,7 @@ pub fn load_gtfs_index_for_trip(
         }
         // Query plan of the real fetch, one `plan.<detail>` label per plan row.
         if let Ok(mut stmt) = conn.prepare(
-            "EXPLAIN QUERY PLAN SELECT trip_pk, stop_pk, stop_sequence, arrival_sec, departure_sec, pickup_type, drop_off_type \
+            "EXPLAIN QUERY PLAN SELECT trip_pk, stop_pk, stop_sequence, departure_sec - dwell_sec, departure_sec, pickup_type, drop_off_type \
              FROM stop_times \
              WHERE stop_pk IN (SELECT id FROM corridor_stop_pks) \
              AND departure_sec BETWEEN ?1 AND ?2 \

@@ -1,5 +1,5 @@
 /** Must equal GTFS_SCHEMA_VERSION in modules/gtfs-importer/rust/src/schema.rs; tests/schemaVersion.test.ts checks it. */
-export const REQUIRED_SCHEMA_VERSION = 1;
+export const REQUIRED_SCHEMA_VERSION = 2;
 
 type Versioned = { schemaVersion?: number };
 

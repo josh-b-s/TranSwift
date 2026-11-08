@@ -488,7 +488,7 @@ impl GtfsRouterEngine {
             // range), so exactly the pages a search will need get touched.
             // SUM over a non-key column forces the row payload to be read.
             let _ = conn.query_row(
-                "SELECT COALESCE(SUM(arrival_sec), 0) FROM stop_times \
+                "SELECT COALESCE(SUM(dwell_sec), 0) FROM stop_times \
                  WHERE stop_pk IN (SELECT stop_pk FROM stops) \
                  AND departure_sec BETWEEN ?1 AND ?2",
                 [lo, hi],

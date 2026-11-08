@@ -498,12 +498,12 @@ fn process_agency(
         for chunk in flat.chunks(STOP_TIMES_BATCH_SIZE) {
             let placeholders = chunk.iter().map(|_| "(?,?,?,?,?,?,?)").collect::<Vec<_>>().join(",");
             let sql = format!(
-                "INSERT INTO stop_times (trip_pk,stop_sequence,stop_pk,arrival_sec,departure_sec,pickup_type,drop_off_type) VALUES {placeholders}"
+                "INSERT INTO stop_times (trip_pk,stop_sequence,stop_pk,dwell_sec,departure_sec,pickup_type,drop_off_type) VALUES {placeholders}"
             );
             let mut ins = conn.prepare_cached(&sql)?;
             let mut params_flat: Vec<i64> = Vec::with_capacity(chunk.len() * 7);
             for r in chunk {
-                params_flat.extend_from_slice(&[r.trip_pk, r.stop_sequence, r.stop_pk, r.arrival_sec, r.departure_sec, r.pickup_type, r.drop_off_type]);
+                params_flat.extend_from_slice(&[r.trip_pk, r.stop_sequence, r.stop_pk, r.departure_sec - r.arrival_sec, r.departure_sec, r.pickup_type, r.drop_off_type]);
             }
             let param_refs: Vec<&dyn rusqlite::ToSql> = params_flat.iter().map(|v| v as &dyn rusqlite::ToSql).collect();
             ins.execute(param_refs.as_slice())?;

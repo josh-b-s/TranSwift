@@ -88,7 +88,8 @@ CREATE TABLE stop_times (
                             trip_pk       INTEGER NOT NULL,
                             stop_sequence INTEGER NOT NULL,
                             stop_pk       INTEGER NOT NULL,
-                            arrival_sec   INTEGER NOT NULL,
+                            -- Arrival is departure_sec - dwell_sec; a stored 0 takes no space.
+                            dwell_sec     INTEGER NOT NULL DEFAULT 0,
                             departure_sec INTEGER NOT NULL,
     -- GTFS pickup_type/drop_off_type: 0 = regular
     -- (default when blank/missing, per spec), 1 = no
@@ -115,7 +116,7 @@ CREATE TABLE stop_times (
     -- alone. With the old key, `idx_st_stop_dep`
     -- (stop_pk, departure_sec) could locate matching
     -- rows, but fetching the rest of each row (
-    -- arrival_sec/pickup_type/drop_off_type) meant a
+    -- dwell_sec/pickup_type/drop_off_type) meant a
     -- random jump into a table physically sorted by
     -- TRIP — a scattered disk seek per matched row,
     -- for every single search. Re-keyed so physical

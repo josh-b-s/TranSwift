@@ -16,7 +16,7 @@ type TripStopRow = { stop_name: string; stop_sequence: number; arrival_sec: numb
 export async function getTripStops(db: QueryableDb, departure: Departure): Promise<TripStop[]> {
     const fromSec = Math.round((departure.timeMs - departure.dayStartMs) / 1000);
     const rows = await db.getAllAsync<TripStopRow>(
-        `SELECT s.stop_name, ps.stop_sequence, st.arrival_sec, st.departure_sec
+        `SELECT s.stop_name, ps.stop_sequence, st.departure_sec - st.dwell_sec AS arrival_sec, st.departure_sec
          FROM trips t
          JOIN pattern_stops ps ON ps.pattern_pk = t.pattern_pk AND ps.stop_sequence >= ?
          JOIN stop_times st ON st.stop_pk = ps.stop_pk

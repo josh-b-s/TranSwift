@@ -22,7 +22,7 @@ export async function scheduledArrivalMs(db: QueryableDb, tripPk: number, alight
         const aroundSec = Math.round((plannedMs - dayStartMs) / 1000);
         // Searched by departure, which the stop_times index covers; a stop's dwell is seconds.
         const [row] = await db.getAllAsync<{ arrival_sec: number }>(
-            `SELECT arrival_sec FROM stop_times
+            `SELECT departure_sec - dwell_sec AS arrival_sec FROM stop_times
              WHERE stop_pk = ? AND trip_pk = ? AND stop_sequence = ? AND departure_sec BETWEEN ? AND ?`,
             [stop.stop_pk, tripPk, alightSequence, aroundSec - SEARCH_WINDOW_SEC, aroundSec + SEARCH_WINDOW_SEC],
         );

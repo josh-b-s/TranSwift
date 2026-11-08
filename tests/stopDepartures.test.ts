@@ -47,8 +47,8 @@ function addTrip(tripPk: number, serviceId: string, fromAlphaSec: number) {
         .run(tripPk, `t${tripPk}`, serviceId);
     [1, 2, 3].forEach((stopPk, i) => {
         const sec = fromAlphaSec + i * 300;
-        sqlite.prepare(`INSERT INTO stop_times (trip_pk, stop_sequence, stop_pk, arrival_sec, departure_sec) VALUES (?, ?, ?, ?, ?)`)
-            .run(tripPk, i + 1, stopPk, sec, sec);
+        sqlite.prepare(`INSERT INTO stop_times (trip_pk, stop_sequence, stop_pk, departure_sec) VALUES (?, ?, ?, ?)`)
+            .run(tripPk, i + 1, stopPk, sec);
     });
 }
 
@@ -108,8 +108,8 @@ test('a service id shared with another agency does not leak across', async () =>
         INSERT INTO patterns (pattern_pk, route_id, agency, direction_id, shape_id, trip_pk) VALUES (20, 'R2', 2, 0, NULL, 200);
         INSERT INTO pattern_stops (pattern_pk, stop_pk, stop_sequence) VALUES (20, 1, 1), (20, 3, 2);
         INSERT INTO trips (trip_pk, trip_id, agency, pattern_pk, service_id) VALUES (200, 't200', 2, 20, 'WK');
-        INSERT INTO stop_times (trip_pk, stop_sequence, stop_pk, arrival_sec, departure_sec) VALUES
-            (200, 1, 1, 36060, 36060), (200, 2, 3, 36360, 36360);
+        INSERT INTO stop_times (trip_pk, stop_sequence, stop_pk, departure_sec) VALUES
+            (200, 1, 1, 36060), (200, 2, 3, 36360);
     `);
     const out = await getStopDepartures(db, 1, new Date(at(MON, 9)), 3 * HOUR_MS, 10);
     assert.deepEqual(out.map(d => d.routeName), ['96']);
@@ -126,8 +126,8 @@ test('a loop trip departs from its first stop but its return there is not a depa
         INSERT INTO patterns (pattern_pk, route_id, agency, direction_id, shape_id, trip_pk) VALUES (11, 'R1', 1, 0, NULL, 200);
         INSERT INTO pattern_stops (pattern_pk, stop_pk, stop_sequence) VALUES (11, 1, 1), (11, 2, 2), (11, 1, 3);
         INSERT INTO trips (trip_pk, trip_id, agency, pattern_pk, service_id) VALUES (200, 'loop', 1, 11, 'WK');
-        INSERT INTO stop_times (trip_pk, stop_sequence, stop_pk, arrival_sec, departure_sec) VALUES
-            (200, 1, 1, 36000, 36000), (200, 2, 2, 36300, 36300), (200, 3, 1, 36600, 36600);
+        INSERT INTO stop_times (trip_pk, stop_sequence, stop_pk, departure_sec) VALUES
+            (200, 1, 1, 36000), (200, 2, 2, 36300), (200, 3, 1, 36600);
     `);
     const out = await getStopDepartures(db, 1, new Date(at(MON, 9)), 3 * HOUR_MS, 10);
     assert.deepEqual(out.map(d => d.timeMs), [at(MON, 10)]);
@@ -142,6 +142,13 @@ test('lists the stops a departure calls at from its own stop onward', async () =
 
     const [fromBravo] = await getStopDepartures(db, 2, new Date(at(MON, 9)), 3 * HOUR_MS, 10);
     assert.deepEqual((await getTripStops(db, fromBravo)).map(s => s.stopName), ['Bravo', 'Charlie']);
+});
+
+test('a stop is shown as an arrival, which is its departure minus the dwell', async () => {
+    addTrip(100, 'WK', 10 * 3600);
+    sqlite.exec(`UPDATE stop_times SET dwell_sec = 60 WHERE trip_pk = 100 AND stop_sequence = 2`);
+    const [fromAlpha] = await getStopDepartures(db, 1, new Date(at(MON, 9)), 3 * HOUR_MS, 10);
+    assert.deepEqual((await getTripStops(db, fromAlpha)).map(s => s.timeMs), [at(MON, 10), at(MON, 10, 4), at(MON, 10, 10)]);
 });
 
 test('trip stops come only from the chosen trip, and times past midnight keep their service day', async () => {
