@@ -2,3 +2,5 @@
 // other than one level up from src/ (i.e. at rust/schema.sql, rust/indexes.sql).
 pub const GTFS_SCHEMA_SQL: &str = include_str!("../schema.sql");
 pub const GTFS_INDEXES_SQL: &str = include_str!("../indexes.sql");
+/// Bumped whenever schema.sql changes shape. The app compares it with REQUIRED_SCHEMA_VERSION in schemaVersion.ts.
+pub const GTFS_SCHEMA_VERSION: i64 = 1;

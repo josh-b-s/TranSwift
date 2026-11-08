@@ -12,6 +12,7 @@ import { invalidateStopCache } from '../core/stopRepo';
 import { invalidateStopColors } from '../departures/stopColors';
 import { computeFeedStats, type FeedStats } from './gtfsFeedStats';
 import { deleteDatabaseFiles } from './storageCleanup';
+import { isCurrentSchema, REQUIRED_SCHEMA_VERSION } from './schemaVersion';
 import type { RealtimeAuth } from '../catalog/realtimeParse';
 
 /** Where a feed was downloaded from, kept for licence credit and later update checks. */
@@ -31,6 +32,8 @@ export type GtfsDatabaseEntry = {
     name: string;
     fileName: string;
     importedAt: number;
+    /** Importer schema the file was built with. Absent on entries saved before versions existed, which means 1. */
+    schemaVersion?: number;
     /** MD5 of the source zip, used to spot an already-imported feed. Older entries have none and never match. */
     zipHash?: string;
     /** Set for feeds imported from the catalog; absent for zips picked from the device. */
@@ -97,7 +100,8 @@ export async function getActiveDatabaseId(): Promise<string | null> {
 /** Finds an imported database whose source zip had this hash, so a duplicate feed is caught before the expensive import. */
 export async function findDatabaseByHash(zipHash: string): Promise<GtfsDatabaseEntry | null> {
     const reg = await readRegistry();
-    return reg.databases.find(d => d.zipHash === zipHash) ?? null;
+    // An outdated database cannot be selected, so it must not block importing the same zip again.
+    return reg.databases.find(d => d.zipHash === zipHash && isCurrentSchema(d)) ?? null;
 }
 
 /** Strips a trailing .zip (case-insensitive) so "melbourne-gtfs.zip" -> "melbourne-gtfs". */
@@ -162,12 +166,12 @@ export async function restoreActiveDatabase(): Promise<void> {
     const path = entry ? dbPathFor(entry) : null;
     const exists = path ? (await FileSystem.getInfoAsync(path)).exists : false;
 
-    if (entry && exists) {
+    if (entry && exists && isCurrentSchema(entry)) {
         setActiveDbPath(path!);
         return;
     }
 
-    console.warn(`[gtfsDbRegistry] active database "${reg.activeId}" is missing on disk — clearing selection`);
+    console.warn(`[gtfsDbRegistry] active database "${reg.activeId}" is missing or outdated, clearing selection`);
     reg.activeId = null;
     await writeRegistry(reg);
 }
@@ -177,6 +181,7 @@ export async function setActiveDatabase(id: string): Promise<void> {
     const reg = await readRegistry();
     const entry = reg.databases.find(d => d.id === id);
     if (!entry) throw new Error(`Unknown GTFS database id: ${id}`);
+    if (!isCurrentSchema(entry)) throw new Error(`"${entry.name}" was saved by an older version of the app. Download it again.`);
 
     setActiveDbPath(dbPathFor(entry));
     invalidateDatabaseCaches();
@@ -200,6 +205,7 @@ export async function registerDatabase(
         name: uniqueName,
         fileName,
         importedAt: Date.now(),
+        schemaVersion: REQUIRED_SCHEMA_VERSION,
         zipHash,
         source,
     };
@@ -297,7 +303,7 @@ export async function deleteDatabase(id: string): Promise<void> {
     reg.databases = reg.databases.filter(d => d.id !== id);
 
     if (reg.activeId === id) {
-        const fallback = [...reg.databases].sort((a, b) => b.importedAt - a.importedAt)[0] ?? null;
+        const fallback = reg.databases.filter(isCurrentSchema).sort((a, b) => b.importedAt - a.importedAt)[0] ?? null;
         if (fallback) {
             reg.activeId = fallback.id;
             setActiveDbPath(dbPathFor(fallback));

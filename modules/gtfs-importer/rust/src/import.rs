@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 use rusqlite::{Connection, params};
 use crate::source::{find_all_gtfs_sources, GtfsSource};
 use crate::csv_util::parse_csv_map;
-use crate::schema::{GTFS_SCHEMA_SQL, GTFS_INDEXES_SQL};
+use crate::schema::{GTFS_SCHEMA_SQL, GTFS_INDEXES_SQL, GTFS_SCHEMA_VERSION};
 
 const ALL_TABLES: &[&str] = &[
     "stops", "stops_rtree", "routes", "calendar", "calendar_dates", "trips", "patterns",
@@ -640,6 +640,7 @@ pub fn import_gtfs(zip_path: &str, db_path: &str, progress: &dyn ImportProgress)
         conn.execute(&format!("DROP TABLE IF EXISTS {table}"), [])?;
     }
     conn.execute_batch(GTFS_SCHEMA_SQL)?;
+    conn.pragma_update(None, "user_version", GTFS_SCHEMA_VERSION)?;
 
     let tx = conn.transaction()?;
     let mut pk_offsets = PkOffsets { stop: 1, trip: 1, pattern: 1, shape: 1 };

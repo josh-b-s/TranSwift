@@ -16,6 +16,7 @@ import { coverageContains, type Point } from '../catalog/coverage';
 import { loadCatalog } from '../catalog/feedCatalog';
 import { fetchZipSize } from '../import/gtfsDownload';
 import { ensureActiveStats, listDatabases, type GtfsDatabaseEntry } from '../import/gtfsDbRegistry';
+import { isCurrentSchema } from '../import/schemaVersion';
 import { daysUntilGtfsDate } from './serviceDate';
 import { hasNewerVersion } from './feedUpdate';
 
@@ -50,7 +51,8 @@ async function catalogFeedsAt(feeds: CatalogFeed[], at: Point): Promise<CatalogF
 export type FeedSuggestion =
     | { kind: 'nearby'; feed: CatalogFeed }
     | { kind: 'expiring'; entry: GtfsDatabaseEntry; daysLeft: number }
-    | { kind: 'updated'; entry: GtfsDatabaseEntry };
+    | { kind: 'updated'; entry: GtfsDatabaseEntry }
+    | { kind: 'oldFormat'; entry: GtfsDatabaseEntry };
 
 function expiryOf(entries: GtfsDatabaseEntry[]): FeedSuggestion | null {
     const latest = entries.reduce((a, b) => ((b.stats!.serviceEnd ?? '') > (a.stats!.serviceEnd ?? '') ? b : a));
@@ -61,9 +63,12 @@ function expiryOf(entries: GtfsDatabaseEntry[]): FeedSuggestion | null {
     return daysLeft <= EXPIRY_WARNING_DAYS ? { kind: 'expiring', entry: latest, daysLeft } : null;
 }
 
-/** A newer upstream version, or realtime ids that stopped matching. Only for entries that can be re-downloaded. */
+/** A database the app can no longer open, a newer upstream version, or realtime ids that stopped matching. Only for entries that can be re-downloaded. */
 async function updateOf(entries: GtfsDatabaseEntry[]): Promise<FeedSuggestion | null> {
     const downloadable = entries.filter((e) => e.source);
+    const oldFormat = downloadable.find((e) => !isCurrentSchema(e));
+    if (oldFormat) return { kind: 'oldFormat', entry: oldFormat };
+
     const mismatched = downloadable.find((e) => e.realtimeMismatch);
     if (mismatched) return { kind: 'updated', entry: mismatched };
 

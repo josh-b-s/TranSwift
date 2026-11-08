@@ -23,7 +23,9 @@ function show(suggestion: FeedSuggestion, router: Router) {
     }
 
     const { entry } = suggestion;
-    const message = suggestion.kind === 'updated'
+    const message = suggestion.kind === 'oldFormat'
+        ? `"${entry.name}" was saved by an older version of the app and can't be used until it is downloaded again.`
+        : suggestion.kind === 'updated'
         ? `A newer version of "${entry.name}" is available. Re-download it?`
         : `The timetable in "${entry.name}" ${suggestion.daysLeft < 0 ? 'ended' : suggestion.daysLeft === 0 ? 'ends today' : `ends in ${suggestion.daysLeft} days`}. Re-download the latest version?`;
     Alert.alert(
