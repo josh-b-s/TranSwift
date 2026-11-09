@@ -27,6 +27,7 @@ import {useViewedTrip} from '@/hooks/viewedTrip';
 import {useCloseTripView} from '@/hooks/closeTripView';
 import {useBackHandler} from '@/hooks/backHandler';
 import StopDeparturesSheet from '@/components/sheets/StopDeparturesSheet';
+import VehicleSheet from '@/components/sheets/VehicleSheet';
 import {StopDots} from '@/components/map/StopDots';
 import VehicleMarkers from '@/components/map/VehicleMarkers';
 import TripPathOverlay from '@/components/map/TripPathOverlay';
@@ -55,6 +56,7 @@ import {useTripNotificationTap} from '@/hooks/tripNotificationTap';
 import {useAutoStartTrip} from '@/hooks/autoStartTrip';
 import {useMapFollow} from '@/hooks/mapFollow';
 import {useUserPosition} from '@/hooks/userPosition';
+import {useSyncUserLocation} from '@/hooks/syncUserLocation';
 import {useCompassHeading} from '@/hooks/compassHeading';
 import {useSimulation} from '@/hooks/simulation';
 import {useStopsInView} from '@/hooks/stopsInView';
@@ -87,6 +89,7 @@ export default function Index() {
     const modalRef = useRef<BottomSheetModal>(null);
     const departuresRef = useRef<BottomSheetModal>(null);
     const tripSheetRef = useRef<BottomSheetModal>(null);
+    const vehicleSheetRef = useRef<BottomSheetModal>(null);
     const dispatch = useDispatch<AppDispatch>();
     const bottomSheetPosition = useSharedValue(1000);
     const {colorScheme} = useColorScheme();
@@ -126,6 +129,13 @@ export default function Index() {
     const [departuresLowered, setDeparturesLowered] = useState(false);
     // The trip whose whole line and stops are drawn, and whose vehicle is highlighted.
     const [tripFocus, setTripFocus] = useState<TripFocus | null>(null);
+    // The tapped vehicle, whose next stops fill a sheet. The ref lets callbacks that must keep one identity see it.
+    const [pickedVehicle, setPickedVehicle] = useState<MapVehicle | null>(null);
+    const pickedVehicleKey = useRef<string | null>(null);
+    const pickVehicle = useCallback((vehicle: MapVehicle | null) => {
+        pickedVehicleKey.current = vehicle?.key ?? null;
+        setPickedVehicle(vehicle);
+    }, []);
     const tripPath = useTripPath(tripFocus?.trip ?? null);
     const layers = {
         hasPlace: selectedPlace !== null,
@@ -168,6 +178,8 @@ export default function Index() {
     const compass = useCompassHeading(isFocused);
     // A simulated fix is exact, and the simulator stands in for both the position and the compass.
     const simulation = useSimulation();
+    // The simulator sets the stored location itself.
+    useSyncUserLocation(position, !simulation);
     const here = useMemo(() => (simulation ? {...simulation.position, accuracyM: 0} : position), [simulation, position]);
     const follow = useMapFollow(mapRef, here, simulation ? simulation.headingDeg : compass?.degrees ?? null);
     useAutoStartTrip(here);
@@ -204,6 +216,8 @@ export default function Index() {
     const showAllVehicles = vehicleScope === 'nearby' && zoomedIn;
     const vehicles = useVehicles(wantedRouteKeys, isFocused && !debugEnabled, showAllVehicles);
     const focusedTripId = tripPath?.tripId ?? null;
+    // The picked vehicle as last reported, falling back to the tap while the feed has dropped it for a moment.
+    const liveVehicle = pickedVehicle && (vehicles.find(v => v.key === pickedVehicle.key) ?? pickedVehicle);
     const lineTripIds = useMemo(
         () => (focusedTripId === null ? [] : [...new Set([focusedTripId, ...vehicles.flatMap(v => (v.tripId ? [v.tripId] : []))])]),
         [focusedTripId, vehicles],
@@ -215,8 +229,24 @@ export default function Index() {
     );
     const stopColors = useStopColors(stopsInView);
     useEffect(() => {
-        if (placeClosesDepartures(layers)) setDepartureStop(null);
+        if (!placeClosesDepartures(layers)) return;
+        setDepartureStop(null);
+        if (pickedVehicleKey.current !== null) {
+            pickVehicle(null);
+            setTripFocus(null);
+        }
     }, [selectedPlace, tripRunning, viewedTripId]);
+    // Same handling as the departures sheet below.
+    const vehicleSheetOpen = pickedVehicle !== null;
+    useEffect(() => {
+        if (!isFocused) {
+            vehicleSheetRef.current?.close({ duration: 0 });
+        } else if (vehicleSheetOpen) {
+            vehicleSheetRef.current?.present();
+        } else {
+            vehicleSheetRef.current?.dismiss();
+        }
+    }, [isFocused, vehicleSheetOpen]);
     // Same handling as the route sheet above: closed, not dismissed, while another tab is showing.
     useEffect(() => {
         if (!isFocused) {
@@ -230,6 +260,7 @@ export default function Index() {
 
     const selectStop = useCallback((stop: RepoStop) => {
         follow.release();
+        pickVehicle(null);
         setDepartureStop(stop);
         setTripFocus(null);
         // A stop picked while the sheet is lowered brings it back up.
@@ -240,20 +271,28 @@ export default function Index() {
             { latitude: stop.stop_lat - delta * 0.25, longitude: stop.stop_lon, latitudeDelta: delta, longitudeDelta: delta },
             400,
         );
-    }, [follow.release]);
+    }, [follow.release, pickVehicle]);
 
     const selectRouteStop = useCallback(async (routeStop: RouteStop) => {
         const stop = findRepoStop(await getAllStopsCached(await getDb()), routeStop);
         if (stop) selectStop(stop);
     }, [selectStop]);
 
-    // A second tap on the same vehicle puts the line away. A vehicle that reports no trip cannot be traced to a line.
+    // A second tap on the same vehicle puts the line and its sheet away. A vehicle that reports no trip cannot be traced to a line.
     const selectVehicle = useCallback((vehicle: MapVehicle) => {
         const tripId = vehicle.tripId;
         if (!tripId) return;
         follow.release();
-        setTripFocus(current => (current && 'tripId' in current.trip && current.trip.tripId === tripId ? null : {trip: {tripId}, color: vehicle.color, routeKey: routeKey(vehicle.routeName, vehicle.routeType)}));
-    }, [follow.release]);
+        if (pickedVehicleKey.current === vehicle.key) {
+            pickVehicle(null);
+            setTripFocus(null);
+            return;
+        }
+        // The vehicle's sheet takes the place of the stop's.
+        pickVehicle(vehicle);
+        setDepartureStop(null);
+        setTripFocus({trip: {tripId}, color: vehicle.color, routeKey: routeKey(vehicle.routeName, vehicle.routeType)});
+    }, [follow.release, pickVehicle]);
 
     const routeStops = useMemo(
         () => (!journeyShown ? [] : routeSegments.flatMap(s => (s.type === 'transit' ? s.stops ?? [] : []))),
@@ -329,6 +368,9 @@ export default function Index() {
             closeTripView();
         } else if (alternativesOpen) {
             dispatch(closeAlternatives());
+        } else if (pickedVehicle) {
+            pickVehicle(null);
+            setTripFocus(null);
         } else if (departureStop) {
             setDepartureStop(null);
             setTripFocus(null);
@@ -498,12 +540,25 @@ export default function Index() {
                 animatedPosition={bottomSheetPosition}
                 onClose={() => {
                     setDepartureStop(null);
-                    setTripFocus(null);
+                    // A tapped vehicle closes this sheet and keeps its own line.
+                    if (pickedVehicleKey.current === null) setTripFocus(null);
                 }}
                 onRoutes={setStopRouteKeys}
-                onTripFocus={setTripFocus}
+                onTripFocus={focus => { if (pickedVehicleKey.current === null) setTripFocus(focus); }}
                 onSnap={index => setDeparturesLowered(index === 0)}
                 vehicles={vehicles}
+            />
+            <VehicleSheet
+                ref={vehicleSheetRef}
+                vehicle={liveVehicle}
+                terminus={tripPath?.terminus ?? null}
+                animatedPosition={bottomSheetPosition}
+                onClose={() => {
+                    // Closing it from here (a stop was picked) has already cleared the vehicle; only the person's own dismissal is left.
+                    if (pickedVehicleKey.current === null) return;
+                    pickVehicle(null);
+                    setTripFocus(null);
+                }}
             />
         </View>
     );

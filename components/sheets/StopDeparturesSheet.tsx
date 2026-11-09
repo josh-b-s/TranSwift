@@ -1,11 +1,12 @@
 import React, { forwardRef, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { BottomSheetModal, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { SharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useIsFocused } from '@react-navigation/native';
 import { useBackHandler } from '@/hooks/backHandler';
+import { ChevronDown } from 'lucide-react-native';
 import { ACCENT, RADIUS, SHADOW, TOP_SAFE, useThemeStyle } from '@/constants/themes';
 import RouteSheetHeader from '@/components/sheets/RouteSheetHeader';
 import DepartureFilterChips from '@/components/sheets/DepartureFilterChips';
@@ -23,6 +24,8 @@ import { stopToPlace } from '@/services/places/endpoints';
 import type { RepoStop } from '@/services/gtfs/core/stopRepo';
 import { routeKey } from '@/services/gtfs/vehicles/vehicleRoutes';
 import type { Departure } from '@/services/gtfs/departures/stopDepartures';
+import { groupDepartures } from '@/services/gtfs/departures/departureGroups';
+import { formatDepartureIn } from '@/services/gtfs/departures/departureFormat';
 import {
     applyDepartureFilter,
     filterLines,
@@ -58,15 +61,18 @@ const StopDeparturesSheet = forwardRef<BottomSheetModal, Props>(({ stop, animate
 
     const [filter, setFilter] = useState<DepartureFilter>(NO_FILTER);
     const [openKey, setOpenKey] = useState<string | null>(null);
+    const [openGroupKey, setOpenGroupKey] = useState<string | null>(null);
     useEffect(() => {
         setFilter(NO_FILTER);
         setOpenKey(null);
+        setOpenGroupKey(null);
     }, [stop]);
 
-    // Back puts an opened departure away before it closes the sheet.
+    // Back puts an opened departure away, then an opened group, before it closes the sheet.
     const focused = useIsFocused();
-    useBackHandler(focused && stop !== null && openKey !== null, () => {
-        setOpenKey(null);
+    useBackHandler(focused && stop !== null && (openKey !== null || openGroupKey !== null), () => {
+        if (openKey !== null) setOpenKey(null);
+        else setOpenGroupKey(null);
         return true;
     });
 
@@ -84,11 +90,15 @@ const StopDeparturesSheet = forwardRef<BottomSheetModal, Props>(({ stop, animate
     const lines = filterLines(departures);
     const termini = filterTermini(departures, filter.line);
     const shown = applyDepartureFilter(departures, filter);
+    const groups = groupDepartures(shown);
+    const openGroup = groups.find(g => g.key === openGroupKey);
     const openDeparture = shown.find(d => departureKey(d) === openKey);
-    const openTripPk = openDeparture?.tripPk ?? null;
+    // An open departure shows its own trip. Otherwise an open group shows its line, through its first trip the timetable knows.
+    const focusDeparture = openDeparture ?? openGroup?.departures.find(d => !d.added && !d.cancelled);
+    const focusTripPk = focusDeparture?.tripPk ?? null;
     useEffect(() => {
-        onTripFocus?.(openDeparture ? { trip: { tripPk: openDeparture.tripPk }, color: openDeparture.routeColor, routeKey: routeKey(openDeparture.routeName, openDeparture.routeType) } : null);
-    }, [openTripPk]);
+        onTripFocus?.(focusDeparture ? { trip: { tripPk: focusDeparture.tripPk }, color: focusDeparture.routeColor, routeKey: routeKey(focusDeparture.routeName, focusDeparture.routeType) } : null);
+    }, [focusTripPk]);
     const now = Date.now();
     const noteStyle = { color: theme.muted, fontSize: 14, textAlign: 'center' as const, padding: 24 };
 
@@ -155,17 +165,53 @@ const StopDeparturesSheet = forwardRef<BottomSheetModal, Props>(({ stop, animate
                 )}
 
                 <View style={{ gap: 8, paddingHorizontal: 24 }}>
-                    {shown.map(d => {
-                        const key = departureKey(d);
+                    {groups.map(group => {
+                        const open = group.key === openGroupKey;
+                        const upcoming = group.departures.filter(d => !d.cancelled);
+                        const later = upcoming.slice(1, 3).map(d => formatDepartureIn(d.liveTimeMs, now)).join(', ');
                         return (
-                            <DepartureRow
-                                key={key}
-                                departure={d}
-                                open={key === openKey}
-                                stopsAway={stopsAway.get(d.tripPk)}
-                                nowMs={now}
-                                onToggle={() => setOpenKey(key === openKey ? null : key)}
-                            />
+                            <View key={group.key} style={{ gap: 8 }}>
+                                <Pressable
+                                    accessibilityRole="button"
+                                    accessibilityLabel={`${group.routeName} to ${group.terminus}, ${open ? 'hide' : 'show'} departures`}
+                                    accessibilityState={{ expanded: open }}
+                                    onPress={() => {
+                                        setOpenKey(null);
+                                        setOpenGroupKey(open ? null : group.key);
+                                    }}
+                                    style={{ flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: RADIUS.tile, padding: 14, backgroundColor: theme.backgroundColor }}
+                                >
+                                    <View style={{ minWidth: 52, height: 36, paddingHorizontal: 8, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: group.routeColor }}>
+                                        <Text numberOfLines={1} style={{ color: group.routeTextColor, fontSize: 15, fontWeight: '800' }}>{group.routeName}</Text>
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <Text numberOfLines={1} style={{ color: theme.color, fontSize: 15, fontWeight: '600' }}>
+                                            {group.terminus ? `to ${group.terminus}` : ''}
+                                        </Text>
+                                        {later !== '' && (
+                                            <Text numberOfLines={1} style={{ color: theme.muted, fontSize: 12, marginTop: 1 }}>then {later}</Text>
+                                        )}
+                                    </View>
+                                    <Text style={{ color: theme.color, fontSize: 17, fontWeight: '800' }}>
+                                        {upcoming[0] ? formatDepartureIn(upcoming[0].liveTimeMs, now) : 'Cancelled'}
+                                    </Text>
+                                    <ChevronDown size={18} color={theme.muted} style={{ transform: [{ rotate: open ? '180deg' : '0deg' }] }} />
+                                </Pressable>
+
+                                {open && group.departures.map(d => {
+                                    const key = departureKey(d);
+                                    return (
+                                        <DepartureRow
+                                            key={key}
+                                            departure={d}
+                                            open={key === openKey}
+                                            stopsAway={stopsAway.get(d.tripPk)}
+                                            nowMs={now}
+                                            onToggle={() => setOpenKey(key === openKey ? null : key)}
+                                        />
+                                    );
+                                })}
+                            </View>
                         );
                     })}
                 </View>

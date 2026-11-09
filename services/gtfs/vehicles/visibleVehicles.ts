@@ -4,12 +4,11 @@ import type { MapVehicle } from './vehicleRoutes';
 export type FocusedLine = { tripId: string; lineKeys: ReadonlyMap<string, string> };
 
 /**
- * The vehicles to draw. Zoomed out they are hidden, like the stop dots, except those on the shown trip's route and
- * terminus: showing a whole line zooms the map out, and its vehicles must stay.
+ * The vehicles to draw. With a line shown (a tapped vehicle, an open departure) only the vehicles on that trip's route
+ * and terminus stay, at any zoom. Without one they are hidden when zoomed out, like the stop dots.
  */
 export function visibleVehicles(vehicles: MapVehicle[], zoomedIn: boolean, focus: FocusedLine | null): MapVehicle[] {
-    if (zoomedIn) return vehicles;
-    if (!focus) return [];
+    if (!focus) return zoomedIn ? vehicles : [];
     const line = focus.lineKeys.get(focus.tripId);
     return vehicles.filter(v => v.tripId !== null && (v.tripId === focus.tripId || (line !== undefined && focus.lineKeys.get(v.tripId) === line)));
 }
