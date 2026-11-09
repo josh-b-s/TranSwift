@@ -5,6 +5,7 @@ import { AppDispatch, RootState } from '@/store/store';
 import { viewTrip } from '@/store/tripView.slice';
 import { applySwitch, clearSwitchRequest, endTrip, setLeftEarlyAt, setTripPace, setTripRequiredMps, setTripStep, setTripStopsLeft, type SwitchRequest } from '@/store/trip.slice';
 import { createTripSession, rideLegOf } from '@/services/trips/tripSession';
+import { forgetResumePoint, rememberResumePoint } from '@/services/trips/resumePoint';
 import { haversineMeters } from '@/services/geo/geoUtil';
 import { getDb } from '@/services/db/sqliteDb';
 import { createAlightAlert } from '@/services/trips/alightAlert';
@@ -99,6 +100,7 @@ export function useTripRecorder() {
 
         const finish = () => {
             finished = true;
+            forgetResumePoint();
             dispatch(endTrip());
             persist(false)
                 .then(trip => {
@@ -112,6 +114,7 @@ export function useTripRecorder() {
         const endEarly = () => {
             if (finished) return;
             finished = true;
+            rememberResumePoint(steps, session.stepIndex, session.boarded, session.stopsLeft, Date.now());
             dispatch(endTrip());
             if (finishedLegs([...doneLegsRef.current, ...session.legs]).length === 0) return;
             persist(true).catch(err => Alert.alert('Could not save trip', String(err)));

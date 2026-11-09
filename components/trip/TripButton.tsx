@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Alert, Pressable, Text, View } from 'react-native';
 import { Play } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { useSelector } from 'react-redux';
@@ -7,6 +7,8 @@ import { RootState } from '@/store/store';
 import { selectDisplayedJourney } from '@/store/route.slice';
 import { useStartTrip } from '@/hooks/startTrip';
 import { ACCENT } from '@/constants/themes';
+import { resumePointFor } from '@/services/trips/resumePoint';
+import { stepsFromJourney } from '@/services/trips/tripSteps';
 
 /** Starts the selected journey as a trip. Hidden while a trip runs, when ActiveTripPanel takes its place. */
 export default function TripButton() {
@@ -23,7 +25,12 @@ export default function TripButton() {
                 accessibilityLabel="Start trip"
                 onPress={() => {
                     Haptics.selectionAsync();
-                    startTrip(journey);
+                    const resume = resumePointFor(stepsFromJourney(journey), Date.now());
+                    if (!resume) return startTrip(journey);
+                    Alert.alert('Resume this trip?', `You stopped partway. Carry on from ${resume.steps[0].from}?`, [
+                        { text: 'Start over', onPress: () => startTrip(journey) },
+                        { text: 'Resume', onPress: () => startTrip(journey, resume) },
+                    ]);
                 }}
                 style={{
                     flexDirection: 'row',
