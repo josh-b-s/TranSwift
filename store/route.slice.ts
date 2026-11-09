@@ -7,6 +7,8 @@ import { publishDebugData } from '@/services/gtfs/debug/debugDataStore';
 import { fetchWalkPath, hasWalkRouting } from '@/services/routing/walkPath';
 import { withWalkPaths } from '@/services/routing/withWalkPaths';
 import { segmentMeters } from '@/services/gtfs/router/walkTimes';
+import { arriveBySearch } from '@/services/gtfs/router/arriveBy';
+import { retimeJourney } from '@/services/gtfs/router/journeyTimes';
 
 export const computeRoute = createAsyncThunk<
     GtfsRouteResult,
@@ -19,15 +21,20 @@ export const computeRoute = createAsyncThunk<
          * "now" is the actual moment of search.
          */
         departureTime?: Date;
+        /** Treats `departureTime` as the time to arrive by. Needs `departureTime`. */
+        arriveBy?: boolean;
         /** Undefined -> computeGtfsRouteNative's own default (1.4 m/s). */
         walkingSpeedMps?: number;
         /** Undefined -> computeGtfsRouteNative's own default. */
         maxWalkDistanceM?: number;
     },
     { rejectValue: string }
->('route/compute', async ({ origin, destination, debugMode = false, departureTime, walkingSpeedMps, maxWalkDistanceM }, { rejectWithValue, dispatch }) => {
+>('route/compute', async ({ origin, destination, debugMode = false, departureTime, arriveBy = false, walkingSpeedMps, maxWalkDistanceM }, { rejectWithValue, dispatch }) => {
     try {
-        const result = await computeGtfsRouteNative(origin, destination, departureTime, walkingSpeedMps, maxWalkDistanceM, debugMode);
+        const search = (at?: Date) => computeGtfsRouteNative(origin, destination, at, walkingSpeedMps, maxWalkDistanceM, debugMode);
+        const result = arriveBy && departureTime
+            ? { journeys: await arriveBySearch(async at => (await search(at)).journeys, departureTime.getTime(), Date.now()), debug: undefined }
+            : await search(departureTime);
         // Dispatched inside the thunk because debug data belongs in debug.slice, not route state. The big payload goes to the
         // module-level store and only its small meta enters Redux. Don't return `result` as-is: a thunk's return value becomes the
         // `fulfilled` payload, which RTK's dev middleware deep-walks, so strip `debug` from it.
@@ -42,12 +49,14 @@ export const computeRoute = createAsyncThunk<
 
 /** Routes the walks of one journey along footpaths. Skipped when no key is set or the journey was already done. */
 export const refineWalkPaths = createAsyncThunk<
-    { searchId: number; index: number; segments: RouteSegment[] },
+    { searchId: number; index: number; segments: RouteSegment[]; times: ReturnType<typeof retimeJourney> },
     number,
-    { state: { route: State } }
+    { state: { route: State; search: { walkingSpeedMps: number } } }
 >('route/refineWalkPaths', async (index, { getState }) => {
-    const { journeys, searchId } = getState().route;
-    return { searchId, index, segments: await withWalkPaths(journeys[index].segments, fetchWalkPath) };
+    const { route: { journeys, searchId }, search } = getState();
+    const segments = await withWalkPaths(journeys[index].segments, fetchWalkPath);
+    // A footpath is rarely as long as the straight line, so the times that rested on it move too.
+    return { searchId, index, segments, times: retimeJourney({ ...journeys[index], segments }, search.walkingSpeedMps) };
 }, {
     condition: (index, { getState }) => {
         const journey = getState().route.journeys[index];
@@ -117,9 +126,10 @@ const slice = createSlice({
                 s.selectedJourneyIndex = 0;
             })
             .addCase(refineWalkPaths.fulfilled, (s, a) => {
-                const { searchId, index, segments } = a.payload;
+                const { searchId, index, segments, times } = a.payload;
                 if (searchId !== s.searchId) return;
                 s.journeys[index].segments = segments;
+                if (times) Object.assign(s.journeys[index], times);
                 s.journeys[index].totalWalkingMeters = Math.round(
                     segments.filter(seg => seg.type === 'walk').reduce((sum, seg) => sum + segmentMeters(seg), 0),
                 );

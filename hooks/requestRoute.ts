@@ -11,6 +11,7 @@ type Overrides = {
     origin?: SearchPlace;
     destination?: SearchPlace;
     departureTime?: number | null;
+    arriveBy?: boolean;
     walkingSpeedMps?: number;
 };
 
@@ -22,6 +23,7 @@ export function useRequestRoute() {
     const storedOrigin = useSelector((s: RootState) => s.search.origin);
     const storedDestination = useSelector((s: RootState) => s.search.selected);
     const storedDeparture = useSelector((s: RootState) => s.search.departureTime);
+    const storedArriveBy = useSelector((s: RootState) => s.search.arriveBy);
     const storedSpeed = useSelector((s: RootState) => s.search.walkingSpeedMps);
     const maxWalkDistanceM = useSelector((s: RootState) => s.preferences.maxWalkDistanceM);
 
@@ -42,8 +44,9 @@ export function useRequestRoute() {
             destination:     target,
             debugMode:       debugEnabled,
             departureTime:   departureTime ? new Date(departureTime) : undefined,
+            arriveBy:        departureTime ? (overrides.arriveBy ?? storedArriveBy) : false,
             walkingSpeedMps: overrides.walkingSpeedMps ?? storedSpeed,
             maxWalkDistanceM,
         }));
-    }, [dispatch, userLocation, debugEnabled, storedOrigin, storedDestination, storedDeparture, storedSpeed, maxWalkDistanceM]);
+    }, [dispatch, userLocation, debugEnabled, storedOrigin, storedDestination, storedDeparture, storedArriveBy, storedSpeed, maxWalkDistanceM]);
 }

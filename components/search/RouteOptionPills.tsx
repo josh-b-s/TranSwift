@@ -4,7 +4,7 @@ import { ChevronDown, CircleX, Clock, Footprints } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch, RootState } from '@/store/store';
-import { setDepartureTime, setWalkingSpeed } from '@/store/search.slice';
+import { setArriveBy, setDepartureTime, setWalkingSpeed } from '@/store/search.slice';
 import { useRequestRoute } from '@/hooks/requestRoute';
 import { ACCENT, useThemeStyle } from '@/constants/themes';
 import DepartureTimeModal from '@/components/search/DepartureTimeModal';
@@ -16,7 +16,7 @@ export default function RouteOptionPills() {
     const dispatch = useDispatch<AppDispatch>();
     const theme = useThemeStyle();
     const requestRoute = useRequestRoute();
-    const { departureTime, walkingSpeedMps } = useSelector((s: RootState) => s.search);
+    const { departureTime, arriveBy, walkingSpeedMps } = useSelector((s: RootState) => s.search);
     // User-editable presets, see app/(tabs)/settings/preferences.tsx.
     const walkingSpeedOptions = useSelector((s: RootState) => s.preferences.walkingSpeeds);
     const [showTimeModal, setShowTimeModal] = useState(false);
@@ -26,9 +26,10 @@ export default function RouteOptionPills() {
     const current = walkingSpeedOptions.find(o => o.mps === walkingSpeedMps);
     const speedLabel = current ? walkingSpeedLabel(current) : formatMps(walkingSpeedMps);
 
-    const changeDeparture = useCallback((epochMs: number | null) => {
+    const changeDeparture = useCallback((epochMs: number | null, arrive = false) => {
         dispatch(setDepartureTime(epochMs));
-        requestRoute({ departureTime: epochMs });
+        dispatch(setArriveBy(arrive));
+        requestRoute({ departureTime: epochMs, arriveBy: arrive });
     }, [dispatch, requestRoute]);
 
     const chooseWalkingSpeed = useCallback((mps: number) => {
@@ -59,7 +60,7 @@ export default function RouteOptionPills() {
                 <Clock size={16} color={ACCENT} />
                 <Text style={textStyle}>
                     {departureTime
-                        ? new Date(departureTime).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+                        ? `${arriveBy ? 'Arrive by ' : ''}${new Date(departureTime).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`
                         : 'Leave now'}
                 </Text>
                 {departureTime !== null && (
@@ -95,6 +96,7 @@ export default function RouteOptionPills() {
             <DepartureTimeModal
                 visible={showTimeModal}
                 value={departureTime}
+                arriveBy={arriveBy}
                 onClose={() => setShowTimeModal(false)}
                 onConfirm={changeDeparture}
             />

@@ -51,6 +51,8 @@ type State = {
      * of search, not whenever this was picked.
      */
     departureTime: number | null;
+    /** Whether `departureTime` is the time to arrive by instead of leave at. Ignored when it is null. */
+    arriveBy: boolean;
     /** Meters/sec. Defaults to computeGtfsRouteNative's own default (1.4) so an
      *  untouched picker matches it. */
     walkingSpeedMps: number;
@@ -68,6 +70,7 @@ const initialState: State = {
     error: null,
     showResults: false,
     departureTime: null,
+    arriveBy: false,
     walkingSpeedMps: DEFAULT_WALKING_SPEED_MPS,
 };
 
@@ -105,6 +108,9 @@ const slice = createSlice({
         setDepartureTime(state, action: PayloadAction<number | null>) {
             state.departureTime = action.payload;
         },
+        setArriveBy(state, action: PayloadAction<boolean>) {
+            state.arriveBy = action.payload;
+        },
         setWalkingSpeed(state, action: PayloadAction<number>) {
             state.walkingSpeedMps = action.payload;
         },
@@ -138,6 +144,6 @@ const slice = createSlice({
 
 export const {
     setQuery, selectPlace, setOrigin, swapEndpoints, startPicking, stopPicking,
-    clearResults, setDepartureTime, setWalkingSpeed,
+    clearResults, setDepartureTime, setArriveBy, setWalkingSpeed,
 } = slice.actions;
 export default slice.reducer;

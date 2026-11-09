@@ -15,6 +15,8 @@ import type {
 } from './routeTypes';
 import { createDebugSinkCollector } from '../debug/debugSinkCollector';
 import { formatTimings } from './formatTimings';
+import { leaveSeconds, secToTimeString } from './journeyTimes';
+import { walkSecondsByGap } from './walkTimes';
 import { getCurrentDbPath } from '@/services/db/sqliteDb';
 import { refreshRealtime } from '../realtime/gtfsRealtime';
 import { DEFAULT_MAX_WALK_DISTANCE_M } from '@/constants/walkLimit';
@@ -77,14 +79,6 @@ export function invalidateNativeRouter() {
     warmUpPromise = null;
 }
 
-function secToTimeString(sec?: number): string | undefined {
-    if (sec === undefined) return undefined;
-    const h = Math.floor(sec / 3600) % 24;
-    const m = Math.floor((sec % 3600) / 60);
-    const s = Math.floor(sec % 60);
-    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-}
-
 /**
  * loader.rs wants GTFS-style YYYYMMDD in local time. toISOString() is hyphenated and UTC, so it gives the wrong
  * day for early-morning searches in Melbourne.
@@ -115,12 +109,12 @@ function toSegment(seg: import('@mapapp/gtfs-router-rust').RouteSegment): RouteS
     };
 }
 
-function toJourney(j: Journey): GtfsJourney {
+function toJourney(j: Journey, walkingSpeedMps: number): GtfsJourney {
     // j.segments are the fine walk/transit polyline pieces; j.legs are the coarser board-here, alight-there summary.
     const segments = j.segments.map(toSegment);
     const first = j.legs[0];
     const last = j.legs[j.legs.length - 1];
-    return {
+    const journey: GtfsJourney = {
         coords: j.coords,
         segments,
         legs: j.legs.map((leg: Leg) => ({
@@ -147,6 +141,13 @@ function toJourney(j: Journey): GtfsJourney {
         departureTime: secToTimeString(j.departureTimeSec)!,
         arrivalTime: secToTimeString(j.arrivalTimeSec)!,
     };
+    // The router's departure is when the search began. Show when the rider must leave to catch the first ride at their pace.
+    if (first) {
+        const leave = leaveSeconds(Number(j.departureTimeSec), first.departureTimeSec, walkSecondsByGap(journey, walkingSpeedMps)[0]);
+        journey.departureTime = secToTimeString(leave)!;
+        journey.totalDurationMin = Math.floor((Number(j.arrivalTimeSec) - leave) / 60);
+    }
+    return journey;
 }
 
 /** One line per journey for the console, so settings can be compared on the result as well as the timings. */
@@ -216,7 +217,7 @@ export async function computeGtfsRouteNative(
         }
 
         return {
-            journeys: result.journeys.map(toJourney),
+            journeys: result.journeys.map((j: Journey) => toJourney(j, walkingSpeedMps)),
             debug: collector?.toDebugInfo(),  // unchanged — toDebugInfo lives on the wrapper, not the sink
         };
     } catch (err) {
