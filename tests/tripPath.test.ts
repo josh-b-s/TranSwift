@@ -65,3 +65,9 @@ test('a trip the timetable does not know gives no path', async () => {
     assert.equal(await loadTripPath(db, { tripPk: 999 }), null);
     assert.equal(await loadTripPath(db, { tripId: 'nope' }), null);
 });
+
+test('the terminus is the trip headsign when it has one, otherwise the last stop', async () => {
+    await db.execAsync(`UPDATE trips SET trip_headsign = 'C via B' WHERE trip_id = 'T1';`);
+    assert.equal((await loadTripPath(db, { tripId: 'T1' }))?.terminus, 'C via B');
+    assert.equal((await loadTripPath(db, { tripId: 'T2' }))?.terminus, 'B');
+});

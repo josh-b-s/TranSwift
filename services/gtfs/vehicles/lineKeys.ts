@@ -1,18 +1,21 @@
 import type { QueryableDb } from '@/services/db/queryableDb';
+import { headsignSql } from '@/services/gtfs/departures/tripHeadsign';
+import { terminusOf } from '@/services/gtfs/departures/terminus';
 import { chunks, marks } from './vehicleRoutes';
 
-type LineRow = { trip_id: string; route_id: string; agency: number; terminus: string | null };
+type LineRow = { trip_id: string; route_id: string; agency: number; terminus: string | null; headsign: string | null };
 
 /**
- * Names the line each trip runs on by its route and the name of the stop it ends at, so a route's two directions
+ * Names the line each trip runs on by its route and where it is heading (see `terminusOf`), so a route's two directions
  * get different keys and its trips to the same end get the same one. Keyed by the feed's trip id. Trips the
  * timetable does not know are left out.
  */
 export async function loadLineKeys(db: QueryableDb, tripIds: string[]): Promise<Map<string, string>> {
     const keys = new Map<string, string>();
+    const headsign = await headsignSql(db);
     for (const ids of chunks(tripIds)) {
         const rows = await db.getAllAsync<LineRow>(
-            `SELECT t.trip_id, p.route_id, p.agency, s.stop_name AS terminus
+            `SELECT t.trip_id, p.route_id, p.agency, s.stop_name AS terminus, ${headsign} AS headsign
              FROM trips t
              JOIN patterns p ON p.pattern_pk = t.pattern_pk
              JOIN pattern_stops ps ON ps.pattern_pk = t.pattern_pk
@@ -21,7 +24,7 @@ export async function loadLineKeys(db: QueryableDb, tripIds: string[]): Promise<
              WHERE t.trip_id IN (${marks(ids.length)})`,
             ids,
         );
-        for (const r of rows) if (!keys.has(r.trip_id)) keys.set(r.trip_id, `${r.agency}|${r.route_id}|${r.terminus ?? ''}`);
+        for (const r of rows) if (!keys.has(r.trip_id)) keys.set(r.trip_id, `${r.agency}|${r.route_id}|${terminusOf(r.headsign, r.terminus) ?? ''}`);
     }
     return keys;
 }

@@ -14,3 +14,8 @@ export async function hasTripHeadsign(db: QueryableDb): Promise<boolean> {
     known.set(db, found);
     return found;
 }
+
+/** The SQL for a trip's headsign, with blanks as NULL, or NULL itself for a database that has no headsigns. For a query over `trips t`. */
+export async function headsignSql(db: QueryableDb): Promise<string> {
+    return (await hasTripHeadsign(db)) ? "NULLIF(TRIM(t.trip_headsign), '')" : 'NULL';
+}

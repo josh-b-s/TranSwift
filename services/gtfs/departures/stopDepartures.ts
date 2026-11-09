@@ -3,7 +3,8 @@ import { makeKey, parseKey } from '@/services/gtfs/core/gtfsKeyUtil';
 import { getStopCalls } from '@/services/gtfs/core/stopTimeWindow';
 import { fallbackRouteColor, hexColor } from '@/services/gtfs/core/routeTypeUtil';
 import { getActiveServiceKeys } from './activeServices';
-import { hasTripHeadsign } from './tripHeadsign';
+import { headsignSql } from './tripHeadsign';
+import { terminusOf } from './terminus';
 
 const HOUR_MS = 3_600_000;
 
@@ -57,7 +58,7 @@ export async function getStopDepartures(
     const fromMs = from.getTime();
     const toMs = fromMs + windowMs;
     const out: Departure[] = [];
-    const headsign = (await hasTripHeadsign(db)) ? "NULLIF(TRIM(t.trip_headsign), '')" : 'NULL';
+    const headsign = await headsignSql(db);
 
     // Yesterday's trips can run past midnight, and tomorrow's can start inside the window.
     for (const offset of [-1, 0, 1]) {
@@ -105,7 +106,7 @@ export async function getStopDepartures(
                 routeType: r.route_type,
                 routeColor: hexColor(r.route_color, fallbackRouteColor(r.route_type, routeName)),
                 routeTextColor: hexColor(r.route_text_color, '#FFFFFF'),
-                terminus: r.headsign ?? r.terminus ?? '',
+                terminus: terminusOf(r.headsign, r.terminus) ?? '',
                 tripPk: call.tripPk,
                 stopSequence: call.stopSequence,
                 dayStartMs,

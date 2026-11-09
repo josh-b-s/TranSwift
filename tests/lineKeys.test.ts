@@ -42,3 +42,19 @@ test('a trip the timetable does not know is left out', async () => {
     const keys = await loadLineKeys(db, ['T1', 'nope']);
     assert.deepEqual([...keys.keys()], ['T1']);
 });
+
+test('a headsign names the line instead of the last stop, so trips with different ones are different lines', async () => {
+    await db.execAsync(`
+        UPDATE trips SET trip_headsign = 'Charlie via Bravo' WHERE trip_id = 'T1';
+        UPDATE trips SET trip_headsign = 'Charlie' WHERE trip_id = 'T2';
+    `);
+    const keys = await loadLineKeys(db, ['T1', 'T2']);
+    assert.ok(keys.get('T1')?.endsWith('|Charlie via Bravo'));
+    assert.notEqual(keys.get('T1'), keys.get('T2'));
+});
+
+test('a blank headsign falls back to the last stop', async () => {
+    await db.execAsync(`UPDATE trips SET trip_headsign = '  ' WHERE trip_id = 'T1';`);
+    const keys = await loadLineKeys(db, ['T1']);
+    assert.ok(keys.get('T1')?.endsWith('|Charlie'));
+});
