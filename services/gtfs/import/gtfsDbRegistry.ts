@@ -56,6 +56,8 @@ export type GtfsDatabaseEntry = {
     realtimeAuth?: RealtimeAuth;
     /** Set when most of a realtime feed's trip ids matched no trip here, which suggests an older timetable. */
     realtimeMismatch?: boolean;
+    /** Set once the realtime ids have matched this timetable. A mismatch after that means the timetable has gone out of date; one from the start means downloading again will not help. */
+    realtimeMatched?: boolean;
 };
 
 type RegistryFile = {
@@ -240,12 +242,15 @@ export async function getActiveDatabaseEntry(): Promise<GtfsDatabaseEntry | null
     return reg.databases.find(d => d.id === reg.activeId) ?? null;
 }
 
-/** Writes only when the flag changes. */
-export async function setRealtimeMismatch(id: string, mismatch: boolean): Promise<void> {
+/** Writes only when something changes. `matched` says the ids lined up on this check. */
+export async function setRealtimeMismatch(id: string, mismatch: boolean, matched = false): Promise<void> {
     const reg = await readRegistry();
     const entry = reg.databases.find(d => d.id === id);
-    if (!entry || !!entry.realtimeMismatch === mismatch) return;
+    if (!entry) return;
+    const newlyMatched = matched && !entry.realtimeMatched;
+    if (!!entry.realtimeMismatch === mismatch && !newlyMatched) return;
     entry.realtimeMismatch = mismatch || undefined;
+    if (newlyMatched) entry.realtimeMatched = true;
     await writeRegistry(reg);
 }
 

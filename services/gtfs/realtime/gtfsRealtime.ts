@@ -83,8 +83,10 @@ export async function refreshRealtime(engine: Engine): Promise<void> {
         });
         console.log(`[gtfsRealtime] ${used.length}/${urls.length} feeds\n  ${perFeed.join('\n  ')}`);
 
-        const mismatch = stats.some(s => s.tripUpdates >= MISMATCH_MIN_UPDATES && s.unmatched / s.tripUpdates > MISMATCH_RATIO);
-        await setRealtimeMismatch(entry.id, mismatch);
+        // A feed with few updates says nothing either way, so it neither flags a mismatch nor counts as a match.
+        const checked = stats.filter(s => s.tripUpdates >= MISMATCH_MIN_UPDATES);
+        const mismatch = checked.some(s => s.unmatched / s.tripUpdates > MISMATCH_RATIO);
+        await setRealtimeMismatch(entry.id, mismatch, checked.length > 0 && !mismatch);
     } catch (err) {
         console.warn('[gtfsRealtime] realtime update failed, keeping last known delays:', err);
     }

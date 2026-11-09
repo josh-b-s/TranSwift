@@ -21,8 +21,6 @@ import { daysUntilGtfsDate } from './serviceDate';
 import { hasNewerVersion } from './feedUpdate';
 
 const EXPIRY_WARNING_DAYS = 14;
-// A feed downloaded this recently that still mismatches realtime won't be fixed by downloading it again.
-const MISMATCH_GRACE_MS = 7 * 24 * 60 * 60 * 1000;
 
 async function regionOf(at: Point): Promise<Region | null> {
     const [place] = await Location.reverseGeocodeAsync(at);
@@ -65,21 +63,26 @@ function expiryOf(entries: GtfsDatabaseEntry[]): FeedSuggestion | null {
     return daysLeft <= EXPIRY_WARNING_DAYS ? { kind: 'expiring', entry: latest, daysLeft } : null;
 }
 
-/** A database the app can no longer open, a newer upstream version, or realtime ids that stopped matching. Only for entries that can be re-downloaded. */
+/**
+ * A database the app can no longer open, a newer upstream version, or realtime ids that stopped matching. Only for
+ * entries that can be re-downloaded. Mismatched realtime ids count only when downloading again could help: the server
+ * has a newer zip, or it can't be told and the ids matched before, so the timetable changed since. Ids that never
+ * matched are the provider's doing and a new download keeps them.
+ */
 async function updateOf(entries: GtfsDatabaseEntry[]): Promise<FeedSuggestion | null> {
     const downloadable = entries.filter((e) => e.source);
     const oldFormat = downloadable.find((e) => !isCurrentSchema(e));
     if (oldFormat) return { kind: 'oldFormat', entry: oldFormat };
 
-    const mismatched = downloadable.find((e) => e.realtimeMismatch && Date.now() - e.importedAt > MISMATCH_GRACE_MS);
-    if (mismatched) return { kind: 'updated', entry: mismatched };
-
     for (const entry of downloadable) {
+        let newer: boolean | null = null;
         try {
-            if (await hasNewerVersion(entry)) return { kind: 'updated', entry };
+            newer = await hasNewerVersion(entry);
         } catch (err) {
             console.warn(`[feedSuggestion] update check failed for "${entry.name}":`, err);
         }
+        const staleIds = entry.realtimeMismatch && entry.realtimeMatched && newer === null;
+        if (newer || staleIds) return { kind: 'updated', entry };
     }
     return null;
 }

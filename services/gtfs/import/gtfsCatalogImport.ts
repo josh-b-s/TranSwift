@@ -1,6 +1,7 @@
 import * as FileSystem from 'expo-file-system/legacy';
 import type { CatalogFeed } from '../catalog/catalogParse';
 import { downloadZip } from './gtfsDownload';
+import { fetchRemoteValidators } from '../update/fetchRemoteValidators';
 import { importZipAsNewDatabase } from './gtfsDbImport';
 import {
     deleteDatabase,
@@ -28,14 +29,16 @@ export async function importCatalogFeed(
     onInterrupted?: (err: unknown) => Promise<boolean>,
 ): Promise<GtfsDatabaseEntry> {
     const zip = await downloadZip(feed.zipUrl, `${feed.id}.zip`, onDownload, signal, onInterrupted);
+    // Later checks compare against a HEAD request, and a server can answer HEAD and GET with different validators.
+    const head = await fetchRemoteValidators(feed.zipUrl).catch(() => ({}) as { etag?: string; lastModified?: string });
     try {
         const entry = await importZipAsNewDatabase(zip, onImport, {
             id: feed.id,
             label: feed.name ? `${feed.provider} (${feed.name})` : feed.provider,
             url: feed.zipUrl,
             license: feed.licenseUrl || undefined,
-            etag: zip.etag,
-            lastModified: zip.lastModified,
+            etag: head.etag ?? zip.etag,
+            lastModified: head.lastModified ?? zip.lastModified,
         }, signal);
 
         const old = replaceId ? (await listDatabases()).find((d) => d.id === replaceId) : undefined;
