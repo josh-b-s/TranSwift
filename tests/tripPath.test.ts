@@ -4,6 +4,7 @@ import Database from 'better-sqlite3';
 import { REAL_INDEXES_SQL, REAL_SCHEMA_SQL } from './realSchema';
 import { loadTripPath } from '@/services/gtfs/vehicles/tripPath';
 import type { QueryableDb } from '@/services/db/queryableDb';
+import { addShape } from './timetableFixtures';
 
 let db: QueryableDb;
 
@@ -32,11 +33,12 @@ beforeEach(() => {
             (10, 3, 30), (10, 1, 10), (10, 2, 20),
             (20, 1, 1), (20, 2, 2);
         INSERT INTO shape_meta (shape_pk, shape_id, agency) VALUES (5, 'SH', 1);
-        INSERT INTO shapes (shape_pk, shape_pt_lat, shape_pt_lon, shape_pt_sequence) VALUES
-            (5, ${deg(-37.82)}, ${deg(144.90)}, 3),
-            (5, ${deg(-37.80)}, ${deg(144.90)}, 1),
-            (5, ${deg(-37.81)}, ${deg(144.92)}, 2);
     `);
+    addShape(sqlite, 5, [
+        { lat: deg(-37.80), lon: deg(144.90) },
+        { lat: deg(-37.81), lon: deg(144.92) },
+        { lat: deg(-37.82), lon: deg(144.90) },
+    ]);
 });
 
 test('a trip is found by its key or by its feed id, with the shape and stops in order', async () => {

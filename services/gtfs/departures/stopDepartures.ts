@@ -1,5 +1,6 @@
 import type { QueryableDb } from '@/services/db/queryableDb';
 import { makeKey, parseKey } from '@/services/gtfs/core/gtfsKeyUtil';
+import { getStopCalls } from '@/services/gtfs/core/stopTimeWindow';
 import { fallbackRouteColor, hexColor } from '@/services/gtfs/core/routeTypeUtil';
 import { getActiveServiceKeys } from './activeServices';
 import { hasTripHeadsign } from './tripHeadsign';
@@ -21,10 +22,8 @@ export type Departure = {
     dayStartMs: number;
 };
 
-type DepartureRow = {
-    sec: number;
+type TripRow = {
     trip_pk: number;
-    stop_sequence: number;
     service_id: string;
     agency: number;
     route_short_name: string | null;
@@ -33,6 +32,8 @@ type DepartureRow = {
     route_color: string | null;
     route_text_color: string | null;
     terminus: string | null;
+    terminus_stop_pk: number;
+    terminus_sequence: number;
     headsign: string | null;
 };
 
@@ -44,8 +45,7 @@ export function serviceDayStartMs(day: Date): number {
 /**
  * Scheduled departures from one stop between `from` and `from + windowMs`, soonest first.
  * Trips that end at the stop are left out, since nobody can board them there: that is a row at the pattern's last
- * stop with the last sequence. The check reads the pattern, not the trip's other stop_times, because that table has
- * no trip_pk index and the lookup scanned all of it for every row.
+ * stop with the last sequence. The check reads the pattern, not the trip's other calls, which are not indexed by trip.
  */
 export async function getStopDepartures(
     db: QueryableDb,
@@ -71,40 +71,43 @@ export async function getStopDepartures(
         if (services.size === 0) continue;
         const serviceIds = [...new Set([...services].map(key => parseKey(key).id))];
 
-        const rows = await db.getAllAsync<DepartureRow>(
-            `SELECT st.departure_sec AS sec, st.trip_pk, st.stop_sequence, t.service_id, t.agency,
+        const calls = await getStopCalls(db, stopPk, fromSec, toSec);
+        if (calls.length === 0) continue;
+
+        const trips = await db.getAllAsync<TripRow>(
+            `SELECT t.trip_pk, t.service_id, t.agency,
                     r.route_short_name, r.route_long_name, r.route_type,
                     r.route_color, r.route_text_color,
-                    term.stop_name AS terminus,
+                    term.stop_name AS terminus, ps.stop_pk AS terminus_stop_pk, ps.stop_sequence AS terminus_sequence,
                     ${headsign} AS headsign
-             FROM stop_times st
-             JOIN trips t ON t.trip_pk = st.trip_pk
+             FROM trips t
              JOIN patterns p ON p.pattern_pk = t.pattern_pk
              JOIN routes r ON r.route_id = p.route_id AND r.agency = p.agency
              JOIN pattern_stops ps ON ps.pattern_pk = p.pattern_pk
               AND ps.stop_sequence = (SELECT MAX(stop_sequence) FROM pattern_stops WHERE pattern_pk = p.pattern_pk)
              JOIN stops term ON term.stop_pk = ps.stop_pk
-             WHERE st.stop_pk = ?
-               AND st.departure_sec BETWEEN ? AND ?
-               AND t.service_id IN (SELECT value FROM json_each(?))
-               AND NOT (st.stop_pk = ps.stop_pk AND st.stop_sequence >= ps.stop_sequence)
-             ORDER BY st.departure_sec`,
-            [stopPk, fromSec, toSec, JSON.stringify(serviceIds)],
+             WHERE t.trip_pk IN (SELECT value FROM json_each(?))
+               AND t.service_id IN (SELECT value FROM json_each(?))`,
+            [JSON.stringify([...new Set(calls.map(c => c.tripPk))]), JSON.stringify(serviceIds)],
         );
+        const tripByPk = new Map(trips.map(t => [t.trip_pk, t]));
 
-        for (const r of rows) {
+        for (const call of calls) {
+            const r = tripByPk.get(call.tripPk);
+            if (!r) continue;
             // The SQL filter matches service_id alone, so two agencies can share an id.
             if (!services.has(makeKey(r.agency, r.service_id))) continue;
+            if (stopPk === r.terminus_stop_pk && call.stopSequence >= r.terminus_sequence) continue;
             const routeName = r.route_short_name || r.route_long_name || '?';
             out.push({
-                timeMs: dayStartMs + r.sec * 1000,
+                timeMs: dayStartMs + call.departureSec * 1000,
                 routeName,
                 routeType: r.route_type,
                 routeColor: hexColor(r.route_color, fallbackRouteColor(r.route_type, routeName)),
                 routeTextColor: hexColor(r.route_text_color, '#FFFFFF'),
                 terminus: r.headsign ?? r.terminus ?? '',
-                tripPk: r.trip_pk,
-                stopSequence: r.stop_sequence,
+                tripPk: call.tripPk,
+                stopSequence: call.stopSequence,
                 dayStartMs,
             });
         }

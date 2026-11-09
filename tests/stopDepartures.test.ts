@@ -5,6 +5,7 @@ import { REAL_INDEXES_SQL, REAL_SCHEMA_SQL } from './realSchema';
 import { getStopDepartures } from '@/services/gtfs/departures/stopDepartures';
 import { getTripStops } from '@/services/gtfs/departures/tripStops';
 import type { QueryableDb } from '@/services/db/queryableDb';
+import { addStopCalls, call } from './timetableFixtures';
 
 const HOUR_MS = 3_600_000;
 const at = (d: number, h: number, m = 0) => new Date(2026, 9, d, h, m).getTime();
@@ -47,8 +48,7 @@ function addTrip(tripPk: number, serviceId: string, fromAlphaSec: number) {
         .run(tripPk, `t${tripPk}`, serviceId);
     [1, 2, 3].forEach((stopPk, i) => {
         const sec = fromAlphaSec + i * 300;
-        sqlite.prepare(`INSERT INTO stop_times (trip_pk, stop_sequence, stop_pk, departure_sec) VALUES (?, ?, ?, ?)`)
-            .run(tripPk, i + 1, stopPk, sec);
+        addStopCalls(sqlite, stopPk, [call(sec, tripPk, i + 1)]);
     });
 }
 
@@ -108,9 +108,9 @@ test('a service id shared with another agency does not leak across', async () =>
         INSERT INTO patterns (pattern_pk, route_id, agency, direction_id, shape_id, trip_pk) VALUES (20, 'R2', 2, 0, NULL, 200);
         INSERT INTO pattern_stops (pattern_pk, stop_pk, stop_sequence) VALUES (20, 1, 1), (20, 3, 2);
         INSERT INTO trips (trip_pk, trip_id, agency, pattern_pk, service_id) VALUES (200, 't200', 2, 20, 'WK');
-        INSERT INTO stop_times (trip_pk, stop_sequence, stop_pk, departure_sec) VALUES
-            (200, 1, 1, 36060), (200, 2, 3, 36360);
     `);
+    addStopCalls(sqlite, 1, [call(36060, 200, 1)]);
+    addStopCalls(sqlite, 3, [call(36360, 200, 2)]);
     const out = await getStopDepartures(db, 1, new Date(at(MON, 9)), 3 * HOUR_MS, 10);
     assert.deepEqual(out.map(d => d.routeName), ['96']);
 });
@@ -126,9 +126,9 @@ test('a loop trip departs from its first stop but its return there is not a depa
         INSERT INTO patterns (pattern_pk, route_id, agency, direction_id, shape_id, trip_pk) VALUES (11, 'R1', 1, 0, NULL, 200);
         INSERT INTO pattern_stops (pattern_pk, stop_pk, stop_sequence) VALUES (11, 1, 1), (11, 2, 2), (11, 1, 3);
         INSERT INTO trips (trip_pk, trip_id, agency, pattern_pk, service_id) VALUES (200, 'loop', 1, 11, 'WK');
-        INSERT INTO stop_times (trip_pk, stop_sequence, stop_pk, departure_sec) VALUES
-            (200, 1, 1, 36000), (200, 2, 2, 36300), (200, 3, 1, 36600);
     `);
+    addStopCalls(sqlite, 1, [call(36000, 200, 1), call(36600, 200, 3)]);
+    addStopCalls(sqlite, 2, [call(36300, 200, 2)]);
     const out = await getStopDepartures(db, 1, new Date(at(MON, 9)), 3 * HOUR_MS, 10);
     assert.deepEqual(out.map(d => d.timeMs), [at(MON, 10)]);
 });
@@ -146,7 +146,8 @@ test('lists the stops a departure calls at from its own stop onward', async () =
 
 test('a stop is shown as an arrival, which is its departure minus the dwell', async () => {
     addTrip(100, 'WK', 10 * 3600);
-    sqlite.exec(`UPDATE stop_times SET dwell_sec = 60 WHERE trip_pk = 100 AND stop_sequence = 2`);
+    sqlite.exec(`DELETE FROM stop_time_chunks WHERE stop_pk = 2`);
+    addStopCalls(sqlite, 2, [call(10 * 3600 + 300, 100, 2, 60)]);
     const [fromAlpha] = await getStopDepartures(db, 1, new Date(at(MON, 9)), 3 * HOUR_MS, 10);
     assert.deepEqual((await getTripStops(db, fromAlpha)).map(s => s.timeMs), [at(MON, 10), at(MON, 10, 4), at(MON, 10, 10)]);
 });
@@ -211,4 +212,14 @@ test('a database imported before headsigns existed still lists last stops', asyn
     };
     const out = await getStopDepartures(oldDb, 1, new Date(at(MON, 9, 30)), 3 * HOUR_MS, 10);
     assert.deepEqual(out.map(d => d.terminus), ['Charlie']);
+});
+
+test('departures are found when many trips share chunks, including a chunk that began before the window', async () => {
+    for (let i = 0; i < 20; i++) {
+        sqlite.prepare(`INSERT INTO trips (trip_pk, trip_id, agency, pattern_pk, service_id) VALUES (?, ?, 1, 10, 'WK')`).run(300 + i, `b${i}`);
+    }
+    // Twenty trips leave Alpha every 10 minutes from 08:00, six to a chunk, so the window opens inside a chunk.
+    addStopCalls(sqlite, 1, Array.from({ length: 20 }, (_, i) => call(8 * 3600 + i * 600, 300 + i, 1)), 6);
+    const out = await getStopDepartures(db, 1, new Date(at(MON, 9, 25)), HOUR_MS, 20);
+    assert.deepEqual(out.map(d => d.timeMs), [at(MON, 9, 30), at(MON, 9, 40), at(MON, 9, 50), at(MON, 10), at(MON, 10, 10), at(MON, 10, 20)]);
 });

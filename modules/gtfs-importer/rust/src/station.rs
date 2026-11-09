@@ -132,7 +132,8 @@ mod tests {
             zip.write_all(body.as_bytes()).unwrap();
         }
         let bytes = zip.finish().unwrap().into_inner();
-        let dir = std::env::temp_dir().join(format!("gtfs-station-test-{}", std::process::id()));
+        static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+        let dir = std::env::temp_dir().join(format!("gtfs-station-test-{}-{}", std::process::id(), NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)));
         std::fs::create_dir_all(&dir).unwrap();
         let (zip_path, db_path) = (dir.join("feed.zip"), dir.join("feed.db"));
         let _ = std::fs::remove_file(&db_path);

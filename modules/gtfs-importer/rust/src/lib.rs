@@ -1,6 +1,9 @@
 mod source;
 mod csv_util;
 mod schema;
+mod varint;
+mod shape_codec;
+mod stop_time_codec;
 mod import;
 mod station;
 #[cfg(test)]

@@ -10,33 +10,9 @@
 
 use crate::graph::coarse::{pair_distance_m, CoarseEdge, EdgeKind};
 use crate::repo::StopsCache;
+use crate::varint::{put_varint, read_varint, unzigzag, zigzag};
 
 const WALK: u64 = 1;
-
-fn put_varint(out: &mut Vec<u8>, mut n: u64) {
-    while n >= 0x80 {
-        out.push((n & 0x7f) as u8 | 0x80);
-        n >>= 7;
-    }
-    out.push(n as u8);
-}
-
-fn read_varint(bytes: &[u8], pos: &mut usize) -> Option<u64> {
-    let mut n = 0u64;
-    let mut shift = 0;
-    loop {
-        let byte = *bytes.get(*pos)?;
-        *pos += 1;
-        n |= u64::from(byte & 0x7f) << shift;
-        if byte & 0x80 == 0 { return Some(n); }
-        shift += 7;
-        if shift > 63 { return None; }
-    }
-}
-
-fn zigzag(n: i64) -> u64 { ((n << 1) ^ (n >> 63)) as u64 }
-
-fn unzigzag(n: u64) -> i64 { ((n >> 1) as i64) ^ -((n & 1) as i64) }
 
 pub fn encode_edges(stop_pk: i64, edges: &[CoarseEdge]) -> Vec<u8> {
     let mut out = Vec::with_capacity(edges.len() * 3);

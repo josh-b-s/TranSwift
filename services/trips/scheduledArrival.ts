@@ -1,4 +1,5 @@
 import type { QueryableDb } from '@/services/db/queryableDb';
+import { getStopCalls } from '@/services/gtfs/core/stopTimeWindow';
 import { serviceDayStartMs } from '@/services/gtfs/departures/stopDepartures';
 
 // The planned arrival can be off by a late vehicle, so the scheduled one is searched for this far either side.
@@ -20,13 +21,10 @@ export async function scheduledArrivalMs(db: QueryableDb, tripPk: number, alight
     for (const offset of [0, -1]) {
         const dayStartMs = serviceDayStartMs(new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset));
         const aroundSec = Math.round((plannedMs - dayStartMs) / 1000);
-        // Searched by departure, which the stop_times index covers; a stop's dwell is seconds.
-        const [row] = await db.getAllAsync<{ arrival_sec: number }>(
-            `SELECT departure_sec - dwell_sec AS arrival_sec FROM stop_times
-             WHERE stop_pk = ? AND trip_pk = ? AND stop_sequence = ? AND departure_sec BETWEEN ? AND ?`,
-            [stop.stop_pk, tripPk, alightSequence, aroundSec - SEARCH_WINDOW_SEC, aroundSec + SEARCH_WINDOW_SEC],
-        );
-        if (row) return dayStartMs + row.arrival_sec * 1000;
+        // Searched by departure; a stop's dwell is seconds.
+        const calls = await getStopCalls(db, stop.stop_pk, aroundSec - SEARCH_WINDOW_SEC, aroundSec + SEARCH_WINDOW_SEC);
+        const row = calls.find(c => c.tripPk === tripPk && c.stopSequence === alightSequence);
+        if (row) return dayStartMs + (row.departureSec - row.dwellSec) * 1000;
     }
     return null;
 }

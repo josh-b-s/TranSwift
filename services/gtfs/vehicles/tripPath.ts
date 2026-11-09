@@ -1,5 +1,7 @@
 import type { QueryableDb } from '@/services/db/queryableDb';
 import type { LatLng } from '@/services/db/sqliteDb';
+import { decodeShape } from '@/services/gtfs/core/shapeCodec';
+import type { BlobBytes } from '@/services/gtfs/core/varint';
 import { trimShapeToStops } from './trimShape';
 
 // Coordinates are stored as integer degrees * 1e6 (see schema.sql).
@@ -38,14 +40,14 @@ export async function loadTripPath(db: QueryableDb, trip: TripRef): Promise<Trip
          ORDER BY ps.stop_sequence`,
         [row.pattern_pk],
     );
-    const shapeRows = row.shape_id === null ? [] : await db.getAllAsync<PointRow>(
-        `SELECT sh.shape_pt_lat AS lat, sh.shape_pt_lon AS lon
+    const [shape] = row.shape_id === null ? [] : await db.getAllAsync<{ points: BlobBytes }>(
+        `SELECT sh.points
          FROM shape_meta m
          JOIN shapes sh ON sh.shape_pk = m.shape_pk
-         WHERE m.shape_id = ? AND m.agency = ?
-         ORDER BY sh.shape_pt_sequence`,
+         WHERE m.shape_id = ? AND m.agency = ?`,
         [row.shape_id, row.agency],
     );
+    const shapeRows = shape ? decodeShape(shape.points) : [];
 
     const stops = stopRows.map(toLatLng);
     const shaped = shapeRows.length > 1;

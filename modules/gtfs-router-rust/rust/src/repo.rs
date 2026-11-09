@@ -17,6 +17,7 @@
 //! importer ever stops guaranteeing contiguous pks, these caches need to
 //! fall back to a HashMap instead.
 
+use crate::shape_codec::decode_shape;
 use std::collections::{HashMap, HashSet};
 use rusqlite::Connection;
 use crate::geo::{haversine_meters, LatLon};
@@ -538,26 +539,23 @@ pub fn get_shape_points(
     let pks: Vec<i64> = pk_to_key.keys().copied().collect();
     if pks.is_empty() { return Ok(HashMap::new()); }
 
-    let rows: Vec<(i64, i64, i64, i64)> = chunked_in_i64(
+    let blobs: Vec<(i64, Vec<u8>)> = chunked_in_i64(
         conn, &pks,
-        "SELECT shape_pk, shape_pt_lat, shape_pt_lon, shape_pt_sequence FROM shapes WHERE shape_pk IN",
-        "ORDER BY shape_pk, shape_pt_sequence",
-        |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
+        "SELECT shape_pk, points FROM shapes WHERE shape_pk IN",
+        "",
+        |r| Ok((r.get(0)?, r.get(1)?)),
     )?;
 
-    let mut out: HashMap<i64, Vec<(f64, f64, i64)>> = HashMap::new();
-    for (pk, lat, lon, seq) in rows {
-        out.entry(pk).or_default().push((lat as f64 / COORD_SCALE, lon as f64 / COORD_SCALE, seq));
-    }
     // Keyed by (agency, shape_id) — every current/planned caller only ever
     // has this key (from PatternMeta), never the internal shape_pk, so
     // re-keying here (using pk_to_key, which we already built above) saves
     // every caller from having to duplicate that lookup themselves.
     let mut result = HashMap::new();
-    for (pk, mut pts) in out {
-        pts.sort_by_key(|p| p.2);
+    for (pk, blob) in blobs {
+        let points = decode_shape(&blob).ok_or_else(|| rusqlite::Error::FromSqlConversionFailure(
+            1, rusqlite::types::Type::Blob, format!("shape {pk} is cut short").into()))?;
         if let Some(key) = pk_to_key.get(&pk) {
-            result.insert(key.clone(), pts.into_iter().map(|(lat, lon, _)| (lat, lon)).collect());
+            result.insert(key.clone(), points.into_iter().map(|(lat, lon)| (lat as f64 / COORD_SCALE, lon as f64 / COORD_SCALE)).collect());
         }
     }
     Ok(result)

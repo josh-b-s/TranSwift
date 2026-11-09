@@ -75,7 +75,7 @@ CREATE TABLE patterns (
 );
 
 -- pattern_pk deliberately NOT stored here: fully derivable via
--- trip_pk -> trips.pattern_pk. Nothing queries stop_times by
+-- trip_pk -> trips.pattern_pk. Nothing reads stop_time_chunks by
 -- pattern_pk directly (see gtfsRepo.ts's module doc).
 CREATE TABLE pattern_stops (
                                pattern_pk    INTEGER NOT NULL,
@@ -84,58 +84,23 @@ CREATE TABLE pattern_stops (
                                PRIMARY KEY (pattern_pk, stop_sequence)
 ) WITHOUT ROWID;
 
-CREATE TABLE stop_times (
-                            trip_pk       INTEGER NOT NULL,
-                            stop_sequence INTEGER NOT NULL,
-                            stop_pk       INTEGER NOT NULL,
-                            -- Arrival is departure_sec - dwell_sec; a stored 0 takes no space.
-                            dwell_sec     INTEGER NOT NULL DEFAULT 0,
-                            departure_sec INTEGER NOT NULL,
-    -- GTFS pickup_type/drop_off_type: 0 = regular
-    -- (default when blank/missing, per spec), 1 = no
-    -- service, 2 = must phone agency, 3 = must
-    -- coordinate with driver. The router only ever
-    -- treats 0 as usable for automatic trip
-    -- planning — 2/3 need advance human contact and
-    -- can't be relied on as a walk-up automatic
-    -- transfer point, so they're excluded from
-    -- routing the same as 1 (no service) is, not
-    -- just literal "no service" rows.
-                            pickup_type   INTEGER NOT NULL DEFAULT 0,
-                            drop_off_type INTEGER NOT NULL DEFAULT 0,
-    -- PERF NOTE: PK (and therefore physical row
-    -- order, since this is WITHOUT ROWID) was
-    -- `(trip_pk, stop_sequence)` — a leftover of
-    -- streaming stop_times.txt grouped per trip at
-    -- import time, not a deliberate read-path
-    -- choice. EVERY read of this table (gtfs router
-    -- crate, loader.rs) filters by `stop_pk` first —
-    -- `windowed_trip_discovery` and `stop_times_
-    -- fetch` both do `WHERE stop_pk IN (...) AND
-    -- ...`; nothing anywhere queries by trip_pk
-    -- alone. With the old key, `idx_st_stop_dep`
-    -- (stop_pk, departure_sec) could locate matching
-    -- rows, but fetching the rest of each row (
-    -- dwell_sec/pickup_type/drop_off_type) meant a
-    -- random jump into a table physically sorted by
-    -- TRIP — a scattered disk seek per matched row,
-    -- for every single search. Re-keyed so physical
-    -- order matches the actual read pattern: rows
-    -- for the same stop are now contiguous on disk,
-    -- so `stop_pk IN (...)` becomes a handful of
-    -- sequential range reads instead of thousands of
-    -- scattered ones, and satisfies `stop_pk` +
-    -- `departure_sec` range filtering directly from
-    -- the clustered table with no secondary-index
-    -- hop at all (see indexes.sql — idx_st_stop_dep
-    -- removed, now redundant with this ordering).
-    -- `trip_pk, stop_sequence` appended after
-    -- `departure_sec` purely to preserve the
-    -- original key's uniqueness guarantee (a trip
-    -- cannot revisit the same stop at the same
-    -- departure_sec) — not because anything reads
-    -- in that order.
-                            PRIMARY KEY (stop_pk, departure_sec, trip_pk, stop_sequence)
+-- Every scheduled stop call, packed per stop. A stop's calls are sorted by (departure_sec, trip_pk, stop_sequence)
+-- and cut into chunks of 64 rows; `data` holds one chunk as changes from the row before it (layout in
+-- stop_time_codec.rs). Each call carries trip_pk, stop_sequence and, when not 0, dwell_sec, pickup_type and
+-- drop_off_type. Arrival is departure - dwell. pickup_type and drop_off_type follow GTFS: 0 regular, 1 none,
+-- 2 phone the agency, 3 coordinate with the driver; the router only boards or alights on 0.
+--
+-- Sorted by stop first because every search reads by stop and time window, so a stop's chunks are contiguous.
+-- A window [lo, hi] at a stop needs the chunks with first_dep in [lo, hi] plus the last chunk that starts before
+-- lo, which may run into the window. SQL cannot read the blobs, so the router (loader.rs) and the app
+-- (services/gtfs/departures) decode them and do their own joining and filtering.
+CREATE TABLE stop_time_chunks (
+                                  stop_pk   INTEGER NOT NULL,
+                                  first_dep INTEGER NOT NULL,
+                                  -- 0, 1, 2... within the stop. Keeps keys unique when chunks share a first_dep.
+                                  chunk_idx INTEGER NOT NULL,
+                                  data      BLOB    NOT NULL,
+                                  PRIMARY KEY (stop_pk, first_dep, chunk_idx)
 ) WITHOUT ROWID;
 
 CREATE TABLE shape_meta (
@@ -144,13 +109,12 @@ CREATE TABLE shape_meta (
                             agency   INTEGER NOT NULL
 );
 
+-- One row per shape: its points in order, as changes from the previous point (layout in shape_codec.rs).
+-- Coordinates are in the same scaled-integer units as stops.stop_lat.
 CREATE TABLE shapes (
-                        shape_pk          INTEGER NOT NULL,
-                        shape_pt_lat      INTEGER NOT NULL,
-                        shape_pt_lon      INTEGER NOT NULL,
-                        shape_pt_sequence INTEGER NOT NULL,
-                        PRIMARY KEY (shape_pk, shape_pt_sequence)
-) WITHOUT ROWID;
+                        shape_pk INTEGER PRIMARY KEY,
+                        points   BLOB NOT NULL
+);
 
 -- Precomputed per-pattern hop times, aggregated across every trip of a
 -- pattern at import time (see import.rs's compute_pattern_hop_stats). One

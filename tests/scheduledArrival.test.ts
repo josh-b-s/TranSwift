@@ -5,6 +5,7 @@ import { REAL_INDEXES_SQL, REAL_SCHEMA_SQL } from './realSchema';
 import { scheduledArrivalMs } from '@/services/trips/scheduledArrival';
 import { serviceDayStartMs } from '@/services/gtfs/departures/stopDepartures';
 import type { QueryableDb } from '@/services/db/queryableDb';
+import { addStopCalls, call } from './timetableFixtures';
 
 let sqlite: Database.Database;
 let db: QueryableDb;
@@ -36,9 +37,10 @@ beforeEach(() => {
 });
 
 // Bravo is left a minute after it is reached, so its arrival has to come from the dwell.
-const addTimes = (departAlpha: number, arriveBravo: number) =>
-    sqlite.exec(`INSERT INTO stop_times (trip_pk, stop_sequence, stop_pk, dwell_sec, departure_sec) VALUES
-        (100, 1, 1, 0, ${departAlpha}), (100, 2, 2, 60, ${arriveBravo + 60})`);
+const addTimes = (departAlpha: number, arriveBravo: number) => {
+    addStopCalls(sqlite, 1, [call(departAlpha, 100, 1)]);
+    addStopCalls(sqlite, 2, [call(arriveBravo + 60, 100, 2, 60)]);
+};
 
 test('finds the scheduled arrival at the last stop for the planned time', async () => {
     addTimes(10 * 3600, 10 * 3600 + 300);

@@ -212,21 +212,6 @@ pub const WINDOW_DURATION_MARGIN_RELATIVE_PCT: f64 = 0.25;
 /// that widening loop rather than fetching an enormous window outright.
 pub const DURATION_WINDOW_MAX_SEC: f64 = 8.0 * 3600.0;
 
-/// A/B toggle for how `windowed_trip_discovery` filters to active trips:
-/// - `true` (current default, as of on-device A/B testing): stage
-///   `active_trip_pks` into a temp table and add `AND trip_pk IN (...)` to
-///   the SQL, so SQLite filters before rows ever cross into Rust.
-/// - `false`: fetch every stop_times row in the time window, filter each
-///   one against the Rust `active_trip_pks` HashSet.
-/// Flipped to `true` after matched on-device comparisons (Caulfield to
-/// Mornington/Werribee/Epping, same routes both settings): windowed_trip_
-/// discovery was consistently faster with SQL-side filtering (-19%, -9%,
-/// -22%), including one clean case where trips_for_candidates cost was
-/// identical between runs so the comparison wasn't confounded by cache
-/// warmth. Still only 3 routes worth of evidence — revisit if a wider
-/// range of corridors doesn't hold the same pattern.
-pub const USE_SQL_ACTIVE_TRIP_FILTER: bool = true;
-
 /// `max(floor, estimate * relative_pct)` — shared by the window and
 /// seed-path margin filters.
 pub fn margin_threshold(estimate: f64, floor: f64, relative_pct: f64) -> f64 {
@@ -281,16 +266,16 @@ pub const UNKNOWN_HEADWAY_WAIT_SEC: i64 = 20 * 60;
 /// constant.
 pub const ENABLE_SEED_PATH_MARGIN: bool = true;
 
-/// The stop_times fetch does one time-range lookup per corridor stop, and
-/// each lookup reads EVERY trip's departures at that stop before the trip
-/// filter runs. The allowed-stop set used to be the whole corridor (4.5-9.5k
+/// The stop_times fetch does one time-range lookup per corridor stop over
+/// stop_time_chunks, and each lookup decodes EVERY trip's departures at that
+/// stop before the trip filter runs. The allowed-stop set used to be the whole corridor (4.5-9.5k
 /// stops) although only ~1.4-4.8k of them ever had a candidate trip. true =
 /// fetch only stops that lie on a loaded (narrowed) pattern, plus the edge
 /// corridor's endpoints.
 pub const NARROW_FETCH_STOPS_TO_PATTERNS: bool = true;
 
 /// After warm-up JS calls `prewarm_timetable(now)`; a background thread
-/// reads the stop_times pages a search near that time will need through its
+/// reads the stop_time_chunks pages a search near that time will need through its
 /// own read-only connection, so the OS page cache is hot before the first
 /// search (the first search was ~2.4x slower per row than the second).
 pub const PREWARM_TIMETABLE: bool = true;
@@ -504,11 +489,3 @@ pub fn level_cap_for(max_transfers: u32) -> u32 {
     max_transfers.max(1) + 1
 }
 
-/// Diagnostic for the windowed stop_times fetch: after the real fetch, also
-/// count how many stop_times rows the SAME stop/window range holds BEFORE the
-/// active-trip filter (`count.stop_times_rows_scanned`), log how long that
-/// count takes (`diag.scan_count_ms`), and log SQLite's query plan for the
-/// fetch as `plan.*` labels. scanned >> returned means most of the fetch is
-/// spent walking trips of patterns we never loaded. Costs one extra range
-/// scan per search — set false when not investigating.
-pub const DIAG_FETCH_SCAN: bool = false;

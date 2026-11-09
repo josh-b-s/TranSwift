@@ -703,24 +703,6 @@ pub fn load_gtfs_index_for_trip(
     stage_ids(conn, "corridor_stop_pks", &corridor_stop_pks)?;
     mark!(t_stage_corridor, "stage_corridor_stop_pks");
 
-    // Surfaces which side of the settings::USE_SQL_ACTIVE_TRIP_FILTER A/B
-    // this run took, right in the stage-timings log line — not a real
-    // duration, just piggybacking on the existing (label, i64) timings
-    // format so it shows up as active_trip_filter_sql=1|0 without needing
-    // a second log statement.
-    timings.push(("active_trip_filter_sql".to_string(), crate::settings::USE_SQL_ACTIVE_TRIP_FILTER as i64));
-
-    // See settings::USE_SQL_ACTIVE_TRIP_FILTER's doc — this is the other
-    // half of the A/B: stage active_trip_pks too, and let SQLite filter on
-    // it directly instead of fetching every windowed row and checking a
-    // Rust HashSet per row.
-    if crate::settings::USE_SQL_ACTIVE_TRIP_FILTER {
-        let active_trip_pks_vec: Vec<i64> = active_trip_pks.iter().copied().collect();
-        let t_stage_active = Instant::now();
-        stage_ids(conn, "active_trip_pks_staged", &active_trip_pks_vec)?;
-        mark!(t_stage_active, "stage_active_trip_pks");
-    }
-
     // Per-widening-stage sub-timings — surfaced separately from the total
     // below so a slow discovery+fetch can be traced to EITHER "the first
     // (narrowest) window attempt is just slow" (query/index problem, same
@@ -761,67 +743,18 @@ pub fn load_gtfs_index_for_trip(
         windowed_trip_pks.clear();
         let mut rows_returned: i64 = 0;
 
-        // stop_pk IN (corridor_stop_pks) filters in SQL instead of after
-        // fetching: a trip's full stop sequence can run well outside a
-        // narrow corridor (system-wide route vs. a slice of it), so
-        // without this, every out-of-corridor stop would still get
-        // decoded into a StopTimeEntry and thrown away below.
-        //
-        // departure_sec BETWEEN matters because stop_times' PRIMARY KEY
-        // is (stop_pk, departure_sec, trip_pk, stop_sequence) — without
-        // this bound, the stop_pk IN (...) seek has to walk EVERY
-        // stop_time for each of potentially thousands of corridor stops
-        // across the whole day before trip_pk gets a chance to filter
-        // anything out. With it, each per-stop seek is a bounded range
-        // scan instead.
-        if crate::settings::USE_SQL_ACTIVE_TRIP_FILTER {
-            let mut stmt = conn.prepare(
-                "SELECT trip_pk, stop_pk, stop_sequence, departure_sec - dwell_sec, departure_sec, pickup_type, drop_off_type \
-                 FROM stop_times \
-                 WHERE stop_pk IN (SELECT id FROM corridor_stop_pks) \
-                 AND departure_sec BETWEEN ?1 AND ?2 \
-                 AND trip_pk IN (SELECT id FROM active_trip_pks_staged)"
-            )?;
-            let rows = stmt.query_map([window_lo, window_hi], |r| {
-                Ok((r.get::<_, i64>(0)?, r.get::<_, i64>(1)?, r.get::<_, i64>(2)?, r.get::<_, i64>(3)?, r.get::<_, i64>(4)?, r.get::<_, i64>(5)?, r.get::<_, i64>(6)?))
-            })?;
-            for row in rows {
-                rows_returned += 1;
-                let (trip_pk, stop_pk, stop_sequence, arrival_sec, departure_sec, pickup_type, drop_off_type) = row?;
-                if realtime.is_cancelled(trip_pk) { continue; }
-                windowed_trip_pks.insert(trip_pk);
-                let Some(&pattern_pk) = trip_pk_to_pattern.get(&trip_pk) else { continue };
-                let (arrival_sec, departure_sec, departure_delay_sec) = realtime.apply(trip_pk, stop_sequence, arrival_sec, departure_sec);
-                let (pickup_type, drop_off_type) = if realtime.is_skipped(trip_pk, stop_sequence) { (1, 1) } else { (pickup_type, drop_off_type) };
-                let entry = Rc::new(StopTimeEntry { trip_pk, pattern_pk, stop_sequence, arrival_sec, departure_sec, pickup_type, drop_off_type, departure_delay_sec });
-                stop_times_by_stop.entry(stop_pk).or_default().push(Rc::clone(&entry));
-                stop_times_by_stop_and_pattern.entry((stop_pk, pattern_pk)).or_default().push(Rc::clone(&entry));
-                stop_times_by_stop_and_trip.entry(stop_pk).or_default().insert(trip_pk, entry);
-            }
-        } else {
-            let mut stmt = conn.prepare(
-                "SELECT trip_pk, stop_pk, stop_sequence, departure_sec - dwell_sec, departure_sec, pickup_type, drop_off_type \
-                 FROM stop_times \
-                 WHERE stop_pk IN (SELECT id FROM corridor_stop_pks) \
-                 AND departure_sec BETWEEN ?1 AND ?2"
-            )?;
-            let rows = stmt.query_map([window_lo, window_hi], |r| {
-                Ok((r.get::<_, i64>(0)?, r.get::<_, i64>(1)?, r.get::<_, i64>(2)?, r.get::<_, i64>(3)?, r.get::<_, i64>(4)?, r.get::<_, i64>(5)?, r.get::<_, i64>(6)?))
-            })?;
-            for row in rows {
-                let (trip_pk, stop_pk, stop_sequence, arrival_sec, departure_sec, pickup_type, drop_off_type) = row?;
-                if !active_trip_pks.contains(&trip_pk) { continue; }
-                rows_returned += 1;
-                if realtime.is_cancelled(trip_pk) { continue; }
-                windowed_trip_pks.insert(trip_pk);
-                let Some(&pattern_pk) = trip_pk_to_pattern.get(&trip_pk) else { continue };
-                let (arrival_sec, departure_sec, departure_delay_sec) = realtime.apply(trip_pk, stop_sequence, arrival_sec, departure_sec);
-                let (pickup_type, drop_off_type) = if realtime.is_skipped(trip_pk, stop_sequence) { (1, 1) } else { (pickup_type, drop_off_type) };
-                let entry = Rc::new(StopTimeEntry { trip_pk, pattern_pk, stop_sequence, arrival_sec, departure_sec, pickup_type, drop_off_type, departure_delay_sec });
-                stop_times_by_stop.entry(stop_pk).or_default().push(Rc::clone(&entry));
-                stop_times_by_stop_and_pattern.entry((stop_pk, pattern_pk)).or_default().push(Rc::clone(&entry));
-                stop_times_by_stop_and_trip.entry(stop_pk).or_default().insert(trip_pk, entry);
-            }
+        for (stop_pk, call) in crate::windowed_calls::fetch_windowed_calls(conn, window_lo, window_hi)? {
+            rows_returned += 1;
+            let (trip_pk, stop_sequence) = (call.trip_pk, call.stop_sequence);
+            if !active_trip_pks.contains(&trip_pk) || realtime.is_cancelled(trip_pk) { continue; }
+            windowed_trip_pks.insert(trip_pk);
+            let Some(&pattern_pk) = trip_pk_to_pattern.get(&trip_pk) else { continue };
+            let (arrival_sec, departure_sec, departure_delay_sec) = realtime.apply(trip_pk, stop_sequence, call.departure_sec - call.dwell_sec, call.departure_sec);
+            let (pickup_type, drop_off_type) = if realtime.is_skipped(trip_pk, stop_sequence) { (1, 1) } else { (call.pickup_type, call.drop_off_type) };
+            let entry = Rc::new(StopTimeEntry { trip_pk, pattern_pk, stop_sequence, arrival_sec, departure_sec, pickup_type, drop_off_type, departure_delay_sec });
+            stop_times_by_stop.entry(stop_pk).or_default().push(Rc::clone(&entry));
+            stop_times_by_stop_and_pattern.entry((stop_pk, pattern_pk)).or_default().push(Rc::clone(&entry));
+            stop_times_by_stop_and_trip.entry(stop_pk).or_default().insert(trip_pk, entry);
         }
         rows_returned_total = rows_returned;
         mark!(t_stage, format!("windowed_discovery_and_fetch.attempt{stages_tried}_window{window_sec}s_trips{}_rows{}", windowed_trip_pks.len(), rows_returned));
@@ -829,34 +762,6 @@ pub fn load_gtfs_index_for_trip(
     }
     mark!(t, "windowed_discovery_and_fetch");
 
-    if crate::settings::DIAG_FETCH_SCAN {
-        let last_window = window_stages[(stages_tried as usize).saturating_sub(1).min(window_stages.len() - 1)];
-        let lo = (depart_sec_of_day - WINDOW_BOARD_BUFFER_SEC).max(0);
-        let hi = depart_sec_of_day + last_window;
-        let t_diag = Instant::now();
-        let scanned: rusqlite::Result<i64> = conn.query_row(
-            "SELECT COUNT(*) FROM stop_times \
-             WHERE stop_pk IN (SELECT id FROM corridor_stop_pks) \
-             AND departure_sec BETWEEN ?1 AND ?2",
-            [lo, hi], |r| r.get(0));
-        if let Ok(n) = scanned {
-            timings.push(("count.stop_times_rows_scanned".to_string(), n));
-            timings.push(("diag.scan_count_ms".to_string(), t_diag.elapsed().as_millis() as i64));
-        }
-        // Query plan of the real fetch, one `plan.<detail>` label per plan row.
-        if let Ok(mut stmt) = conn.prepare(
-            "EXPLAIN QUERY PLAN SELECT trip_pk, stop_pk, stop_sequence, departure_sec - dwell_sec, departure_sec, pickup_type, drop_off_type \
-             FROM stop_times \
-             WHERE stop_pk IN (SELECT id FROM corridor_stop_pks) \
-             AND departure_sec BETWEEN ?1 AND ?2 \
-             AND trip_pk IN (SELECT id FROM active_trip_pks_staged)") {
-            if let Ok(rows) = stmt.query_map([lo, hi], |r| r.get::<_, String>(3)) {
-                for (i, d) in rows.flatten().enumerate() {
-                    timings.push((format!("plan.{i}.{}", d.replace(' ', "_")), 0));
-                }
-            }
-        }
-    }
     timings.push(("windowed_trip_discovery.stages_tried".to_string(), stages_tried));
     timings.push(("count.windowed_trip_pks".to_string(), windowed_trip_pks.len() as i64));
     timings.push(("count.stop_times_rows_returned".to_string(), rows_returned_total));

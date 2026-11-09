@@ -23,6 +23,10 @@ mod realtime;
 mod raptor;
 mod verifier;
 mod fxhash;
+mod varint;
+mod shape_codec;
+mod stop_time_codec;
+mod windowed_calls;
 
 use std::collections::HashMap;
 use std::future::Future;
@@ -469,7 +473,7 @@ impl GtfsRouterEngine {
         }
     }
 
-    /// Fire-and-forget: pre-reads the stop_times pages a search departing
+    /// Fire-and-forget: pre-reads the stop_time_chunks pages a search departing
     /// near `depart_sec_of_day` will touch, on a background thread with its
     /// own read-only connection (WAL readers don't block the search
     /// connection). Purely warms the OS page cache — the first search after
@@ -486,11 +490,11 @@ impl GtfsRouterEngine {
             let _ = conn.execute_batch("PRAGMA mmap_size = 268435456; PRAGMA cache_size = -8192;");
             // Same access pattern as the real fetch (per-stop seek + time
             // range), so exactly the pages a search will need get touched.
-            // SUM over a non-key column forces the row payload to be read.
+            // SUM over the blob length forces the chunk rows to be read.
             let _ = conn.query_row(
-                "SELECT COALESCE(SUM(dwell_sec), 0) FROM stop_times \
+                "SELECT COALESCE(SUM(length(data)), 0) FROM stop_time_chunks \
                  WHERE stop_pk IN (SELECT stop_pk FROM stops) \
-                 AND departure_sec BETWEEN ?1 AND ?2",
+                 AND first_dep BETWEEN ?1 AND ?2",
                 [lo, hi],
                 |r| r.get::<_, i64>(0),
             );
@@ -514,10 +518,10 @@ impl GtfsRouterEngine {
     /// ~12-14s from-scratch cost the TS version documents, paid once).
     /// Safe to call again after a feed update; it re-opens and rebuilds.
     ///
-    /// PERF NOTE: `stop_times`'s indexing/clustering is now entirely a
-    /// schema-level property of the DB the importer produces (WITHOUT
-    /// ROWID, keyed by `(stop_pk, departure_sec, trip_pk, stop_sequence)`
-    /// — see gtfs-importer's schema.sql) rather than something warm_up
+    /// PERF NOTE: the timetable's clustering is entirely a schema-level
+    /// property of the DB the importer produces (`stop_time_chunks` is WITHOUT
+    /// ROWID, keyed by `(stop_pk, first_dep, chunk_idx)` — see
+    /// gtfs-importer's schema.sql) rather than something warm_up
     /// patches in at runtime, so there's no first-run index-build cost
     /// here to worry about any more. If a `warm_up` call against a given
     /// DB file is surprisingly slow, check `warm_up_timings()`'s
@@ -607,14 +611,14 @@ impl GtfsRouterEngine {
         mark!(t, "open_connection");
 
         // PERF NOTE: `cache_size = -8000` is only an 8MB page cache — trivial
-        // against an ~11.86M-row `stop_times` table, so every
+        // against the ~37 MB `stop_time_chunks` table, so every
         // windowed_trip_discovery/stop_times_fetch query was mostly paying
         // for disk I/O SQLite would otherwise have cached. Bumped to 128MB
         // (still small next to typical phone RAM) and added `mmap_size` so
         // the OS page cache can serve pages SQLite's own cache evicted,
         // instead of round-tripping through read() syscalls. `temp_store =
         // MEMORY` keeps the TEMP TABLEs `stage_ids` creates (corridor_stop_
-        // pks / active_trip_pks_staged / windowed_trip_pks) off disk too —
+        // pks / windowed_trip_pks) off disk too —
         // by default SQLite may spill temp tables to a file, which would
         // otherwise silently tax every search's staging step.
         let t = Instant::now();

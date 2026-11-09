@@ -3,10 +3,12 @@ use rusqlite::{Connection, params};
 use crate::source::{find_all_gtfs_sources, GtfsSource};
 use crate::csv_util::parse_csv_map;
 use crate::schema::{GTFS_SCHEMA_SQL, GTFS_INDEXES_SQL, GTFS_SCHEMA_VERSION};
+use crate::shape_codec::encode_shape;
+use crate::stop_time_codec::{encode_chunk, StopTimeRow, CHUNK_ROWS};
 
 const ALL_TABLES: &[&str] = &[
     "stops", "stops_rtree", "routes", "calendar", "calendar_dates", "trips", "patterns",
-    "pattern_stops", "stop_times", "shape_meta", "shapes",
+    "pattern_stops", "stop_time_chunks", "shape_meta", "shapes",
     "pattern_hops", "pattern_headway",
     "stop_platforms", "station_nodes", "pathways", "levels",
 ];
@@ -193,7 +195,8 @@ fn pack_coord(v: &str) -> Option<i64> {
 const MIN_SHAPE_POINT_GAP_M: f64 = 10.0;
 const METRES_PER_COORD_UNIT: f64 = 0.11132; // one 1e-6 degree of latitude
 
-struct ShapeCursor { pk: i64, kept: (i64, i64), skipped: Option<(i64, i64, i64)> }
+/// `points` are the kept (lat, lon, sequence) so far; `skipped` is the latest point dropped since the last kept one.
+struct ShapeCursor { pk: i64, kept: (i64, i64), skipped: Option<(i64, i64, i64)>, points: Vec<(i64, i64, i64)> }
 
 fn metres_apart(a: (i64, i64), b: (i64, i64)) -> f64 {
     let lon_scale = (a.0 as f64 / 1_000_000.0).to_radians().cos();
@@ -456,62 +459,42 @@ fn process_agency(
         progress.on_progress(format!("agency {agency_id} · trips"), count, count)?;
     }
 
-    // ── stop_times (insert) — the big one, ~11.8M rows across the feed ──
+    // ── stop_time_chunks (insert) — the big one, ~12.3M calls across the feed ──
     //
-    // PERF NOTE: stop_times' PRIMARY KEY (and therefore physical row order,
-    // since it's WITHOUT ROWID) is `(stop_pk, departure_sec, trip_pk,
-    // stop_sequence)` — see schema.sql's note on why. `trip_stop_times` is
-    // grouped by trip (that's how stop_times.txt streams in), which is a
-    // COMPLETELY different order. Inserting in trip order against a
-    // stop_pk-keyed table would mean every single insert lands at a random
-    // point in the B-tree instead of appending at the end — each one a
-    // potential page split, for millions of rows. Collected into one flat
-    // Vec and sorted into PK order first so the actual `INSERT` pass below
-    // is a sequential append, same as the OLD trip-ordered key got "for
-    // free" from stop_times.txt's natural order — the sort is a one-time,
-    // cache-friendly pass over small structs, far cheaper than paying
-    // random-insertion page-split cost 11.8M times.
-    //
-    // Also switched from one `execute()` per row to batched multi-value
-    // `INSERT ... VALUES (?,?,?,?,?,?,?),(...),...` (same batching already
-    // used for staging in the router crate's `stage_ids`) — cuts several
-    // million single-row round-trips down to a few thousand statements.
+    // `trip_stop_times` is grouped by trip, which is how stop_times.txt streams in. The chunks are cut per
+    // stop, so every call goes into one flat Vec and is sorted into (stop_pk, departure_sec, trip_pk,
+    // stop_sequence) order first; that also makes the inserts a sequential append in the table's key order.
     {
-        struct FlatStopTime { trip_pk: i64, stop_sequence: i64, stop_pk: i64, arrival_sec: i64, departure_sec: i64, pickup_type: i64, drop_off_type: i64 }
-
-        let mut flat: Vec<FlatStopTime> = Vec::new();
+        let mut flat: Vec<(i64, StopTimeRow)> = Vec::new();
         for (trip_id, stops) in &trip_stop_times {
             if !trip_to_pattern_pk.contains_key(trip_id) { continue; } // gates on membership only, same as both TS versions
             let trip_pk = trip_meta[trip_id].pk;
             for s in stops {
-                flat.push(FlatStopTime {
-                    trip_pk, stop_sequence: s.stop_sequence, stop_pk: s.stop_pk,
-                    arrival_sec: s.arrival_sec, departure_sec: s.departure_sec,
-                    pickup_type: s.pickup_type, drop_off_type: s.drop_off_type,
-                });
+                flat.push((s.stop_pk, StopTimeRow {
+                    departure_sec: s.departure_sec, trip_pk, stop_sequence: s.stop_sequence,
+                    dwell_sec: s.departure_sec - s.arrival_sec, pickup_type: s.pickup_type, drop_off_type: s.drop_off_type,
+                }));
             }
         }
-        flat.sort_unstable_by_key(|r| (r.stop_pk, r.departure_sec, r.trip_pk, r.stop_sequence));
+        flat.sort_unstable_by_key(|(stop_pk, r)| (*stop_pk, r.departure_sec, r.trip_pk, r.stop_sequence));
 
-        const STOP_TIMES_BATCH_SIZE: usize = 140; // 7 cols x 140 rows = 980 bound params, under SQLite's 999-per-statement default (SQLITE_LIMIT_VARIABLE_NUMBER) — 400 here would have been 2800 and simply failed at execute() time.
+        let mut ins = conn.prepare("INSERT INTO stop_time_chunks (stop_pk,first_dep,chunk_idx,data) VALUES (?,?,?,?)")?;
         let mut count = 0u64;
-        for chunk in flat.chunks(STOP_TIMES_BATCH_SIZE) {
-            let placeholders = chunk.iter().map(|_| "(?,?,?,?,?,?,?)").collect::<Vec<_>>().join(",");
-            let sql = format!(
-                "INSERT INTO stop_times (trip_pk,stop_sequence,stop_pk,dwell_sec,departure_sec,pickup_type,drop_off_type) VALUES {placeholders}"
-            );
-            let mut ins = conn.prepare_cached(&sql)?;
-            let mut params_flat: Vec<i64> = Vec::with_capacity(chunk.len() * 7);
-            for r in chunk {
-                params_flat.extend_from_slice(&[r.trip_pk, r.stop_sequence, r.stop_pk, r.departure_sec - r.arrival_sec, r.departure_sec, r.pickup_type, r.drop_off_type]);
+        let mut start = 0;
+        while start < flat.len() {
+            let stop_pk = flat[start].0;
+            let end = start + flat[start..].iter().take_while(|(pk, _)| *pk == stop_pk).count();
+            for (chunk_idx, chunk) in flat[start..end].chunks(CHUNK_ROWS).enumerate() {
+                let first_dep = chunk[0].1.departure_sec;
+                let data = encode_chunk(first_dep, chunk.iter().map(|(_, r)| r));
+                ins.execute(params![stop_pk, first_dep, chunk_idx as i64, data])?;
+                let prev_count = count;
+                count += chunk.len() as u64;
+                if count / 200_000 != prev_count / 200_000 {
+                    progress.on_progress(format!("agency {agency_id} · stop_times"), count, 0)?;
+                }
             }
-            let param_refs: Vec<&dyn rusqlite::ToSql> = params_flat.iter().map(|v| v as &dyn rusqlite::ToSql).collect();
-            ins.execute(param_refs.as_slice())?;
-            let prev_count = count;
-            count += chunk.len() as u64;
-            if count / 200_000 != prev_count / 200_000 {
-                progress.on_progress(format!("agency {agency_id} · stop_times"), count, 0)?;
-            }
+            start = end;
         }
         progress.on_progress(format!("agency {agency_id} · stop_times"), count, count)?;
     }
@@ -545,7 +528,7 @@ fn process_agency(
         let bytes = source.file("shapes.txt");
         if !bytes.is_empty() {
             let mut ins_meta = conn.prepare("INSERT INTO shape_meta (shape_pk,shape_id,agency) VALUES (?,?,?)")?;
-            let mut ins_shape = conn.prepare("INSERT INTO shapes (shape_pk,shape_pt_lat,shape_pt_lon,shape_pt_sequence) VALUES (?,?,?,?)")?;
+            let mut ins_shape = conn.prepare("INSERT INTO shapes (shape_pk,points) VALUES (?,?)")?;
             let mut cursors: HashMap<String, ShapeCursor> = HashMap::new();
 
             let mut rdr = csv::ReaderBuilder::new().has_headers(true).flexible(true).from_reader(bytes.as_slice());
@@ -569,12 +552,11 @@ fn process_agency(
                         None => {
                             let pk = next_shape_pk; next_shape_pk += 1;
                             ins_meta.execute(params![pk, shape_id, agency_id])?;
-                            ins_shape.execute(params![pk, lat, lon, seq])?;
-                            cursors.insert(shape_id.to_string(), ShapeCursor { pk, kept: (lat, lon), skipped: None });
+                            cursors.insert(shape_id.to_string(), ShapeCursor { pk, kept: (lat, lon), skipped: None, points: vec![(lat, lon, seq)] });
                             stored += 1;
                         }
                         Some(c) if metres_apart(c.kept, (lat, lon)) >= MIN_SHAPE_POINT_GAP_M => {
-                            ins_shape.execute(params![c.pk, lat, lon, seq])?;
+                            c.points.push((lat, lon, seq));
                             c.kept = (lat, lon);
                             c.skipped = None;
                             stored += 1;
@@ -584,12 +566,17 @@ fn process_agency(
                     if stored % 200_000 == 0 { progress.on_progress(format!("agency {agency_id} · shapes"), stored, 0)?; }
                 }
             }
-            // The last point of a shape is always kept so the line reaches the terminus.
-            for c in cursors.values() {
-                if let Some((lat, lon, seq)) = c.skipped {
-                    ins_shape.execute(params![c.pk, lat, lon, seq])?;
+            // The last point of a shape is always kept so the line reaches the terminus. One row per shape, in key order.
+            let mut shapes: Vec<ShapeCursor> = cursors.into_values().collect();
+            shapes.sort_unstable_by_key(|c| c.pk);
+            for mut c in shapes {
+                if let Some(last) = c.skipped {
+                    c.points.push(last);
                     stored += 1;
                 }
+                c.points.sort_by_key(|&(_, _, seq)| seq);
+                let points: Vec<(i64, i64)> = c.points.iter().map(|&(lat, lon, _)| (lat, lon)).collect();
+                ins_shape.execute(params![c.pk, encode_shape(&points)])?;
             }
             progress.on_progress(format!("agency {agency_id} · shapes"), stored, stored)?;
         }
