@@ -2,22 +2,12 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, FlatList, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useThemeStyle } from '@/constants/themes';
-import ImportProgressCard from '@/components/ui/ImportProgressCard';
 import { countriesOf, filterFeeds } from '@/services/gtfs/catalog/catalogFilter';
 import type { CatalogFeed } from '@/services/gtfs/catalog/catalogParse';
 import { loadCatalog, type CatalogResult } from '@/services/gtfs/catalog/feedCatalog';
-import { importCatalogFeed } from '@/services/gtfs/import/gtfsCatalogImport';
-import { DuplicateFeedError } from '@/services/gtfs/import/gtfsDbRegistry';
-import { CancelledError } from '@/services/gtfs/import/cancelledError';
+import { startCatalogImport, useCatalogImportJob } from '@/services/gtfs/import/catalogImportJob';
 import { fetchZipSize } from '@/services/gtfs/import/gtfsDownload';
-import {
-    createProgressTracker,
-    downloadProgress,
-    formatMegabytes,
-    type ImportProgress,
-} from '@/services/gtfs/import/importProgress';
-
-type Busy = { label: string; progress: ImportProgress } | null;
+import { formatMegabytes } from '@/services/gtfs/import/importProgress';
 
 const ACCENT = '#2563eb';
 
@@ -26,16 +16,13 @@ export default function BrowseFeeds() {
     const router = useRouter();
     const { feedId, replaceId } = useLocalSearchParams<{ feedId?: string; replaceId?: string }>();
     const openedFeed = useRef(false);
-    const abortRef = useRef<AbortController | null>(null);
-    // Set while a dropped download waits for the user to continue or give up.
-    const answerRef = useRef<((again: boolean) => void) | null>(null);
-    const [stalled, setStalled] = useState(false);
+    const importing = useCatalogImportJob() !== null;
     const [catalog, setCatalog] = useState<CatalogResult | null>(null);
     const [loadError, setLoadError] = useState('');
     const [refreshing, setRefreshing] = useState(false);
     const [query, setQuery] = useState('');
     const [country, setCountry] = useState<string | null>(null);
-    const [busy, setBusy] = useState<Busy>(null);
+    const [checking, setChecking] = useState(false);
     const [error, setError] = useState('');
 
     const load = useCallback(async (force: boolean) => {
@@ -71,7 +58,7 @@ export default function BrowseFeeds() {
 
     async function handlePick(feed: CatalogFeed) {
         setError('');
-        setBusy({ label: feed.provider, progress: { fraction: 0, label: 'Checking file size', etaSeconds: null } });
+        setChecking(true);
         let size: number | null;
         try {
             size = await fetchZipSize(feed.zipUrl);
@@ -79,7 +66,7 @@ export default function BrowseFeeds() {
             setError(`Couldn't reach the feed: ${String(err)}`);
             return;
         } finally {
-            setBusy(null);
+            setChecking(false);
         }
 
         Alert.alert(
@@ -96,65 +83,23 @@ export default function BrowseFeeds() {
         );
     }
 
-    function askToContinue(): Promise<boolean> {
-        setStalled(true);
-        return new Promise((resolve) => {
-            answerRef.current = (again) => {
-                answerRef.current = null;
-                setStalled(false);
-                resolve(again);
-            };
-        });
-    }
-
-    function cancelImport() {
-        abortRef.current?.abort();
-        answerRef.current?.(false);
-    }
-
-    async function runImport(feed: CatalogFeed) {
-        const track = createProgressTracker();
-        setBusy({ label: feed.provider, progress: downloadProgress(0, 0) });
-        const abort = new AbortController();
-        abortRef.current = abort;
-        try {
-            await importCatalogFeed(
-                feed,
-                (written, total) => setBusy({ label: feed.provider, progress: downloadProgress(written, total) }),
-                (p) => setBusy({ label: feed.provider, progress: track(p) }),
-                replaceId,
-                abort.signal,
-                askToContinue,
-            );
-            if (router.canGoBack()) router.back();
-            else router.replace('/settings');
-        } catch (err) {
-            if (err instanceof CancelledError) return;
-            if (err instanceof DuplicateFeedError) {
-                if (replaceId) Alert.alert('Already up to date', "The provider hasn't published a newer version yet.");
-                else Alert.alert('Already imported', err.message);
-            } else {
-                setError(`Import failed: ${String(err)}`);
-            }
-        } finally {
-            abortRef.current = null;
-            answerRef.current = null;
-            setStalled(false);
-            setBusy(null);
-        }
+    function runImport(feed: CatalogFeed) {
+        // Progress shows on the feed list, where the new database will appear.
+        startCatalogImport(feed, replaceId);
+        router.dismissTo('/settings/gtfs');
     }
 
     function renderFeed({ item }: { item: CatalogFeed }) {
         const place = [item.municipality, item.subdivision, item.country].filter(Boolean).join(', ');
         return (
             <Pressable
-                disabled={busy !== null}
+                disabled={checking || importing}
                 onPress={() => handlePick(item)}
                 style={{
                     padding: 16,
                     borderRadius: 16,
                     backgroundColor: theme.backgroundColor,
-                    opacity: busy ? 0.5 : 1,
+                    opacity: checking || importing ? 0.5 : 1,
                 }}
             >
                 <Text style={{ color: theme.color, fontSize: 16, fontWeight: '600' }}>{item.provider}</Text>
@@ -212,16 +157,6 @@ export default function BrowseFeeds() {
                 <Text style={{ color: theme.color, opacity: 0.5, fontSize: 12 }}>
                     Couldn't refresh the list. Showing the copy from {new Date(catalog.fetchedAt).toLocaleDateString()}.
                 </Text>
-            )}
-            {busy && (
-                <ImportProgressCard
-                    fileName={busy.label}
-                    progress={stalled
-                        ? { ...busy.progress, label: 'Connection lost', detail: 'What was downloaded is kept.' }
-                        : busy.progress}
-                    onCancel={cancelImport}
-                    onContinue={stalled ? () => answerRef.current?.(true) : undefined}
-                />
             )}
             {!!error && <Text style={{ color: '#ef4444', fontSize: 12 }}>{error}</Text>}
         </View>

@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useDispatch, useSelector } from 'react-redux';
@@ -15,6 +15,13 @@ import { loadRealtimeEndpoints } from '@/services/gtfs/catalog/feedCatalog';
 import { describeAuth, forgetAuthFailure } from '@/services/gtfs/realtime/authFailure';
 import { createProgressTracker, type ImportProgress } from '@/services/gtfs/import/importProgress';
 import { CancelledError } from '@/services/gtfs/import/cancelledError';
+import {
+    cancelCatalogImport,
+    clearCatalogImportNotice,
+    continueCatalogImport,
+    useCatalogImportJob,
+    useCatalogImportNotice,
+} from '@/services/gtfs/import/catalogImportJob';
 import * as FileSystem from 'expo-file-system/legacy';
 import { pickGtfsZip, importZipAsNewDatabase } from '@/services/gtfs/import/gtfsDbImport';
 import {
@@ -60,6 +67,8 @@ export default function GtfsData() {
     const [switchingId, setSwitchingId] = useState<string | null>(null);
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [error, setError] = useState('');
+    const catalogJob = useCatalogImportJob();
+    const catalogNotice = useCatalogImportNotice();
 
     // Inline rename state: editingId names which row currently shows a
     // TextInput instead of static text, mirroring preferences.tsx's
@@ -87,6 +96,16 @@ export default function GtfsData() {
             refresh();
         }, [refresh]),
     );
+
+    // A catalog download started on Browse Feeds finishes here, so list its database once it has.
+    const hadJob = useRef(false);
+    useEffect(() => {
+        if (hadJob.current && !catalogJob) refresh();
+        hadJob.current = catalogJob !== null;
+    }, [catalogJob, refresh]);
+
+    // Leaving the screen with a notice up would show it again next time.
+    useEffect(() => clearCatalogImportNotice, []);
 
     async function handleAddZip() {
         setError('');
@@ -259,7 +278,7 @@ export default function GtfsData() {
         );
     }
 
-    const busy = importState.busy || switchingId !== null || deletingId !== null;
+    const busy = importState.busy || catalogJob !== null || switchingId !== null || deletingId !== null;
 
     return (
         <ScrollView style={{ flex: 1, backgroundColor: theme.surfaceColor }} contentContainerStyle={{ padding: 16, gap: 12 }}>
@@ -278,7 +297,7 @@ export default function GtfsData() {
                 />
             </SettingsSection>
 
-            {loaded && databases.length === 0 && !importState.busy && (
+            {loaded && databases.length === 0 && !importState.busy && !catalogJob && (
                 <Text style={{ color: theme.color, opacity: 0.5, fontSize: 13, fontStyle: 'italic' }}>
                     No feeds imported yet. Add one below.
                 </Text>
@@ -469,6 +488,25 @@ export default function GtfsData() {
                     onCancel={() => abortRef.current?.abort()}
                 />
             )
+            )}
+
+            {catalogJob && (
+                <ImportProgressCard
+                    fileName={catalogJob.label}
+                    progress={catalogJob.stalled
+                        ? { ...catalogJob.progress, label: 'Connection lost', detail: 'What was downloaded is kept.' }
+                        : catalogJob.progress}
+                    onCancel={cancelCatalogImport}
+                    onContinue={catalogJob.stalled ? continueCatalogImport : undefined}
+                />
+            )}
+
+            {catalogNotice && (
+                <View style={{ padding: 12, borderRadius: 12, backgroundColor: theme.backgroundColor }}>
+                    <Text style={{ color: catalogNotice.kind === 'error' ? '#ef4444' : theme.color, fontSize: 12 }}>
+                        {catalogNotice.message}
+                    </Text>
+                </View>
             )}
 
             {!!error && (
